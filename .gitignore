@@ -1,0 +1,7 @@
+.Rproj.user
+.Rhistory
+data/*
+data-raw/*
+analysis/*.html
+notrack/*
+analysis/trialerror/*
