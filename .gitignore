@@ -3,5 +3,7 @@
 data/*
 data-raw/*
 analysis/*.html
-notrack/*
+analysis/*.csl
 analysis/trialerror/*
+notrack/*
+
