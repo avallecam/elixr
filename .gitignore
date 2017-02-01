@@ -3,6 +3,7 @@
 data/*
 data-raw/*
 analysis/*.html
+analysis/*.nb.html
 analysis/*.csl
 analysis/trialerror/*
 notrack/*
