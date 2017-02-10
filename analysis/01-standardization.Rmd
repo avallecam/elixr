@@ -22,7 +22,7 @@ csl: american-medical-association.csl
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, # CHANGE TO FALSE IN PDF_DOCUMENTS
                       warning = FALSE) 
-knitr::opts_knit$set(root.dir = gsub("/analysis","",getwd()))
+knitr::opts_knit$set(root.dir = '../.') #gsub("/analysis","",getwd())
 #getwd()
 options(width = 110) # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
@@ -455,8 +455,11 @@ paramALL <- rbind(paramALL, t(data.frame(coefficients(wb11.model.BX)[3:6])))
 
 ```
 
+# save .Rds
 ```{r}
 saveRDS(wb11_Ab, "data/01-output-raw.rds")
+saveRDS(paramALL, "data/01-parameters.rds")
+saveRDS(Pf.ID, "data/01-dilutions.rds")
 ```
 
 

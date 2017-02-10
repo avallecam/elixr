@@ -22,7 +22,7 @@ csl: american-medical-association.csl
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, # CHANGE TO FALSE IN PDF_DOCUMENTS
                       warning = FALSE) 
-knitr::opts_knit$set(root.dir = gsub("/analysis","",getwd()))
+knitr::opts_knit$set(root.dir = '../.') #gsub("/analysis","",getwd())
 #getwd()
 options(width = 110) # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
@@ -85,12 +85,13 @@ library("ggplot2")
 library("Rmisc")        #multiploting ggplots
 ```
 
-# Covariates
-
+# read .Rds
 ```{r}
-final <- readRDS("data/standarized-tidy.rds")
-finalDB <- readRDS("data/standarized-untidy.rds")
+final <- readRDS("data/02-standard-tidy.rds")
+finalDB <- readRDS("data/02-standard-untidy.rds")
 ```
+
+# Covariates
 
 ## NEW DB comparison
 
@@ -187,7 +188,9 @@ for(i in 1:length(finalEXCL)) {
 #dim(finalDB) #-9
 ```
     
-```{r}
+```{r, eval=FALSE}
+## NOW in false due to NO 'NA' RETRIEVING in 02-data-filtering.Rmd
+
 ## ADD 03 automatically rejected samples as NaN (mean.OD below lower.limit)
 #head(finalDB)
 #tail(finalDB)
@@ -195,7 +198,9 @@ for(i in 1:length(finalEXCL)) {
 finalDB <- rbind(finalDB, 
                  data.frame(ID= postEXCL,
                             Ab.unit.Pfal= NaN,
-                            Ab.unit.Pviv= NaN))
+                            Ab.unit.Pviv= NaN,
+                            mean.OD.Pfal= NaN,
+                            mean.OD.Pviv= NaN))
 finalDB$ID <- factor(finalDB$ID)
 #dim(finalDB) # +3
 #tail(finalDB)
@@ -207,8 +212,13 @@ finalDB$ID <- factor(finalDB$ID)
 rownames(post) <- NULL
 rownames(finalDB) <- NULL
 
+finalDBcov <- merge(post, finalDB, by.x = "id", by.y = "ID")
+```
+
+```{r, eval=FALSE}
+## NOW in FALSE due to NO 'NA' RETRIEVING in 02-data-filtering.Rmd
+
 finalDBcov <- data.frame()
-# finalDBcov <- merge(post, finalDB, by.x = "id", by.y = "ID")
 for(i in 1:length(post$id)) {
   finalDBcov <- rbind(finalDBcov,
                       cbind(post[post$id==post$id[i],],
@@ -218,11 +228,11 @@ for(i in 1:length(post$id)) {
 #dim(finalDBcov)
 ```
 
+
 The `finalDBcov` output is write as `Standardized_ELISA_ALL_COVARIATES.csv`:
 ```{r}
 str(finalDBcov)
 summary(finalDBcov)
-write.csv(format(finalDBcov[,-11], scientific=FALSE, digits=2), "data/Standardized_ELISA_ALL_COVARIATES.csv")# WITHOUT LABELING!!
 ```
 
 The `finalDBcov` data.frame is ready to re-run the seropositivity analysis.
@@ -367,4 +377,15 @@ str(final_allcov)
 summary(final_allcov)
 ```
 
+# EXPORT
+```{r}
+write.csv(format(finalDBcov[,-11], scientific=FALSE, digits=2), "data/Standardized_ELISA_ALL_COVARIATES.csv")# WITHOUT LABELING!!
+```
 
+# save .Rds
+```{r}
+saveRDS(finalDBcov, "data/03-standard-untidy-cov.rds")
+saveRDS(final_allcov, "data/03-standard-tidy-cov.rds")
+```
+
+# References

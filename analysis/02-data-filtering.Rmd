@@ -22,7 +22,7 @@ csl: american-medical-association.csl
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, # CHANGE TO FALSE IN PDF_DOCUMENTS
                       warning = FALSE) 
-knitr::opts_knit$set(root.dir = gsub("/analysis","",getwd()))
+knitr::opts_knit$set(root.dir = '../.') #gsub("/analysis","",getwd())
 #getwd()
 options(width = 110) # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
@@ -85,12 +85,14 @@ library("ggplot2")
 library("Rmisc")        #multiploting ggplots
 ```
 
-# Results
-
+# read .Rds
 ```{r}
 wb11_Ab <- readRDS("data/01-output-raw.rds")
 ```
 
+***
+
+# Results
 
 ```{r}
 # to FREEZE and ANALYSE
@@ -613,10 +615,115 @@ abline(h=20, v=0.25, lty=2, col=2)
 #     main="Heteroskedasticity?") 
 ```
 
-## EXPORT
+
+
+## DISTRIBUTIONS
+
+### OD distribution
+```{r, fig.align='center', fig.height=9, fig.width=9}
+par(mfrow=c(3,3))
+
+my <- max(hist(wb11_Ab$mean.OD, plot = F)$counts, na.rm=TRUE)
+
+hist(wb11_Ab$mean.OD, xlim = c(0,1.4), 
+     main = "mean.OD Histogram", xlab = "mean.OD")
+plot(density(na.omit(wb11_Ab$mean.OD)), 
+     main = "mean.OD Density Plot", xlab = "mean.OD")#, ylim = c(0,my)
+qqnorm(wb11_Ab$mean.OD); qqline(wb11_Ab$mean.OD)
+
+hist(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD, ylim = c(0,my), xlim = c(0,1.4), 
+     main = "P.vivax", xlab = "mean.OD")
+plot(density(na.omit(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD)),
+     main = "P.vivax", xlab = "mean.OD")#, ylim = c(0,my)
+qqnorm(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD); qqline(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD)
+
+hist(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD, ylim = c(0,my), xlim = c(0,1.4),
+     main = "P.falciparum", xlab = "mean.OD")
+plot(density(na.omit(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD)),
+     main = "P.falciparum", xlab = "mean.OD")#, ylim = c(0,my)
+qqnorm(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD); qqline(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD)
+```
+
+### Ab distribution
+
+```{r, fig.align='center', fig.height=9, fig.width=9}
+par(mfrow=c(3,3))
+
+my <- max(hist(wb11_Ab$Ab.unit, plot = F)$counts, na.rm=TRUE)
+
+hist(wb11_Ab$Ab.unit, 
+     main = "Ab.units Histogram", xlab = "Ab.units")#, xlim = c(0,15000)
+plot(density(na.omit(wb11_Ab$Ab.unit)), 
+     main = "Ab.units Density Plot", xlab = "Ab.units")#, ylim = c(0,my)
+qqnorm(wb11_Ab$Ab.unit); qqline(wb11_Ab$Ab.unit)
+
+hist(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit, ylim = c(0,my),
+     main = "P.vivax", xlab = "Ab.units")#, xlim = c(0,15000)
+plot(density(na.omit(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit)),
+     main = "P.vivax", xlab = "Ab.units")#, ylim = c(0,my)
+qqnorm(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit); qqline(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit)
+
+hist(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit, ylim = c(0,my),
+     main = "P.falciparum", xlab = "Ab.units")#, xlim = c(0,15000)
+plot(density(na.omit(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit)),
+     main = "P.falciparum", xlab = "Ab.units")#, ylim = c(0,my)
+qqnorm(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit); qqline(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit)
+```
+
+### Log scale
+
+```{r, fig.align='center', fig.height=3, fig.width=9}
+par(mfrow=c(1,3))
+
+my <- max(hist(log(wb11_Ab$mean.OD), plot = F)$counts, na.rm=TRUE)
+
+hist(log(wb11_Ab$mean.OD), xlim = c(-3.5,1),
+     main = "mean.OD Histogram", xlab = "log(mean.OD)")
+hist(log(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD), ylim = c(0,my), xlim = c(-3.5,1),
+     main = "P.vivax", xlab = "log(mean.OD)")
+hist(log(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD), ylim = c(0,my), xlim = c(-3.5,1),
+     main = "P.falciparum", xlab = "log(mean.OD)")
+```
+
+```{r, fig.align='center', fig.height=3, fig.width=9}
+par(mfrow=c(1,3))
+
+my <- max(hist(log(wb11_Ab$Ab.unit), plot = F)$counts, na.rm=TRUE)
+
+hist(log(wb11_Ab$Ab.unit), xlim = c(-6,10),
+     main = "Ab.units Histogram", xlab = "Ab.units")
+hist(log(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit), ylim = c(0,my), xlim = c(-6,10),
+     main = "P.vivax", xlab = "log(Ab.units)")
+hist(log(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit), ylim = c(0,my), xlim = c(-6,10),
+     main = "P.falciparum", xlab = "log(Ab.units)")
+```
+
+```{r, fig.align='center', fig.width=8, fig.height=3, eval=FALSE}
+#library(ggplot2)
+#library(Rmisc)        #multiploting ggplots
+a <- ggplot(wb11_Ab, aes(x=mean.OD, fill=Specie)) + 
+  geom_histogram(alpha=.5, position = "identity") + 
+  labs(title="Histograma de mean.OD") +
+  scale_x_continuous(breaks = c(0,0.1,0.2,0.5,1,1.5),limits = c(0,1.5),
+                     trans = "log1p", 
+                     expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0),limits = c(0,600))
+b <- ggplot(wb11_Ab, aes(x=Ab.unit, fill=Specie)) + 
+  geom_histogram(alpha=.5, position = "identity") + 
+  labs(title="Histograma de Ab.units") +
+  scale_x_continuous(breaks = c(0,1,10,100,1000,10000,20000), 
+                     trans = "log1p", 
+                     expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0),limits = c(0,600))
+multiplot(a,b, cols = 2)
+```
+
+
+# EXPORT
 
 - Aim:
-    + 01 row, 01 sample, 02 reads
+    + untidy format:
+        + 01 row, 01 sample, 02 reads
 ```{r}
 final <- wb11_Ab
 #summary(final[,-c(1:2)])
@@ -630,7 +737,7 @@ for (i in 1:length(levels(final$ID))) {
                          if (identical(final[final$ID==levels(final$ID)[i] & 
                                              final$Specie==levels(final$Specie)[1],4],
                                        numeric(0))) {
-                           0#NaN
+                           NaN
                          } else {
                            final[final$ID==levels(final$ID)[i] & 
                                    final$Specie==levels(final$Specie)[1],4]
@@ -640,7 +747,7 @@ for (i in 1:length(levels(final$ID))) {
                          if (identical(final[final$ID==levels(final$ID)[i] & 
                                              final$Specie==levels(final$Specie)[2],4],
                                        numeric(0))) {
-                           0#NaN
+                           NaN
                          } else {
                            final[final$ID==levels(final$ID)[i] & 
                                    final$Specie==levels(final$Specie)[2],4]
@@ -690,109 +797,18 @@ finalDBx <- format(finalDB, scientific=F, digits=2)
 write.csv(finalDBx, "data/Standardized_ELISA_ALL.csv")
 ```
 
+# save .Rds
 ```{r}
-saveRDS(final, "data/standarized-tidy.rds")
-saveRDS(finalDB, "data/standarized-untidy.rds")
+saveRDS(final, "data/02-standard-tidy.rds")
+saveRDS(finalDB, "data/02-standard-untidy.rds")
+
+saveRDS(naMAT, "data/02-out-of-bounce.rds")
+
+saveRDS(triplMAT, "data/02-triplicates.rds")
+saveRDS(dupliMAT, "data/02-duplicates.rds")
+saveRDS(triplNEW, "data/02-triplicates-filter.rds")
+saveRDS(dupliNEW, "data/02-duplicates-filter.rds")
+
 ```
 
-
-# OD vs Ab distribution
-
-## OD distribution
-```{r, fig.align='center', fig.height=9, fig.width=9}
-par(mfrow=c(3,3))
-
-my <- max(hist(wb11_Ab$mean.OD, plot = F)$counts, na.rm=TRUE)
-
-hist(wb11_Ab$mean.OD, xlim = c(0,1.4), 
-     main = "mean.OD Histogram", xlab = "mean.OD")
-plot(density(na.omit(wb11_Ab$mean.OD)), 
-     main = "mean.OD Density Plot", xlab = "mean.OD")#, ylim = c(0,my)
-qqnorm(wb11_Ab$mean.OD); qqline(wb11_Ab$mean.OD)
-
-hist(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD, ylim = c(0,my), xlim = c(0,1.4), 
-     main = "P.vivax", xlab = "mean.OD")
-plot(density(na.omit(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD)),
-     main = "P.vivax", xlab = "mean.OD")#, ylim = c(0,my)
-qqnorm(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD); qqline(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD)
-
-hist(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD, ylim = c(0,my), xlim = c(0,1.4),
-     main = "P.falciparum", xlab = "mean.OD")
-plot(density(na.omit(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD)),
-     main = "P.falciparum", xlab = "mean.OD")#, ylim = c(0,my)
-qqnorm(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD); qqline(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD)
-```
-
-## Ab distribution
-
-```{r, fig.align='center', fig.height=9, fig.width=9}
-par(mfrow=c(3,3))
-
-my <- max(hist(wb11_Ab$Ab.unit, plot = F)$counts, na.rm=TRUE)
-
-hist(wb11_Ab$Ab.unit, 
-     main = "Ab.units Histogram", xlab = "Ab.units")#, xlim = c(0,15000)
-plot(density(na.omit(wb11_Ab$Ab.unit)), 
-     main = "Ab.units Density Plot", xlab = "Ab.units")#, ylim = c(0,my)
-qqnorm(wb11_Ab$Ab.unit); qqline(wb11_Ab$Ab.unit)
-
-hist(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit, ylim = c(0,my),
-     main = "P.vivax", xlab = "Ab.units")#, xlim = c(0,15000)
-plot(density(na.omit(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit)),
-     main = "P.vivax", xlab = "Ab.units")#, ylim = c(0,my)
-qqnorm(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit); qqline(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit)
-
-hist(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit, ylim = c(0,my),
-     main = "P.falciparum", xlab = "Ab.units")#, xlim = c(0,15000)
-plot(density(na.omit(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit)),
-     main = "P.falciparum", xlab = "Ab.units")#, ylim = c(0,my)
-qqnorm(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit); qqline(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit)
-```
-
-## Log scale
-
-```{r, fig.align='center', fig.height=3, fig.width=9}
-par(mfrow=c(1,3))
-
-my <- max(hist(log(wb11_Ab$mean.OD), plot = F)$counts, na.rm=TRUE)
-
-hist(log(wb11_Ab$mean.OD), xlim = c(-3.5,1),
-     main = "mean.OD Histogram", xlab = "log(mean.OD)")
-hist(log(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD), ylim = c(0,my), xlim = c(-3.5,1),
-     main = "P.vivax", xlab = "log(mean.OD)")
-hist(log(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD), ylim = c(0,my), xlim = c(-3.5,1),
-     main = "P.falciparum", xlab = "log(mean.OD)")
-```
-
-```{r, fig.align='center', fig.height=3, fig.width=9}
-par(mfrow=c(1,3))
-
-my <- max(hist(log(wb11_Ab$Ab.unit), plot = F)$counts, na.rm=TRUE)
-
-hist(log(wb11_Ab$Ab.unit), xlim = c(-6,10),
-     main = "Ab.units Histogram", xlab = "Ab.units")
-hist(log(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit), ylim = c(0,my), xlim = c(-6,10),
-     main = "P.vivax", xlab = "log(Ab.units)")
-hist(log(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit), ylim = c(0,my), xlim = c(-6,10),
-     main = "P.falciparum", xlab = "log(Ab.units)")
-```
-
-```{r, fig.align='center', fig.width=8, fig.height=3, eval=FALSE}
-#library(ggplot2)
-#library(Rmisc)        #multiploting ggplots
-a <- ggplot(wb11_Ab, aes(x=mean.OD, fill=Specie)) + 
-  geom_histogram(alpha=.5, position = "identity") + 
-  labs(title="Histograma de mean.OD") +
-  scale_x_continuous(breaks = c(0,0.1,0.2,0.5,1,1.5),limits = c(0,1.5),
-                     trans = "log1p", 
-                     expand = c(0,0)) +
-  scale_y_continuous(expand = c(0,0),limits = c(0,600))
-b <- ggplot(wb11_Ab, aes(x=Ab.unit, fill=Specie)) + 
-  geom_histogram(alpha=.5, position = "identity") + 
-  labs(title="Histograma de Ab.units") +
-  scale_x_continuous(breaks = c(0,1,10,100,1000,10000,20000), 
-                     trans = "log1p", 
-                     expand = c(0,0)) +
-  scale_y_continuous(expand = c(0,0),limits = c(0,600))
-multiplot(a,b, cols = 2)
-```
+# References

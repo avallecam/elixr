@@ -2,9 +2,7 @@
 .Rhistory
 data/*
 data-raw/*
-report/*.html
-analysis/*.html
-analysis/*.nb.html
+report/*
 analysis/*.csl
 analysis/trialerror/*
 notrack/*

@@ -22,7 +22,7 @@ csl: american-medical-association.csl
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, # CHANGE TO FALSE IN PDF_DOCUMENTS
                       warning = FALSE) 
-knitr::opts_knit$set(root.dir = gsub("/analysis","",getwd()))
+knitr::opts_knit$set(root.dir = '../.') #gsub("/analysis","",getwd())
 #getwd()
 options(width = 110) # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
@@ -85,8 +85,19 @@ library("ggplot2")
 library("Rmisc")        #multiploting ggplots
 ```
 
+# read .Rds
 ```{r}
+wb11_Ab <- readRDS("data/01-output-raw.rds")
+paramALL <- readRDS("data/01-parameters.rds")
 
+naMAT <- readRDS("data/02-out-of-bounce.rds")
+
+triplMAT <- readRDS("data/02-triplicates.rds")
+dupliMAT <- readRDS("data/02-duplicates.rds")
+triplNEW <- readRDS("data/02-triplicates-filter.rds")
+dupliNEW <- readRDS("data/02-duplicates-filter.rds")
+
+Pf.ID <- readRDS("data/01-dilutions.rds")
 ```
 
 
@@ -215,7 +226,7 @@ rbind(finalDBcov[finalDBcov$id=="ZG163-2",-c(7,8,11)],
 # APPENDIX D: Upper/Lower limits
 
 ```{r}
-rownames(paramALL) <- d
+#rownames(paramALL) <- d
 paramALL
 ```
 
@@ -417,3 +428,5 @@ With the Antibody Units:
 - *MUST:* Improve code
     + Replace SDCV by an extended MEAN data.frame.
     + This will solve N15 NaN problem
+
+# References
