@@ -2,6 +2,7 @@
 .Rhistory
 data/*
 data-raw/*
+report/*.html
 analysis/*.html
 analysis/*.nb.html
 analysis/*.csl

@@ -1,0 +1,370 @@
+---
+title: "COVARIATES"
+author: "Andree Valle Campos"
+date: '`r Sys.Date()`'
+output: 
+  html_document:
+#  pdf_document:
+#  html_notebook:
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: yes
+    code_folding: "hide"
+#    number_sections: TRUE
+#    df_print: kable
+#    fig_caption: true
+#  documentclass: report
+bibliography: SeroMarker.bib
+csl: american-medical-association.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, # CHANGE TO FALSE IN PDF_DOCUMENTS
+                      warning = FALSE) 
+knitr::opts_knit$set(root.dir = gsub("/analysis","",getwd()))
+#getwd()
+options(width = 110) # CHANGE TO DEFAULT in PDF
+# FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
+# FOR PDF add new page USE: four \newpage BEFORE #SETUP #APPENDIX #COMPUTER.env #REFERENCES
+```
+
+# Setup 
+
+This report is writen in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
+
+This dynamic document integrates **text**, **code** and **results**.
+
+```{r setup0, results='hide', message=FALSE, eval=TRUE}
+require(Hmisc)
+#require(plotly)
+#options(#grType='plotly',  # for certain graphics functions
+#        width = 110) # to expand the limits of CONSOLE output
+mu <- markupSpecs$html   # markupSpecs is in Hmisc
+
+# The following hidden command (<code>r mu$widescreen()</code>), causes the html notebook to use an entire wide screen.
+#mu$widescreen()
+```
+`r mu$widescreen()`
+
+# Summary
+
+**OBJECTIVE:**
+
+* Principal: 
+    - Standardize the OD~450nm~ values across ELISA plates by the estimation of the Antibody Units of each unknown sample.
+
+* Secondary:
+    - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
+
+**SOLVED PROBLEMS:**
+
+
+# Introduction
+
+This is an R implementation of a pipeline for the standardization of ELISA plates directly from a template matrix.
+
+
+# Dependencies
+
+The required R packages for this analysis are:
+
++ XLConnect [@XLConnect]
++ drc [@Ritz2015]
+
+```{r, results='hide', message=FALSE}
+##essential
+library(XLConnect) # to load EXCEL files
+library(drc)       # Dose-Response modeling
+##accesory
+library("DiagrammeR") # method Flowchart
+#library("rcompanion") # pseudo R-2
+library("knitr")     # To display nice tables
+##extra
+library("ggplot2")
+library("Rmisc")        #multiploting ggplots
+```
+
+# Covariates
+
+```{r}
+final <- readRDS("data/standarized-tidy.rds")
+finalDB <- readRDS("data/standarized-untidy.rds")
+```
+
+## NEW DB comparison
+
+A *bash* script line to copy the original covariate file:
+```{bash}
+cp data-raw/RESULTADOS_LABORATORIO_PRIMER\ BARRIDO\ \(JUL-\ AGO\ 2015\).xlsx data/Zungarococha_database2_16ene2017.xlsx
+```
+
+```{r}
+pos <- loadWorkbook("data/Zungarococha_database2_16ene2017.xlsx")
+#
+post <- readWorksheet(pos, 
+                      sheet = 1, 
+                      startRow = 1, endRow = 961,
+                      startCol = 1, endCol = 15)
+#dim(post)
+#head(post)
+
+colnames(post) <- c("id", "age", "sex", "community", 
+                    "micro1", "dens1", "micro2", "dens2", 
+                    "pv200msp1", "pvmsp1", "pfmsp1", 
+                    "pcrrubio_Pv", "pcrrubio_Pf", "pcrsnounou_Pv", "pcrsnounou_Pf")
+
+#post=="."
+post[post=="."] <- NA ## all dots changed to NA
+
+post$pcrrubio <- post$pcrrubio_Pf + post$pcrrubio_Pv
+post$pcrsnounou <- as.numeric(post$pcrsnounou_Pf) + as.numeric(post$pcrsnounou_Pv)
+
+post$id <- as.factor(post$id)
+post$sex <- as.factor(post$sex)
+post$community <- as.factor(post$community)
+post$micro1 <- as.factor(post$micro1)
+post$dens1 <- as.numeric(post$dens1)
+post$micro2 <- as.factor(post$micro2)
+post$dens2 <- as.numeric(post$dens2)
+post$pcrrubio <- as.factor(post$pcrrubio)
+post$pcrsnounou <- as.factor(post$pcrsnounou)
+
+post <- post[,-c(9:15)] ## excluding mean.OD
+
+#str(post)
+#summary(post)
+```
+
+```{r}
+intCOMM<- intersect(as.character(finalDB$ID),as.character(post$id)) # COMMON
+finalEXCL<- setdiff(as.character(finalDB$ID),as.character(post$id)) # FINAL EXCLUSIVE
+postEXCL<- setdiff(as.character(post$id),as.character(finalDB$ID)) # POST EXCLUSIVE
+
+#length(intCOMM) #955
+#length(finalEXCL) #9
+#length(postEXCL) #5
+
+#NaN_2_MAT[-c(1:4),]
+```
+
+From the total of **`r mue`** evaluated samples, **03** were rejected due to Ab.units approaching zero in both reads, giving **`r length(finalDB$ID)`** available samples in the `finalDB`.
+
+A comparison between the `finalDB` and the **updated** `Zungarococha_database2_16ene2017.xlsx`, showed that:
+
++ `Zungarococha...` have only **`r length(post$id)` samples**
++ both DB have **`r length(intCOMM)`** sample ID in common. 
++ `finalDB` have **`r length(finalEXCL)`** exclusive samples
+```{r}
+finalEXCL
+```
+These samples were arbitrarily rejected based in an **unknowkn criteria** yet. We must add more detail on this step.
+
++ `Zungarococha...` have **`r length(postEXCL)`** exclusive ones.
+```{r}
+postEXCL
+```
+This are the **3** automatically rejected samples, previously mentioned in [NA description](#na).
+
+
+## MERGE Ab.units and covariates
+
+- AIM:
+    + First, retrieve the **`r length(finalEXCL)` excluded samples** [under which criteria?] due to unavailable covariate data.
+    + Second, introduce the **`r length(postEXCL)` automatically rejected samples** [check [NA description](#na)]
+    + Third, merge **`r length(post$id)` sample** Ab.units with its respective covariates.
+    + Finally, write a CSV of the outcome
+    
+```{r}
+chach <- finalDB
+#finalDB <- chach
+
+#dim(finalDB) # 966
+## RETRIEVE excluded SAMPLES
+for(i in 1:length(finalEXCL)) {
+  finalDB <- finalDB[finalDB$ID!=finalEXCL[i],]
+}
+#dim(finalDB) #-9
+```
+    
+```{r}
+## ADD 03 automatically rejected samples as NaN (mean.OD below lower.limit)
+#head(finalDB)
+#tail(finalDB)
+
+finalDB <- rbind(finalDB, 
+                 data.frame(ID= postEXCL,
+                            Ab.unit.Pfal= NaN,
+                            Ab.unit.Pviv= NaN))
+finalDB$ID <- factor(finalDB$ID)
+#dim(finalDB) # +3
+#tail(finalDB)
+```
+
+```{r}
+### MERGING
+#dim(post)
+rownames(post) <- NULL
+rownames(finalDB) <- NULL
+
+finalDBcov <- data.frame()
+# finalDBcov <- merge(post, finalDB, by.x = "id", by.y = "ID")
+for(i in 1:length(post$id)) {
+  finalDBcov <- rbind(finalDBcov,
+                      cbind(post[post$id==post$id[i],],
+                            finalDB[finalDB$ID==post$id[i],]))
+}
+#finalDBcov$id == finalDBcov$ID
+#dim(finalDBcov)
+```
+
+The `finalDBcov` output is write as `Standardized_ELISA_ALL_COVARIATES.csv`:
+```{r}
+str(finalDBcov)
+summary(finalDBcov)
+write.csv(format(finalDBcov[,-11], scientific=FALSE, digits=2), "data/Standardized_ELISA_ALL_COVARIATES.csv")# WITHOUT LABELING!!
+```
+
+The `finalDBcov` data.frame is ready to re-run the seropositivity analysis.
+
+
+### EVALUATE 01 patient 02 IDs
+
+- AIM:
+    + Contrast the data of the samples mentioned in the 2nd sheet of `Zungarococha_database2...`
+
+```{r}
+deldobl <- readWorksheet(pos, 
+                      sheet = 2, 
+                      startRow = 20, endRow = 27,
+                      startCol = 2, endCol = 3)
+deldobl
+
+#str(deldobl)
+```
+
+Strings were split into individual characters in the following way:
+```{r}
+strsplit(deldobl[5,], split = " ")[[1]]
+```
+
+Check equality between pair of samples:
+```{r}
+deldoblMIX <- data.frame()
+for(i in 1:dim(deldobl)[1]) {
+  deldoblMIX <- rbind(deldoblMIX,
+                      finalDBcov[finalDBcov$id==
+                                   strsplit(deldobl[i,], 
+                                            split = " ")[[1]][1],],
+                      finalDBcov[finalDBcov$id==
+                                   strsplit(deldobl[i,], 
+                                            split = " ")[[1]][3],])
+}
+
+format(deldoblMIX[,-11], scientific=FALSE, digits=2)#
+
+#finalDBcov[finalDBcov$id==strsplit(deldobl[4,], split = " ")[[1]][1],]
+```
+
+Some equalities do not seem to be from the same patient. This step needs more support prior to any sample deletion.
+
+## COMPARISON of covariates
+```{r}
+prev <- read.csv("data-raw/Zungarococha_database1_3Oct2016.csv")
+#length(prev$id)
+#length(finalDB$ID)
+```
+
+### PRE DB stats
+```{r, fig.align='center', fig.height=3, fig.width=12, eval=FALSE}
+par(mfrow=c(1,4))
+hist(prev[prev$community==levels(prev$community)[1],]$age,
+     ylim=c(0,150),
+     xlab = "age",
+     main=levels(prev$community)[1])
+hist(prev[prev$community==levels(prev$community)[2],]$age,
+     ylim=c(0,150),
+     xlab = "age",
+     main=levels(prev$community)[2])
+hist(prev[prev$community==levels(prev$community)[3],]$age,
+     ylim=c(0,150),
+     xlab = "age",
+     main=levels(prev$community)[3])
+hist(prev[prev$community==levels(prev$community)[4],]$age,
+     ylim=c(0,150),
+     xlab = "age",
+     main=levels(prev$community)[4])
+```
+
+```{r}
+str(prev)
+summary(prev)
+```
+
+### NEW DB stats
+
+Covariate labeling is based on labels available in covariate DB sheet 2. If more clarity is required, we only need to change those cells.
+
+```{r}
+covLabl <- readWorksheet(pos, 
+                      sheet = 2, 
+                      startRow = 7, endRow = 16,
+                      startCol = 2, endCol = 6)
+#covLabl
+#as.character(covLabl[1,c(2:3)])#sex
+#covLabl[3,]#community
+#covLabl[5,]#specie
+
+levels(post$sex) <- as.character(covLabl[1,c(2:3)])#sex
+levels(post$community) <- as.character(covLabl[3,c(2:5)])#sex
+levels(post$micro1) <- as.character(covLabl[5,c(4,2,3,5)])#specie ##LOOK change in ORDER
+levels(post$micro2) <- as.character(covLabl[5,c(4,2,3,5)])#specie ##LOOK change in ORDER
+levels(post$pcrrubio) <- as.character(covLabl[5,c(4,2,3)])#specie 
+levels(post$pcrsnounou) <- as.character(covLabl[5,c(4,2,3)])#specie
+```
+
+```{r, fig.align='center', fig.height=3, fig.width=12, eval=FALSE}
+par(mfrow=c(1,4))
+hist(post[post$community==levels(post$community)[1],]$age,
+     ylim=c(0,150),
+     xlab = "age",
+     main=levels(post$community)[1])
+hist(post[post$community==levels(post$community)[2],]$age,
+     ylim=c(0,150),
+     xlab = "age",
+     main=levels(post$community)[2])
+hist(post[post$community==levels(post$community)[3],]$age,
+     ylim=c(0,150),
+     xlab = "age",
+     main=levels(post$community)[3])
+hist(post[post$community==levels(post$community)[4],]$age,
+     ylim=c(0,150),
+     xlab = "age",
+     main=levels(post$community)[4])
+```
+
+```{r}
+str(post)
+summary(post)
+```
+
+### MERGE all
+
+```{r}
+colnames(prev) <- c(colnames(prev)[1],paste0(colnames(prev)[-1],".1"))
+colnames(post) <- c(colnames(post)[1],paste0(colnames(post)[-1],".2"))
+```
+
+
+```{r}
+final_allcov <- merge(merge(prev[,-c(7,8)], post, 
+                            by= "id", 
+                            all = T),
+                      final[,-c(7,8)], 
+                      by.x = "id", by.y = "ID", 
+                      all = T)
+str(final_allcov)
+summary(final_allcov)
+```
+
+
