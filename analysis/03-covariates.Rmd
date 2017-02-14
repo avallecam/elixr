@@ -171,12 +171,13 @@ This are the **3** automatically rejected samples, previously mentioned in [NA d
 ## MERGE Ab.units and covariates
 
 - AIM:
-    + First, retrieve the **`r length(finalEXCL)` excluded samples** [under which criteria?] due to unavailable covariate data.
-    + Second, introduce the **`r length(postEXCL)` automatically rejected samples** [check [NA description](#na)]
-    + Third, merge **`r length(post$id)` sample** Ab.units with its respective covariates.
+    + Merge **`r length(levels(finalDB$ID))` sample** Ab.units with its respective **`r length(post$id)` sample** covariates.
     + Finally, write a CSV of the outcome
     
-```{r}
+```{r, eval=FALSE}
+## NO RETRIEVEING
+##    + First, retrieve the **`r length(finalEXCL)` excluded samples** [under which criteria?] due to unavailable covariate data.
+
 chach <- finalDB
 #finalDB <- chach
 
@@ -190,6 +191,7 @@ for(i in 1:length(finalEXCL)) {
     
 ```{r, eval=FALSE}
 ## NOW in false due to NO 'NA' RETRIEVING in 02-data-filtering.Rmd
+##     + Second, introduce the **`r length(postEXCL)` automatically rejected samples** [check [NA description](#na)]
 
 ## ADD 03 automatically rejected samples as NaN (mean.OD below lower.limit)
 #head(finalDB)
@@ -208,11 +210,13 @@ finalDB$ID <- factor(finalDB$ID)
 
 ```{r}
 ### MERGING
+### Third, 
+
 #dim(post)
 rownames(post) <- NULL
 rownames(finalDB) <- NULL
 
-finalDBcov <- merge(post, finalDB, by.x = "id", by.y = "ID")
+finalDBcov <- merge(post, finalDB, by.x = "id", by.y = "ID", all = T)
 ```
 
 ```{r, eval=FALSE}
@@ -238,7 +242,7 @@ summary(finalDBcov)
 The `finalDBcov` data.frame is ready to re-run the seropositivity analysis.
 
 
-### EVALUATE 01 patient 02 IDs
+## EVALUATE 01 patient 02 IDs
 
 - AIM:
     + Contrast the data of the samples mentioned in the 2nd sheet of `Zungarococha_database2...`
@@ -271,7 +275,7 @@ for(i in 1:dim(deldobl)[1]) {
                                             split = " ")[[1]][3],])
 }
 
-format(deldoblMIX[,-11], scientific=FALSE, digits=2)#
+format(deldoblMIX[,-c(7,8,10)], scientific=FALSE, digits=2)#
 
 #finalDBcov[finalDBcov$id==strsplit(deldobl[4,], split = " ")[[1]][1],]
 ```
@@ -358,7 +362,7 @@ str(post)
 summary(post)
 ```
 
-### MERGE all
+## MERGE all
 
 ```{r}
 colnames(prev) <- c(colnames(prev)[1],paste0(colnames(prev)[-1],".1"))
@@ -378,8 +382,17 @@ summary(final_allcov)
 ```
 
 # EXPORT
+
+- `finalDBcov` output is write as `data/03-standard-untidy-cov.csv`.
+- `final_allcov` output is write as `data/03-standard-tidy-cov.csv`:
+
 ```{r}
-write.csv(format(finalDBcov[,-11], scientific=FALSE, digits=2), "data/Standardized_ELISA_ALL_COVARIATES.csv")# WITHOUT LABELING!!
+
+# WRITE untidy CSV
+write.csv(format(finalDBcov, scientific=FALSE, digits=2), "data/03-standard-untidy-cov.csv")# WITHOUT LABELING!!
+
+# WRITE untidy CSV
+write.csv(format(final_allcov, scientific=FALSE, digits=2), "data/03-standard-tidy-cov.csv")# WITHOUT LABELING!!
 ```
 
 # save .Rds

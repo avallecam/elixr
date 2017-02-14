@@ -1,9 +1,9 @@
 .Rproj.user
 .Rhistory
-data/*
-data-raw/*
-report/*
 analysis/*.csl
 analysis/trialerror/*
+data/*
+data-raw/*
+figure/*
 notrack/*
-
+report/*
