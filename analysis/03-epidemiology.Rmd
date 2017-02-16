@@ -1,0 +1,114 @@
+---
+title: "EPIDEMIOLOGICAL COVARIATES"
+author: "Andree Valle Campos"
+date: '`r Sys.Date()`'
+output: 
+  html_document:
+#  pdf_document:
+#  html_notebook:
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: yes
+    code_folding: "hide"
+#    number_sections: TRUE
+#    df_print: kable
+#    fig_caption: true
+#  documentclass: report
+bibliography: SeroMarker.bib
+csl: american-medical-association.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, # CHANGE TO FALSE IN PDF_DOCUMENTS
+                      warning = FALSE) 
+knitr::opts_knit$set(root.dir = '../.') #gsub("/analysis","",getwd())
+#getwd()
+options(width = 110) # CHANGE TO DEFAULT in PDF
+# FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
+# FOR PDF add new page USE: four \newpage BEFORE #SETUP #APPENDIX #COMPUTER.env #REFERENCES
+```
+
+# Setup 
+
+This report is writen in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
+
+This dynamic document integrates **text**, **code** and **results**.
+
+```{r setup0, results='hide', message=FALSE, eval=TRUE}
+require(Hmisc)
+#require(plotly)
+#options(#grType='plotly',  # for certain graphics functions
+#        width = 110) # to expand the limits of CONSOLE output
+mu <- markupSpecs$html   # markupSpecs is in Hmisc
+
+# The following hidden command (<code>r mu$widescreen()</code>), causes the html notebook to use an entire wide screen.
+#mu$widescreen()
+```
+`r mu$widescreen()`
+
+# Summary
+
+**OBJECTIVE:**
+
+* Principal: 
+    - Standardize the OD~450nm~ values across ELISA plates by the estimation of the Antibody Units of each unknown sample.
+
+* Secondary:
+    - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
+
+**SOLVED PROBLEMS:**
+
+
+# Introduction
+
+This is an R implementation of a pipeline for the standardization of ELISA plates directly from a template matrix.
+
+
+# Dependencies
+
+The required R packages for this analysis are:
+
++ XLConnect [@XLConnect]
++ drc [@Ritz2015]
+
+```{r, results='hide', message=FALSE}
+##essential
+library(XLConnect) # to load EXCEL files
+library(drc)       # Dose-Response modeling
+##accesory
+library("DiagrammeR") # method Flowchart
+#library("rcompanion") # pseudo R-2
+library("knitr")     # To display nice tables
+##extra
+library("ggplot2")
+library("Rmisc")        #multiploting ggplots
+```
+
+# read .Rds
+```{r}
+final <- readRDS("data/02-standard-tidy.rds")
+finalDB <- readRDS("data/02-standard-untidy.rds")
+```
+
+- total amount of observations **`r length(final$ID)`**
+- total amount of evaluated patients **`r length(levels(final$ID))`**
+- giving **`r length(finalDB$ID)`** available samples in the `finalDB`.
+
+# Epidemiological Covariates
+
+```{bash}
+ls -sh data/UNAP-*
+```
+
+## UNAP-6-EPI-08feb2017.xlsx
+```{r}
+#check sheets
+readxl::excel_sheets("data/UNAP-6-EPI-08feb2017.xlsx")
+#read xl
+epi <- readxl::read_excel("data/UNAP-6-EPI-08feb2017.xlsx", sheet = 1)
+#filter NA
+epi <- epi[1:sum(epi$id_integrante != "", na.rm = T), 1:sum(colnames(epi) != "")]
+#963x109
+epi
+```

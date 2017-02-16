@@ -4,6 +4,11 @@ This is a reproducible workflow in R for the standardization of ELISA reads acro
 
 ## TO-DO
 
+1. Order covariate data sets (Excel and Stata formats)
+2. Manage large covariate dataset (Excel)
+3. Add an alternative initial path: 'plater' instead of 'XLConnect'
+4. Merge histograms by factor Specie
+
 - Write methodology and limitations
     + Compare against drLumi statistical considerations
     + `medrc` package
@@ -13,7 +18,7 @@ This is a reproducible workflow in R for the standardization of ELISA reads acro
     + each variable is a column
     + each observation is a row
     + each type of observational unit forms a table
-- Add mote on maximum Ab.unit **previous to filtering**
+- Add note on maximum Ab.unit **previous to filtering**
 - Add details on K.Miura methods (appendix)
 
 ## Project suggestions
@@ -29,7 +34,7 @@ This is a reproducible workflow in R for the standardization of ELISA reads acro
 
 ## Additional analysis?
 
-- Study odd-ratio statistics
+- Study Logistic regression + odds-ratio statistics (handbookstatistics!)
 - Individual level heterogeneity
     + map location
     + climate, geographical differences, altitude, ...
