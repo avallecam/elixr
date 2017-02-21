@@ -20,12 +20,10 @@ csl: american-medical-association.csl
 ---
 
 ```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, # CHANGE TO FALSE IN PDF_DOCUMENTS
+                      warning = FALSE) 
 knitr::opts_knit$set(root.dir = '../.') #gsub("/analysis","",getwd())
 #getwd()
-knitr::opts_chunk$set(echo = TRUE, # CHANGE TO FALSE IN PDF_DOCUMENTS
-                      warning = FALSE,
-                      fig.path = "02-") 
-#
 options(width = 110) # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
 # FOR PDF add new page USE: four \newpage BEFORE #SETUP #APPENDIX #COMPUTER.env #REFERENCES
@@ -89,18 +87,12 @@ library("Rmisc")        #multiploting ggplots
 
 # read .Rds
 ```{r}
-wb11_Ab <- readRDS("data/01-output-raw.rds")
+std.raw <- readRDS("data/01-output-raw.rds")
 ```
 
 ***
 
 # Results
-
-```{r}
-# to FREEZE and ANALYSE
-freeze <- wb11_Ab
-#wb11_Ab <- freeze
-```
 
 ## DB typo corrections
 
@@ -111,27 +103,27 @@ This correction introduced the following samples:
 - **ZG009-3**, by changing *ZG009-1* in plate **N17**, and
 
 ```{r}
-#str(wb11_Ab)
-wb11_Ab$ID <- as.character(wb11_Ab$ID)
+#str(std.raw)
+std.raw$ID <- as.character(std.raw$ID)
 
-wb11_Ab[wb11_Ab$ID=="ZG009-1",]
-#wb11_Ab[wb11_Ab$ID=="ZG009-1" & wb11_Ab$Plate=="N17",]
-wb11_Ab[wb11_Ab$ID=="ZG009-1" & wb11_Ab$Plate=="N17",2] <- rep("ZG009-3",2)
-#wb11_Ab[wb11_Ab$ID=="ZG009-1",]
-wb11_Ab[wb11_Ab$ID=="ZG009-3",]
+std.raw[std.raw$ID=="ZG009-1",]
+#std.raw[std.raw$ID=="ZG009-1" & std.raw$Plate=="N17",]
+std.raw[std.raw$ID=="ZG009-1" & std.raw$Plate=="N17",2] <- rep("ZG009-3",2)
+#std.raw[std.raw$ID=="ZG009-1",]
+std.raw[std.raw$ID=="ZG009-3",]
 ```
 
 - **NN068-2**, by changing *NN082-5* in plate **N33**.
 
 ```{r}
-wb11_Ab[wb11_Ab$ID=="NN082-5",]
-#wb11_Ab[wb11_Ab$ID=="NN082-5" & wb11_Ab$Plate=="N33",]
-wb11_Ab[wb11_Ab$ID=="NN082-5" & wb11_Ab$Plate=="N33",2] <- rep("NN068-2",2)
-wb11_Ab[wb11_Ab$ID=="NN068-2",]
-#wb11_Ab[wb11_Ab$ID=="NN082-5",]
+std.raw[std.raw$ID=="NN082-5",]
+#std.raw[std.raw$ID=="NN082-5" & std.raw$Plate=="N33",]
+std.raw[std.raw$ID=="NN082-5" & std.raw$Plate=="N33",2] <- rep("NN068-2",2)
+std.raw[std.raw$ID=="NN068-2",]
+#std.raw[std.raw$ID=="NN082-5",]
 
-wb11_Ab$ID <- as.factor(wb11_Ab$ID)
-#str(wb11_Ab)
+std.raw$ID <- as.factor(std.raw$ID)
+#str(std.raw)
 ```
 
 As expected, this reduced the number of duplicates.
@@ -140,11 +132,11 @@ As expected, this reduced the number of duplicates.
 
 ```{r}
 ## total de ID evaluados
-mue <- length(levels(as.factor(wb11_Ab$ID))) # TOTAL MUESTRAS EVALUADAS
+mue <- length(levels(as.factor(std.raw$ID))) # TOTAL MUESTRAS EVALUADAS
 ## total ESPERADO + REPLICAS
-rep <- dim(wb11_Ab)[1] # TOTAL INICIAL
+rep <- dim(std.raw)[1] # TOTAL INICIAL
 ## total ESPERADO de ID x2 SPECIES-REPLICATES (uno de P.VIVAX y uno de P.FALCIPARUM)
-esp <- 2*length(levels(as.factor(wb11_Ab$ID))) # TOTAL ESPERADO
+esp <- 2*length(levels(as.factor(std.raw$ID))) # TOTAL ESPERADO
 ## total de ID REPETIDOS (corridos por duplicado o triplicado en nuevos PLATES) y que se deben retirar
 repet <- rep - esp
 ```
@@ -157,7 +149,7 @@ Here is the total amount of evaluated samples in both Pv/Pf plates of each Templ
 
 ```{r}
 ## total de muestras por TEMPLATE (P.VIVAX igual a P.FALCIPARUM)
-table(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Plate)
+table(std.raw[std.raw$Specie=="Pviv",]$Plate)
 ```
 
 - 04 Templates with lower samples than expected:
@@ -172,25 +164,25 @@ table(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Plate)
 
 ## NA
 
-The total amount of samples with **unestimated `Ab.unit` goes up to `r sum(is.na(wb11_Ab$Ab.unit))`**:
+The total amount of samples with **unestimated `Ab.unit` goes up to `r sum(is.na(std.raw$Ab.unit))`**:
 ```{r}
 ## muestras con Ab.units NO estimadas
-table(wb11_Ab[is.na(wb11_Ab$Ab.unit)==TRUE,]$Plate)
+table(std.raw[is.na(std.raw$Ab.unit)==TRUE,]$Plate)
 
 ## MOTIVO: above plate-specific model upper limit or below its lower limit
-#sum(is.na(wb11_Ab$Ab.unit))
-naMAT <- wb11_Ab[is.na(wb11_Ab$Ab.unit)==TRUE,]
+#sum(is.na(std.raw$Ab.unit))
+naMAT <- std.raw[is.na(std.raw$Ab.unit)==TRUE,]
 #naMAT
 ```
 
 **NOTE:** Only **03 samples** with NaN in both reads. Sample **ZG177-4** will be further evaluated in the `Duplicates` section of [UNBIASED selection](#unbiased-selection):
 ```{r}
-NaN_2 <- names(which(table(factor(wb11_Ab[is.na(wb11_Ab$Ab.unit)==TRUE,]$ID))==2))
+NaN_2 <- names(which(table(factor(std.raw[is.na(std.raw$Ab.unit)==TRUE,]$ID))==2))
 NaN_2
 
 NaN_2_MAT <- data.frame()
 for (i in 1:length(NaN_2)) {
-  NaN_2_MAT <- rbind(NaN_2_MAT,wb11_Ab[wb11_Ab$ID==NaN_2[i],])
+  NaN_2_MAT <- rbind(NaN_2_MAT,std.raw[std.raw$ID==NaN_2[i],])
 }
 
 #NaN_2_MAT[-c(7:10),]
@@ -198,23 +190,23 @@ NaN_2_MAT[NaN_2_MAT$ID!="ZG177-4",]
 
 ```
 
-On the other hand, the total amount of samples with **`mean.OD` with `NA` is `r sum(is.na(wb11_Ab$mean.OD))`**:
+On the other hand, the total amount of samples with **`mean.OD` with `NA` is `r sum(is.na(std.raw$mean.OD))`**:
 ```{r}
 ## muestras con OD con valor NA?
-#sum(is.na(wb11_Ab$mean.OD))
-wb11_Ab[is.na(wb11_Ab$mean.OD)==TRUE,]
+#sum(is.na(std.raw$mean.OD))
+std.raw[is.na(std.raw$mean.OD)==TRUE,]
 ```
 
 Both samples belong to **N15**. The problem here was that in this Template, one sample was evaluates in the Pf plate, and the other one in the Pv plate: 
 
 - **ZG181-1**, since it is a replicate, it have reads for both species.
 ```{r}
-wb11_Ab[wb11_Ab$ID=="ZG181-1",]
+std.raw[std.raw$ID=="ZG181-1",]
 ```
 
 - However, **ZG182-1** was only evaluated once, for one ELISA plate and for one specie.
 ```{r}
-wb11_Ab[wb11_Ab$ID=="ZG182-1",]
+std.raw[std.raw$ID=="ZG182-1",]
 ```
 
 ## REPLICATES
@@ -223,7 +215,7 @@ From the **total expected** samples, we calculate that the total amount of reads
 
 ```{r}
 ## FRECUENCIA por ID
-Ab_freq <- data.frame(table(as.factor(wb11_Ab$ID)))
+Ab_freq <- data.frame(table(as.factor(std.raw$ID)))
 
 ## total de ID con mas de una replica por especie
 #dim(Ab_freq[Ab_freq$Freq>2,])[1]
@@ -258,7 +250,7 @@ triplOD <- Ab_freq[Ab_freq$Freq==6,]$Var1
 
 triplMAT <- data.frame()
 for (i in 1:length(triplOD)) {
-  triplMAT <- rbind(triplMAT,wb11_Ab[wb11_Ab$ID==triplOD[i],])
+  triplMAT <- rbind(triplMAT,std.raw[std.raw$ID==triplOD[i],])
 }
 
 as.character(triplOD)
@@ -277,7 +269,7 @@ dupliOD <- Ab_freq[Ab_freq$Freq==4,]$Var1
 
 dupliMAT <- data.frame()
 for (i in 1:length(dupliOD)) {
-  dupliMAT <- rbind(dupliMAT,wb11_Ab[wb11_Ab$ID==dupliOD[i],])
+  dupliMAT <- rbind(dupliMAT,std.raw[std.raw$ID==dupliOD[i],])
 }
 
 as.character(dupliOD)
@@ -406,7 +398,7 @@ dupliNEW <- w
 
 # ADD EXTRA "ZG177-4" only VIVAX
 dupliNEW <- rbind(dupliNEW,extra[4,]) # +1
-#dim(wb11_Ab)
+#dim(std.raw)
 
 ```
 
@@ -420,16 +412,16 @@ dupliNEW <- rbind(dupliNEW,extra[4,]) # +1
 ### Plot previous to filtering
 
 ```{r pre-filter, fig.align='center', fig.height=3, fig.width=9}
-summary(wb11_Ab[,-c(1:2)])
+summary(std.raw[,-c(1:2)])
 par(mfrow=c(1,3))
 ### NON LINEAR RELATIONSHIP
-plot(mean.OD ~ Ab.unit,wb11_Ab,
+plot(mean.OD ~ Ab.unit,std.raw,
      ylim = c(0,1.5), 
      xlim = c(0,5e3),
      main="OD-Ab.unit Non-linearity", pch=4) 
-with(subset(wb11_Ab, Specie=="Pviv"), 
+with(subset(std.raw, Specie=="Pviv"), 
      points(Ab.unit, mean.OD, col="blue", pch=4))
-with(subset(wb11_Ab, Specie=="Pfal"), 
+with(subset(std.raw, Specie=="Pfal"), 
      points(Ab.unit, mean.OD, col="red", pch=4))
 legend("topright", c("P.vivax","P.falcip"), #, "C+/-", "blank"
        col = c( "blue", "red"), #, "black", "black"
@@ -438,13 +430,13 @@ legend("topright", c("P.vivax","P.falcip"), #, "C+/-", "blank"
        cex = 0.8,
        inset = .01#, merge = TRUE
 )
-plot(mean.OD ~ log(Ab.unit),wb11_Ab,
+plot(mean.OD ~ log(Ab.unit),std.raw,
      ylim = c(0,1.5), 
      xlim = c(-6,10),
      main="OD-Ab.unit Non-linearity", pch=4) 
-with(subset(wb11_Ab, Specie=="Pviv"), 
+with(subset(std.raw, Specie=="Pviv"), 
      points(log(Ab.unit), mean.OD, col="blue", pch=4))
-with(subset(wb11_Ab, Specie=="Pfal"), 
+with(subset(std.raw, Specie=="Pfal"), 
      points(log(Ab.unit), mean.OD, col="red", pch=4))
 legend("topleft", c("P.vivax","P.falcip"), #, "C+/-", "blank"
        col = c( "blue", "red"), #, "black", "black"
@@ -454,14 +446,14 @@ legend("topleft", c("P.vivax","P.falcip"), #, "C+/-", "blank"
        inset = .01#, merge = TRUE
 )
 ### %CV
-plot(cv.OD ~ mean.OD,wb11_Ab, 
+plot(cv.OD ~ mean.OD,std.raw, 
      ylim=c(0,100), xlim=c(0,1.5),
      xlab="mean OD 450nm of duplicates",
      ylab="%CV of duplicates",
      main="Percentage Coefficient of Variation")
 abline(h=20, v=0.25, lty=2, col=2)
 ## SD
-#plot(sd.OD ~ mean.OD,wb11_Ab,
+#plot(sd.OD ~ mean.OD,std.raw,
 #     ylim = c(0,0.27),
 #     main="Heteroskedasticity?") 
 ```
@@ -475,8 +467,8 @@ abline(h=20, v=0.25, lty=2, col=2)
 
 ##
 # to FREEZE and ANALYSE
-freeze <- wb11_Ab
-#wb11_Ab <- freeze
+freeze <- std.raw
+#std.raw <- freeze
 ##
 ```
 
@@ -498,26 +490,26 @@ checkIN <- function(a) {
 First, replicates are retrieve:
 ```{r, eval=TRUE}
 ## RETRIEVE
-dim(wb11_Ab)[1]
-checkIN(wb11_Ab)
+dim(std.raw)[1]
+checkIN(std.raw)
 # triplicates
 for (i in 1:length(as.character(triplOD))) {
-  wb11_Ab <- wb11_Ab[wb11_Ab$ID!=as.character(triplOD)[i],] # -96
+  std.raw <- std.raw[std.raw$ID!=as.character(triplOD)[i],] # -96
 }
-checkIN(wb11_Ab)
-#dim(wb11_Ab)[1]
+checkIN(std.raw)
+#dim(std.raw)[1]
 # duplicates
 for (i in 1:length(as.character(dupliOD))) {
-  wb11_Ab <- wb11_Ab[wb11_Ab$ID!=as.character(dupliOD)[i],] # -256
+  std.raw <- std.raw[std.raw$ID!=as.character(dupliOD)[i],] # -256
 }
-checkIN(wb11_Ab)
-#dim(wb11_Ab)[1]
+checkIN(std.raw)
+#dim(std.raw)[1]
 
 ## NA
-#wb11_Ab <- wb11_Ab[is.na(wb11_Ab$Ab.unit)!=TRUE,] # -73
-#checkIN(wb11_Ab)
+#std.raw <- std.raw[is.na(std.raw$Ab.unit)!=TRUE,] # -73
+#checkIN(std.raw)
 ##
-#dim(wb11_Ab)[1]
+#dim(std.raw)[1]
 #
 
 # 3 muestras que pierden Pviv y Pfal por NaN en ambos Ab.unit
@@ -529,13 +521,13 @@ Then, selected reads added:
 ```{r}
 ## ADDITION
 # ADD NEW TRIPLICATES
-wb11_Ab <- rbind(wb11_Ab,triplNEW) # + 32 = 16x2
-checkIN(wb11_Ab)
-#dim(wb11_Ab)
+std.raw <- rbind(std.raw,triplNEW) # + 32 = 16x2
+checkIN(std.raw)
+#dim(std.raw)
 # ADD NEW DUPLICATES
-wb11_Ab <- rbind(wb11_Ab,dupliNEW) # +128 + 1 = 64x2 + 1
-checkIN(wb11_Ab)
-dim(wb11_Ab)[1]
+std.raw <- rbind(std.raw,dupliNEW) # +128 + 1 = 64x2 + 1
+checkIN(std.raw)
+dim(std.raw)[1]
 ```
 
 ### Filtering evaluation
@@ -543,44 +535,44 @@ dim(wb11_Ab)[1]
 ```{r}
 #mue
 # FINAL
-#dim(wb11_Ab)[1]
-#esp - dim(wb11_Ab)[1] # 55 ?
+#dim(std.raw)[1]
+#esp - dim(std.raw)[1] # 55 ?
 
 # CLEAN FINAL DATA.FRAME
-wb11_Ab$ID <- factor(wb11_Ab$ID)
-#length(levels(wb11_Ab$ID))
+std.raw$ID <- factor(std.raw$ID)
+#length(levels(std.raw$ID))
 
-#mue - length(levels(wb11_Ab$ID)) == (length(NaN_2) -1) # 3 muestras que pierden Pviv y Pfal por NaN Ab.unit
+#mue - length(levels(std.raw$ID)) == (length(NaN_2) -1) # 3 muestras que pierden Pviv y Pfal por NaN Ab.unit
 
-#length(levels(wb11_Ab$ID)) + (esp - dim(wb11_Ab)[1])
+#length(levels(std.raw$ID)) + (esp - dim(std.raw)[1])
 ```
 
-After filtering, we obtain **`r length(levels(wb11_Ab$ID))` samples** of **`r mue` expected**, giving a **total of `r dim(wb11_Ab)[1]` reads** on the data frame.
+After filtering, we obtain **`r length(levels(std.raw$ID))` samples** of **`r mue` expected**, giving a **total of `r dim(std.raw)[1]` reads** on the data frame.
 
-As seen in the last `checkIN`, **`r checkIN(wb11_Ab)[1]` samples** have only one read because of **Ab.unit NaN**. For more detail, go to [Appendix C](#appendix-c-residual-na)
+As seen in the last `checkIN`, **`r checkIN(std.raw)[1]` samples** have only one read because of **Ab.unit NaN**. For more detail, go to [Appendix C](#appendix-c-residual-na)
 
 In addition, **`r (length(NaN_2) -1)` samples** were automatically retrieved as a consequence of **Ab.unit NaN** in both species reads. Look back to [NA description](#na).
 
 ```{r}
 #CHECK
-#sum(table(wb11_Ab$ID)!=2) # 49 muestras que pierden a su par por NaN en Ab.units
-#sum(table(wb11_Ab$ID)!=2) + (length(NaN_2) -1)*2 == esp - dim(wb11_Ab)[1] # 55 ?
+#sum(table(std.raw$ID)!=2) # 49 muestras que pierden a su par por NaN en Ab.units
+#sum(table(std.raw$ID)!=2) + (length(NaN_2) -1)*2 == esp - dim(std.raw)[1] # 55 ?
 
-#names(which(table(wb11_Ab$ID)!=2))
+#names(which(table(std.raw$ID)!=2))
 ```
 
 ### Plot after filtering
 ```{r pos-filter, fig.align='center', fig.height=3, fig.width=9}
-summary(wb11_Ab[,-c(1:2)])
+summary(std.raw[,-c(1:2)])
 par(mfrow=c(1,3))
 ### NON LINEAR RELATIONSHIP
-plot(mean.OD ~ Ab.unit,wb11_Ab,
+plot(mean.OD ~ Ab.unit,std.raw,
      ylim = c(0,1.5), 
      xlim = c(0,5e3),
      main="OD-Ab.unit Non-linearity", pch=4) 
-with(subset(wb11_Ab, Specie=="Pviv"), 
+with(subset(std.raw, Specie=="Pviv"), 
      points(Ab.unit, mean.OD, col="blue", pch=4))
-with(subset(wb11_Ab, Specie=="Pfal"), 
+with(subset(std.raw, Specie=="Pfal"), 
      points(Ab.unit, mean.OD, col="red", pch=4))
 legend("topright", c("P.vivax","P.falcip"), #, "C+/-", "blank"
        col = c( "blue", "red"), #, "black", "black"
@@ -589,13 +581,13 @@ legend("topright", c("P.vivax","P.falcip"), #, "C+/-", "blank"
        cex = 0.8,
        inset = .01#, merge = TRUE
 )
-plot(mean.OD ~ log(Ab.unit),wb11_Ab,
+plot(mean.OD ~ log(Ab.unit),std.raw,
      ylim = c(0,1.5), 
      xlim = c(-6,10),
      main="OD-Ab.unit Non-linearity", pch=4) 
-with(subset(wb11_Ab, Specie=="Pviv"), 
+with(subset(std.raw, Specie=="Pviv"), 
      points(log(Ab.unit), mean.OD, col="blue", pch=4))
-with(subset(wb11_Ab, Specie=="Pfal"), 
+with(subset(std.raw, Specie=="Pfal"), 
      points(log(Ab.unit), mean.OD, col="red", pch=4))
 legend("topleft", c("P.vivax","P.falcip"), #, "C+/-", "blank"
        col = c( "blue", "red"), #, "black", "black"
@@ -605,14 +597,14 @@ legend("topleft", c("P.vivax","P.falcip"), #, "C+/-", "blank"
        inset = .01#, merge = TRUE
 )
 ### %CV
-plot(cv.OD ~ mean.OD,wb11_Ab, 
+plot(cv.OD ~ mean.OD,std.raw, 
      ylim=c(0,100), xlim=c(0,1.5),
      xlab="mean OD 450nm of duplicates",
      ylab="%CV of duplicates",
      main="Percentage Coefficient of Variation")
 abline(h=20, v=0.25, lty=2, col=2)
 ## SD
-#plot(sd.OD ~ mean.OD,wb11_Ab,
+#plot(sd.OD ~ mean.OD,std.raw,
 #     ylim = c(0,0.27),
 #     main="Heteroskedasticity?") 
 ```
@@ -627,50 +619,50 @@ abline(h=20, v=0.25, lty=2, col=2)
 ### OD distribution
 par(mfrow=c(2,3))
 
-my <- max(hist(wb11_Ab$mean.OD, plot = F)$counts, na.rm=TRUE)
+my <- max(hist(std.raw$mean.OD, plot = F)$counts, na.rm=TRUE)
 
-hist(wb11_Ab$mean.OD, xlim = c(0,1.4), 
+hist(std.raw$mean.OD, xlim = c(0,1.4), 
      main = "mean.OD Histogram", xlab = "mean.OD")
-#plot(density(na.omit(wb11_Ab$mean.OD)), 
+#plot(density(na.omit(std.raw$mean.OD)), 
 #     main = "mean.OD Density Plot", xlab = "mean.OD")#, ylim = c(0,my)
-#qqnorm(wb11_Ab$mean.OD); qqline(wb11_Ab$mean.OD)
+#qqnorm(std.raw$mean.OD); qqline(std.raw$mean.OD)
 
-hist(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD, ylim = c(0,my), xlim = c(0,1.4), 
+hist(std.raw[std.raw$Specie=="Pviv",]$mean.OD, ylim = c(0,my), xlim = c(0,1.4), 
      main = "P.vivax", xlab = "mean.OD")
-#plot(density(na.omit(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD)),
+#plot(density(na.omit(std.raw[std.raw$Specie=="Pviv",]$mean.OD)),
 #     main = "P.vivax", xlab = "mean.OD")#, ylim = c(0,my)
-#qqnorm(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD); qqline(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD)
+#qqnorm(std.raw[std.raw$Specie=="Pviv",]$mean.OD); qqline(std.raw[std.raw$Specie=="Pviv",]$mean.OD)
 
-hist(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD, ylim = c(0,my), xlim = c(0,1.4),
+hist(std.raw[std.raw$Specie=="Pfal",]$mean.OD, ylim = c(0,my), xlim = c(0,1.4),
      main = "P.falciparum", xlab = "mean.OD")
-#plot(density(na.omit(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD)),
+#plot(density(na.omit(std.raw[std.raw$Specie=="Pfal",]$mean.OD)),
 #     main = "P.falciparum", xlab = "mean.OD")#, ylim = c(0,my)
-#qqnorm(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD); qqline(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD)
+#qqnorm(std.raw[std.raw$Specie=="Pfal",]$mean.OD); qqline(std.raw[std.raw$Specie=="Pfal",]$mean.OD)
 
 
 
 ### Ab distribution
 #par(mfrow=c(1,3))
 
-my <- max(hist(wb11_Ab$Ab.unit, plot = F)$counts, na.rm=TRUE)
+my <- max(hist(std.raw$Ab.unit, plot = F)$counts, na.rm=TRUE)
 
-hist(wb11_Ab$Ab.unit, 
+hist(std.raw$Ab.unit, 
      main = "Ab.units Histogram", xlab = "Ab.units")#, xlim = c(0,15000)
-#plot(density(na.omit(wb11_Ab$Ab.unit)), 
+#plot(density(na.omit(std.raw$Ab.unit)), 
 #     main = "Ab.units Density Plot", xlab = "Ab.units")#, ylim = c(0,my)
-#qqnorm(wb11_Ab$Ab.unit); qqline(wb11_Ab$Ab.unit)
+#qqnorm(std.raw$Ab.unit); qqline(std.raw$Ab.unit)
 
-hist(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit, ylim = c(0,my),
+hist(std.raw[std.raw$Specie=="Pviv",]$Ab.unit, ylim = c(0,my),
      main = "P.vivax", xlab = "Ab.units")#, xlim = c(0,15000)
-#plot(density(na.omit(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit)),
+#plot(density(na.omit(std.raw[std.raw$Specie=="Pviv",]$Ab.unit)),
 #     main = "P.vivax", xlab = "Ab.units")#, ylim = c(0,my)
-#qqnorm(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit); qqline(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit)
+#qqnorm(std.raw[std.raw$Specie=="Pviv",]$Ab.unit); qqline(std.raw[std.raw$Specie=="Pviv",]$Ab.unit)
 
-hist(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit, ylim = c(0,my),
+hist(std.raw[std.raw$Specie=="Pfal",]$Ab.unit, ylim = c(0,my),
      main = "P.falciparum", xlab = "Ab.units")#, xlim = c(0,15000)
-#plot(density(na.omit(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit)),
+#plot(density(na.omit(std.raw[std.raw$Specie=="Pfal",]$Ab.unit)),
 #     main = "P.falciparum", xlab = "Ab.units")#, ylim = c(0,my)
-#qqnorm(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit); qqline(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit)
+#qqnorm(std.raw[std.raw$Specie=="Pfal",]$Ab.unit); qqline(std.raw[std.raw$Specie=="Pfal",]$Ab.unit)
 ```
 
 ### Log scale
@@ -678,39 +670,39 @@ hist(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit, ylim = c(0,my),
 ```{r log-scale, fig.align='center', fig.height=6, fig.width=9}
 par(mfrow=c(2,3))
 
-my <- max(hist(log(wb11_Ab$mean.OD), plot = F)$counts, na.rm=TRUE)
+my <- max(hist(log(std.raw$mean.OD), plot = F)$counts, na.rm=TRUE)
 
-hist(log(wb11_Ab$mean.OD), xlim = c(-3.5,1),
+hist(log(std.raw$mean.OD), xlim = c(-3.5,1),
      main = "mean.OD Histogram", xlab = "log(mean.OD)")
-hist(log(wb11_Ab[wb11_Ab$Specie=="Pviv",]$mean.OD), ylim = c(0,my), xlim = c(-3.5,1),
+hist(log(std.raw[std.raw$Specie=="Pviv",]$mean.OD), ylim = c(0,my), xlim = c(-3.5,1),
      main = "P.vivax", xlab = "log(mean.OD)")
-hist(log(wb11_Ab[wb11_Ab$Specie=="Pfal",]$mean.OD), ylim = c(0,my), xlim = c(-3.5,1),
+hist(log(std.raw[std.raw$Specie=="Pfal",]$mean.OD), ylim = c(0,my), xlim = c(-3.5,1),
      main = "P.falciparum", xlab = "log(mean.OD)")
 
 ############
 #par(mfrow=c(1,3))
 
-my <- max(hist(log(wb11_Ab$Ab.unit), plot = F)$counts, na.rm=TRUE)
+my <- max(hist(log(std.raw$Ab.unit), plot = F)$counts, na.rm=TRUE)
 
-hist(log(wb11_Ab$Ab.unit), xlim = c(-6,10),
+hist(log(std.raw$Ab.unit), xlim = c(-6,10),
      main = "Ab.units Histogram", xlab = "log(Ab.units)")
-hist(log(wb11_Ab[wb11_Ab$Specie=="Pviv",]$Ab.unit), ylim = c(0,my), xlim = c(-6,10),
+hist(log(std.raw[std.raw$Specie=="Pviv",]$Ab.unit), ylim = c(0,my), xlim = c(-6,10),
      main = "P.vivax", xlab = "log(Ab.units)")
-hist(log(wb11_Ab[wb11_Ab$Specie=="Pfal",]$Ab.unit), ylim = c(0,my), xlim = c(-6,10),
+hist(log(std.raw[std.raw$Specie=="Pfal",]$Ab.unit), ylim = c(0,my), xlim = c(-6,10),
      main = "P.falciparum", xlab = "log(Ab.units)")
 ```
 
 ```{r, fig.align='center', fig.width=8, fig.height=3, eval=FALSE}
 #library(ggplot2)
 #library(Rmisc)        #multiploting ggplots
-a <- ggplot(wb11_Ab, aes(x=mean.OD, fill=Specie)) + 
+a <- ggplot(std.raw, aes(x=mean.OD, fill=Specie)) + 
   geom_histogram(alpha=.5, position = "identity") + 
   labs(title="Histograma de mean.OD") +
   scale_x_continuous(breaks = c(0,0.1,0.2,0.5,1,1.5),limits = c(0,1.5),
                      trans = "log1p", 
                      expand = c(0,0)) +
   scale_y_continuous(expand = c(0,0),limits = c(0,600))
-b <- ggplot(wb11_Ab, aes(x=Ab.unit, fill=Specie)) + 
+b <- ggplot(std.raw, aes(x=Ab.unit, fill=Specie)) + 
   geom_histogram(alpha=.5, position = "identity") + 
   labs(title="Histograma de Ab.units") +
   scale_x_continuous(breaks = c(0,1,10,100,1000,10000,20000), 
@@ -728,11 +720,11 @@ multiplot(a,b, cols = 2)
 + 01 row, 01 observation, 01 read
 
 ```{r}
-final <- wb11_Ab
-#summary(final[,-c(1:2)])
+std.nty <- std.raw
+#summary(std.nty[,-c(1:2)])
 
-str(final)
-summary(final)
+str(std.nty)
+summary(std.nty)
 ```
 
 ## untidy format:
@@ -740,82 +732,65 @@ summary(final)
 + 01 row, 01 patient, 02 observations, 02 reads
 
 ```{r}
-finalDB <- data.frame()
-for (i in 1:length(levels(final$ID))) {
-  finMAT <- data.frame(ID= levels(final$ID)[i], 
-                       Ab.unit.Pfal= 
-                         if (identical(final[final$ID==levels(final$ID)[i] & 
-                                             final$Specie==levels(final$Specie)[1],4],
-                                       numeric(0))) {
-                           NaN
-                         } else {
-                           final[final$ID==levels(final$ID)[i] & 
-                                   final$Specie==levels(final$Specie)[1],4]
-                         }
-                       , 
-                       Ab.unit.Pviv= 
-                         if (identical(final[final$ID==levels(final$ID)[i] & 
-                                             final$Specie==levels(final$Specie)[2],4],
-                                       numeric(0))) {
-                           NaN
-                         } else {
-                           final[final$ID==levels(final$ID)[i] & 
-                                   final$Specie==levels(final$Specie)[2],4]
-                         }
-                       ,
-                       mean.OD.Pfal= 
-                        if (identical(final[final$ID==levels(final$ID)[i] & 
-                                            final$Specie==levels(final$Specie)[1],5],
-                                      numeric(0))) {
-                          NaN
-                        } else {
-                          final[final$ID==levels(final$ID)[i] & 
-                                  final$Specie==levels(final$Specie)[1],5]
-                        }
-                      , 
-                      mean.OD.Pviv= 
-                        if (identical(final[final$ID==levels(final$ID)[i] & 
-                                            final$Specie==levels(final$Specie)[2],5],
-                                      numeric(0))) {
-                          NaN
-                        } else {
-                          final[final$ID==levels(final$ID)[i] & 
-                                  final$Specie==levels(final$Specie)[2],5]
-                        }
-                       )
-  finalDB <- rbind(finalDB,finMAT)
-}
-#colnames(finalDB) <- c("ID", "Ab.unit.Pfal", "Ab.unit.Pviv")
-str(finalDB)
-summary(finalDB)
+std.nty
 ```
+
 
 ```{r}
-## ADDITION of 03 samples with NaN in both reads --> THIS completes the 967 final samples
-#tail(finalDB)
-#NaN_2[-1]
-
-## IF NaN changed by ZERO, then the other 03 samples with OD above upper limit should have an input Ab.unit
-# go to "re-run"
-```
-
-```{r, eval=FALSE}
-## NOT REQUIRED csv OUTPUT at this step
-
-# WRITE the untidy CSV
-finalDBx <- format(finalDB, scientific=F, digits=2)
-write.csv(finalDBx, "data/02-standard-untidy.csv")
-
-# WRITE a tidy CSV
-finalx <- format(final, scientific=F, digits=2)
-write.csv(finalx, "data/02-standard-tidy.csv")
-
+std.uty <- data.frame()
+for (i in 1:length(levels(std.nty$ID))) {
+  finMAT <- data.frame(ID= levels(std.nty$ID)[i], 
+                       Ab.unit_Pfal= 
+                         if (identical(std.nty[std.nty$ID==levels(std.nty$ID)[i] & 
+                                             std.nty$Specie==levels(std.nty$Specie)[1],4],
+                                       numeric(0))) {
+                           NaN
+                         } else {
+                           std.nty[std.nty$ID==levels(std.nty$ID)[i] & 
+                                   std.nty$Specie==levels(std.nty$Specie)[1],4]
+                         }
+                       , 
+                       Ab.unit_Pviv= 
+                         if (identical(std.nty[std.nty$ID==levels(std.nty$ID)[i] & 
+                                             std.nty$Specie==levels(std.nty$Specie)[2],4],
+                                       numeric(0))) {
+                           NaN
+                         } else {
+                           std.nty[std.nty$ID==levels(std.nty$ID)[i] & 
+                                   std.nty$Specie==levels(std.nty$Specie)[2],4]
+                         }
+                       ,
+                       mean.OD_Pfal= 
+                         if (identical(std.nty[std.nty$ID==levels(std.nty$ID)[i] & 
+                                             std.nty$Specie==levels(std.nty$Specie)[1],5],
+                                       numeric(0))) {
+                           NaN
+                         } else {
+                           std.nty[std.nty$ID==levels(std.nty$ID)[i] & 
+                                   std.nty$Specie==levels(std.nty$Specie)[1],5]
+                         }
+                       , 
+                       mean.OD_Pviv= 
+                         if (identical(std.nty[std.nty$ID==levels(std.nty$ID)[i] & 
+                                             std.nty$Specie==levels(std.nty$Specie)[2],5],
+                                       numeric(0))) {
+                           NaN
+                         } else {
+                           std.nty[std.nty$ID==levels(std.nty$ID)[i] & 
+                                   std.nty$Specie==levels(std.nty$Specie)[2],5]
+                         }
+  )
+  std.uty <- rbind(std.uty,finMAT)
+}
+#colnames(std.uty) <- c("ID", "Ab.unit_Pfal", "Ab.unit_Pviv")
+str(std.uty)
+summary(std.uty)
 ```
 
 # save .Rds
 ```{r}
-saveRDS(final, "data/02-standard-tidy.rds")
-saveRDS(finalDB, "data/02-standard-untidy.rds")
+saveRDS(std.nty, "data/02-standard-tidy.rds")
+saveRDS(std.uty, "data/02-standard-untidy.rds")
 
 saveRDS(naMAT, "data/02-out-of-bounce.rds")
 
@@ -823,7 +798,6 @@ saveRDS(triplMAT, "data/02-triplicates.rds")
 saveRDS(dupliMAT, "data/02-duplicates.rds")
 saveRDS(triplNEW, "data/02-triplicates-filter.rds")
 saveRDS(dupliNEW, "data/02-duplicates-filter.rds")
-
 ```
 
 # References

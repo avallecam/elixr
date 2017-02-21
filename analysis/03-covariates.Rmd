@@ -93,13 +93,13 @@ library(readxl)
 
 # read .Rds
 ```{r}
-final <- readRDS("data/02-standard-tidy.rds")
-finalDB <- readRDS("data/02-standard-untidy.rds")
+std.nty <- readRDS("data/02-standard-tidy.rds")
+std.uty <- readRDS("data/02-standard-untidy.rds")
 ```
 
-- total amount of observations **`r length(final$ID)`**
-- total amount of evaluated patients **`r length(levels(final$ID))`**
-- giving **`r length(finalDB$ID)`** available samples in the `finalDB`.
+- total amount of observations **`r length(std.nty$ID)`**
+- total amount of evaluated patients **`r length(levels(std.nty$ID))`**
+- giving **`r length(std.uty$ID)`** available samples in the `std.uty`.
 
 # Covariates
 
@@ -122,7 +122,7 @@ cp data-raw/UNAPdatabase20Sept16.dta \
 data/UNAP-3-DB-02nov2016.dta
 
 cp data-raw/RESULTADOS_LABORATORIO_PRIMER\ BARRIDO\ \(JUL-\ AGO\ 2015\).xlsx \
-data/UNAP-4-DB-16ene2017.xlsx
+data/UNAP-4-UP-16ene2017.xlsx
 
 cp data-raw/QC\ results\ Zungarococha.xlsx \
 data/UNAP-5-QC-08feb2017.xlsx
@@ -134,7 +134,7 @@ data/UNAP-6-EPI-08feb2017.xlsx
 New names include:
 
 - order of appearance throughout the project
-- relevand info: DB, QC or EPI
+- relevand info: DB, UP, QC or EPI
 - date of registered last edition, or
 - receipt date
 
@@ -158,14 +158,58 @@ ls -sh data/UNAP-*
     + `unap6` as prev-EPI
 
 
+## RESULTS
+
+- diagram of DB history
+
+```{r, fig.align='center', fig.width=9}
+#install.packages("DiagrammeR")
+#library(DiagrammeR)
+
+grViz("
+digraph a_nice_graph {
+
+graph [layout= dot,
+        rankdir= LR]
+
+# node definitions with substituted label text
+node [fontname = Helvetica]
+a [label = '@@1']
+b [label = '@@2']
+c [label = '@@3']
+d [label = '@@4', color= red, fontcolor= red]
+e [label = '@@5', color= red, fontcolor= red]
+f [label = '@@6', color= green, fontcolor= green]
+g [label = '@@7', color= red, fontcolor= red]
+h [label = '@@8', color= red, fontcolor= red]
+
+# edge definitions with the node IDs
+a -> {b c}
+a -> {d e}  [color= red]
+f -> a [arrowhead= none, color= green]
+e -> {g h} [arrowhead= none, color= red]
+}
+
+[1]: 'unap1 DB (27)'
+[2]: 'unap2 DB (8)'
+[3]: 'unap3 DB (32)'
+[4]: 'unap4 UP (8)'
+[5]: 'unap5 QC (4)'
+[6]: 'unap6 EPI (109)'
+[7]: 'unap'
+[8]: 'namr'
+")
+```
+
 
 ## UNAP-1-DB-20sep2016.dta
 
 discoveries:
 
-- `unap1` already have part of the seropositivity output in `unap3`
+- `unap1` already have part of the seropositivity output (also present in `unap3`)
 - variables absent in `unap2` are listed
 - removed columns:
+    + micro2 and dens2
     + OD reads
     + sero-positive results (cutoff + categories)
     + age categories
@@ -193,6 +237,9 @@ discoveries:
 
 - `unap2` is a subset of `unap1`
 - `unap2` do not used **pvmsp1n** variable
+- removed columns:
+    + OD reads
+
 
 ```{r}
 unap2 <- read_csv("data/UNAP-2-DB-03oct2016.csv") %>%
@@ -207,32 +254,19 @@ summary(unap2)
 colnames(unap2.out)
 ```
 
-```{r, fig.align='center', fig.height=3, fig.width=12, eval=FALSE}
-par(mfrow=c(1,4))
-hist(unap2[unap2$community==levels(unap2$community)[1],]$age,
-     ylim=c(0,150),
-     xlab = "age",
-     main=levels(unap2$community)[1])
-hist(unap2[unap2$community==levels(unap2$community)[2],]$age,
-     ylim=c(0,150),
-     xlab = "age",
-     main=levels(unap2$community)[2])
-hist(unap2[unap2$community==levels(unap2$community)[3],]$age,
-     ylim=c(0,150),
-     xlab = "age",
-     main=levels(unap2$community)[3])
-hist(unap2[unap2$community==levels(unap2$community)[4],]$age,
-     ylim=c(0,150),
-     xlab = "age",
-     main=levels(unap2$community)[4])
-```
 
 
 ## UNAP-3-DB-02nov2016.dta
 
 discoveries:
 
-- `unap3` have **05 more columns** than `unap1` about seropositivity
+- `unap3` is identical to `unap1` plus **05 more columns** about seropositivity
+- removed columns:
+    + micro2 and dens2
+    + OD reads
+    + sero-positive results (cutoff + categories + 5 columns)
+    + age categories
+    + pcrsnou 1/2 and pcrrubio 1/2
 
 ```{r}
 unap3 <- haven::read_dta("data/UNAP-3-DB-02nov2016.dta") %>% 
@@ -252,16 +286,16 @@ summary(select(unap3.out, (seroposall:ll_pvmsp1pos)))
 ```
 
 
-## UNAP-4-DB-16ene2017.xlsx
+## UNAP-4-UP-16ene2017.xlsx
 
 discoveries:
 
-- `unap4` only differs in `age` and `sex`
+- `unap4` is identical to `unap1` with updated `age` and `sex` covariates
 - all the other covariates should be retrieved from `unap1`
 
 ```{r}
 #read xl
-unap4 <- readxl::read_excel("data/UNAP-4-DB-16ene2017.xlsx", 
+unap4 <- readxl::read_excel("data/UNAP-4-UP-16ene2017.xlsx", 
                             sheet = 1, na = ".") %>%
   dplyr::select(id=1, sex=3, age=2, community=4, micro1=5, dens1=6, 
                 pcrrubio_Pv=12, pcrrubio_Pf=13, pcrsnounou_Pv=14, pcrsnounou_Pf=15) %>%
@@ -271,15 +305,14 @@ unap4 <- readxl::read_excel("data/UNAP-4-DB-16ene2017.xlsx",
   dplyr::mutate_each(funs(factor), 2,4,5,7,8)
 str(unap4)
 summary(unap4)
-
 ```
 
-### unap4 covar
+### unap4 covariate labels
 
 Covariate labeling is based on labels available in covariate DB sheet 2. If more clarity is required, we only need to change those cells.
 
 ```{r}
-unap4.xl <- XLConnect::loadWorkbook("data/UNAP-4-DB-16ene2017.xlsx")
+unap4.xl <- XLConnect::loadWorkbook("data/UNAP-4-UP-16ene2017.xlsx")
 #
 unap4.lb <- readWorksheet(unap4.xl, header = F,
                       sheet = 2, 
@@ -289,48 +322,13 @@ unap4.lb
 ```
 
 
-```{r, eval=FALSE}
-#covLabl
-#as.character(covLabl[1,c(2:3)])#sex
-#covLabl[3,]#community
-#covLabl[5,]#specie
-
-levels(unap4$sex) <- as.character(unap4.lb[1,c(2:3)])#sex
-levels(unap4$community) <- as.character(unap4.lb[3,c(2:5)])#sex
-levels(unap4$micro1) <- as.character(unap4.lb[5,c(4,2,3,5)])#specie ##LOOK change in ORDER
-levels(unap4$micro2) <- as.character(unap4.lb[5,c(4,2,3,5)])#specie ##LOOK change in ORDER
-levels(unap4$pcrrubio) <- as.character(unap4.lb[5,c(4,2,3)])#specie 
-levels(unap4$pcrsnounou) <- as.character(unap4.lb[5,c(4,2,3)])#specie
-```
-
-```{r, fig.align='center', fig.height=3, fig.width=12, eval=FALSE}
-par(mfrow=c(1,4))
-hist(post[post$community==levels(post$community)[1],]$age,
-     ylim=c(0,150),
-     xlab = "age",
-     main=levels(post$community)[1])
-hist(post[post$community==levels(post$community)[2],]$age,
-     ylim=c(0,150),
-     xlab = "age",
-     main=levels(post$community)[2])
-hist(post[post$community==levels(post$community)[3],]$age,
-     ylim=c(0,150),
-     xlab = "age",
-     main=levels(post$community)[3])
-hist(post[post$community==levels(post$community)[4],]$age,
-     ylim=c(0,150),
-     xlab = "age",
-     main=levels(post$community)[4])
-```
-
-```{r, eval=FALSE}
-str(post)
-summary(post)
-```
-
-
-
 ## UNAP-5-QC-08feb2017.xlsx
+
+discoveries:
+
+- `unap1` **micro1** is different from `unap5` **micro.unap**
+- **why?**
+
 ```{r}
 #read xl
 unap5 <- readxl::read_excel("data/UNAP-5-QC-08feb2017.xlsx", na = "-")
@@ -338,14 +336,83 @@ unap5 <- readxl::read_excel("data/UNAP-5-QC-08feb2017.xlsx", na = "-")
 unap5 <- unap5[,1:5]
 #
 unap5 <- unap5 %>% 
-  dplyr::select(id=1, micro.unap=2, micro.namr=3, 
-                pcr.unap=4, pcr.namr=5) %>%
+  dplyr::select(id=1, pcr.unap=4, pcr.namr=5,  
+                micro.unap=2, micro.namr=3) %>%
   dplyr::mutate(micro.comp= micro.unap==micro.namr,
                 pcr.comp= pcr.unap==pcr.namr) %>%
-  dplyr::select(1:3,6,4:5,7) %>%
-  dplyr::mutate_each(funs(factor), 2,3,5,6)
+  dplyr::select(1:3,7,4:5,6) #%>%
+  #dplyr::mutate_each(funs(factor), 2,3,5,6)
 str(unap5)
-summary(unap5)
+summary(unap5 %>%
+          select(1,4,7))
+```
+
+### test equality
+
+- `unap1` and `unap5` should have equal **micro** and **pcr** ***UNAP*** covariates
+- suffix:
+    + "_1" unap1
+    + "_5" unap5 **UNAP** covariates
+    + "_0" comparison between "_1" and "_5"
+    + "_n" namru
+    + "_n1" namru vs "_1"
+    + "_n5" namru vs "_5"
+
+```{r}
+unap5c <- unap5 %>%
+  select(id, micro_5= micro.unap, pcr_5=pcr.unap) %>%
+  join(unap1 %>% #full_join(unap1 %>%
+              select(id, micro_1= micro1, pcr_1=pcrrubio), 
+            by= "id") %>%
+  mutate(micro_1= fct_recode(micro_1,
+                             "0"= "Negative", 
+                             "1"= "P vivax", 
+                             "2"= "P falciparum", 
+                             "3"= "Pv/Pf mixed infection"),
+         pcr_1= fct_recode(pcr_1, 
+                           "0"= "Negative", 
+                           "1"= "P vivax", 
+                           "2"= "P falciparum",
+                           "3"= "Pv/Pf mixed infection")) %>%
+  mutate(micro_0= micro_1==micro_5, 
+         pcr_0= pcr_1==pcr_5) %>%
+  full_join(unap5 %>%
+              select(id, micro_n= micro.namr, pcr_n= pcr.namr), 
+            by="id") %>%
+  mutate(micro_n1= micro_n==micro_1,
+         micro_n5= micro_n==micro_5,
+         pcr_n1= pcr_n==pcr_1,
+         pcr_n5= pcr_n==pcr_5) %>%
+  select(1,4,2,6,8,10,11,5,3,7,9,12,13) %>%
+  dplyr::mutate_each(funs(factor), 3,5,9,11)
+  
+str(unap5c)
+```
+
+**pcr_1** and **pcr_5** are equivalent:
+
+```{r}
+summary(unap5c %>% 
+          select(8:13))
+```
+
+However, **micro_1** and **micro_5** are different in **43** cells
+
+```{r}
+summary(unap5c %>% 
+          select(2:7))
+```
+
+### selection
+
+Arbitrary selection of `unap1` as **UNAP** covariates to compare against `unap5` **NAMRU** ones.
+
+```{r}
+unap5d <- unap5c %>%
+  select(1, 
+         2,5,6, 
+         8,11,12)
+summary(unap5d)
 ```
 
 
@@ -354,14 +421,13 @@ summary(unap5)
 - New question, New .Rmd
 
 ```{r}
-#check sheets
-readxl::excel_sheets("data/UNAP-6-EPI-08feb2017.xlsx")
 #read xl
 epi <- readxl::read_excel("data/UNAP-6-EPI-08feb2017.xlsx", sheet = 1)
 #filter NA
-epi <- epi[1:sum(epi$id_integrante != "", na.rm = T), 1:sum(colnames(epi) != "")]
+epi <- epi[1:sum(epi$id_integrante != "", na.rm = T), 
+           1:sum(colnames(epi) != "", na.rm= T)]
 #963x109
-colnames(epi)
+#colnames(epi)
 #str(epi)
 ```
 
@@ -375,11 +441,16 @@ AIM:
     + `unap4` age, sex
     + change factor label in sex
     + create 2 logic variables
-    + `unap5` all
-    + `unap1` community, micro1, dens1
-    + optionally: micro2, dens2 + pcr.snounou
+    + `unap5` all (micro, pcr)
+    + `unap1` community
+    + avoided: dens1, micro2, dens2, pcr.snounou
+- suffix:
+    + "_1" unap1
+    + "_4" unap4
+    + "_0" comparison between "_1" and "_4"
+    + "_n" namru
+    + "_n1" namru vs "_1"
 
-Any of this below could be usefull...
 
 ```{r}
 #str(unap1)
@@ -388,187 +459,113 @@ unap4$sex <- fct_recode(unap4$sex, Female="1", Male="2")
 #str(unap4)
 
 unap0 <- 
-  dplyr::full_join(
+  full_join(
     unap1 %>%
       select(id, age, sex), 
     unap4 %>%
       select(id, age, sex), 
     by= "id", suffix= c("_1", "_4")) %>%
-  mutate(sex0= sex_1==sex_4,
-         age0= age_1==age_4)%>%
+  mutate(sex_0= sex_1==sex_4,
+         age_0= age_1==age_4)%>%
   select(1,3,5,6,2,4,7)%>%
-  full_join(unap5, by= "id") %>%
+  full_join(unap5d, by= "id") %>%
   full_join(unap1 %>%
-              select(id,community, micro1, dens1),
+              select(id,community_1= community#, 
+                     #micro_1= micro1, dens_1= dens1, pcr_1=pcrrubio
+                     ),
             by="id")
 #
 #unap0
 str(unap0)
-summary(unap0)
+#summary(unap0)
 
 ```
 
-# PREVIOUS REPORT
+# MERGE AB UNTIS
 
-## MERGE Ab.units and covariates
+## tidy format
 
-- AIM:
-    + Merge **`r length(levels(finalDB$ID))` sample** Ab.units with its respective **`r length(post$id)` sample** covariates.
-    + Finally, write a CSV of the outcome
-    
-```{r, eval=FALSE}
-## NO RETRIEVEING
-##    + First, retrieve the **`r length(finalEXCL)` excluded samples** [under which criteria?] due to unavailable covariate data.
-
-chach <- finalDB
-#finalDB <- chach
-
-#dim(finalDB) # 966
-## RETRIEVE excluded SAMPLES
-for(i in 1:length(finalEXCL)) {
-  finalDB <- finalDB[finalDB$ID!=finalEXCL[i],]
-}
-#dim(finalDB) #-9
-```
-    
-```{r, eval=FALSE}
-## NOW in false due to NO 'NA' RETRIEVING in 02-data-filtering.Rmd
-##     + Second, introduce the **`r length(postEXCL)` automatically rejected samples** [check [NA description](#na)]
-
-## ADD 03 automatically rejected samples as NaN (mean.OD below lower.limit)
-#head(finalDB)
-#tail(finalDB)
-
-finalDB <- rbind(finalDB, 
-                 data.frame(ID= postEXCL,
-                            Ab.unit.Pfal= NaN,
-                            Ab.unit.Pviv= NaN,
-                            mean.OD.Pfal= NaN,
-                            mean.OD.Pviv= NaN))
-finalDB$ID <- factor(finalDB$ID)
-#dim(finalDB) # +3
-#tail(finalDB)
-```
-
-```{r}
-### MERGING
-### Third, 
-
-#dim(post)
-rownames(post) <- NULL
-rownames(finalDB) <- NULL
-
-finalDBcov <- merge(post, finalDB, by.x = "id", by.y = "ID", all = T)
-```
+- not yet!
 
 ```{r, eval=FALSE}
-## NOW in FALSE due to NO 'NA' RETRIEVING in 02-data-filtering.Rmd
-
-finalDBcov <- data.frame()
-for(i in 1:length(post$id)) {
-  finalDBcov <- rbind(finalDBcov,
-                      cbind(post[post$id==post$id[i],],
-                            finalDB[finalDB$ID==post$id[i],]))
-}
-#finalDBcov$id == finalDBcov$ID
-#dim(finalDBcov)
+#std.nty
+std.nty.cov <- std.nty %>%
+  select(id=ID, 2:5) %>%
+  full_join(unap0, by="id") #%>%
+#select(1:14,21,15:17,19,20,18)
+str(std.nty.cov)
+summary(std.nty.cov)
+#View(std.nty.cov)
+write_csv(std.nty.cov %>%
+            format(scientific=FALSE, digits=2), "data/03-standard-tidy-cov.csv")
+saveRDS(std.nty.cov, "data/03-standard-tidy-cov.rds")
 ```
 
 
-The `finalDBcov` output is write as `Standardized_ELISA_ALL_COVARIATES.csv`:
-```{r}
-str(finalDBcov)
-summary(finalDBcov)
-```
-
-The `finalDBcov` data.frame is ready to re-run the seropositivity analysis.
-
-
-
-## MERGE all
+## untidy format
 
 ```{r}
-colnames(unap2) <- c(colnames(unap2)[1],paste0(colnames(unap2)[-1],".1"))
-colnames(post) <- c(colnames(post)[1],paste0(colnames(post)[-1],".2"))
+#std.nty
+std.uty.cov <- std.uty %>%
+  select(id=ID, 2:5) %>%
+  full_join(unap0, by="id") #%>%
+  #select(1:14,21,15:17,19,20,18)
+str(std.uty.cov)
+summary(std.uty.cov)
+#View(std.uty.cov)
+write_csv(std.uty.cov %>%
+            format(scientific=FALSE, digits=2), "data/03-standard-untidy-cov.csv")
+saveRDS(std.uty.cov, "data/03-standard-untidy-cov.rds")
 ```
 
+# EXPORT
 
-```{r}
-final_allcov <- merge(merge(unap2[,-c(7,8)], post, 
-                            by= "id", 
-                            all = T),
-                      final[,-c(7,8)], 
-                      by.x = "id", by.y = "ID", 
-                      all = T)
-str(final_allcov)
-summary(final_allcov)
-```
+- `std.uty.cov` output is write as `data/03-standard-untidy-cov.csv`.
+- `std.nty.cov` output is write as `data/03-standard-tidy-cov.csv`:
 
+***
 
-
-## COMPARISON of covariates
+# previous report
 
 ## EVALUATE 01 patient 02 IDs
 
 - AIM:
-    + Contrast the data of the samples mentioned in the 2nd sheet of `UNAP-4-DB-16ene2017.xlsx`
+    + Contrast the data of the samples mentioned in the 2nd sheet of `UNAP-4-UP-16ene2017.xlsx`
 
 ```{r}
-deldobl <- readWorksheet(pos, 
+#unap4.xl <- XLConnect::loadWorkbook("data/UNAP-4-UP-16ene2017.xlsx")
+unap4.dl <- readWorksheet(unap4.xl, 
                       sheet = 2, 
                       startRow = 20, endRow = 27,
                       startCol = 2, endCol = 3)
-deldobl
+unap4.dl
 
-#str(deldobl)
+#str(unap4.dl)
 ```
 
 Strings were split into individual characters in the following way:
 ```{r}
-strsplit(deldobl[5,], split = " ")[[1]]
+strsplit(unap4.dl[5,], split = " ")[[1]]
 ```
 
 Check equality between pair of samples:
-```{r}
-deldoblMIX <- data.frame()
-for(i in 1:dim(deldobl)[1]) {
-  deldoblMIX <- rbind(deldoblMIX,
-                      finalDBcov[finalDBcov$id==
-                                   strsplit(deldobl[i,], 
+```{r, eval=FALSE}
+unap4.dlMIX <- data.frame()
+for(i in 1:dim(unap4.dl)[1]) {
+  unap4.dlMIX <- rbind(unap4.dlMIX,
+                      std.uty.cov[std.uty.cov$id==
+                                   strsplit(unap4.dl[i,], 
                                             split = " ")[[1]][1],],
-                      finalDBcov[finalDBcov$id==
-                                   strsplit(deldobl[i,], 
+                      std.uty.cov[std.uty.cov$id==
+                                   strsplit(unap4.dl[i,], 
                                             split = " ")[[1]][3],])
 }
-
-format(deldoblMIX[,-c(7,8,10)], scientific=FALSE, digits=2)#
-
-#finalDBcov[finalDBcov$id==strsplit(deldobl[4,], split = " ")[[1]][1],]
+unap4.dlMIX
+#format(unap4.dlMIX[,-c(7,8,10)], scientific=FALSE, digits=2)#
 ```
 
 Some equalities do not seem to be from the same patient. This step needs more support prior to any sample deletion.
 
 
-
-
-# EXPORT
-
-- `finalDBcov` output is write as `data/03-standard-untidy-cov.csv`.
-- `final_allcov` output is write as `data/03-standard-tidy-cov.csv`:
-
-```{r}
-
-# WRITE untidy CSV
-write.csv(format(finalDBcov, scientific=FALSE, digits=2), "data/03-standard-untidy-cov.csv")# WITHOUT LABELING!!
-
-# WRITE untidy CSV
-write.csv(format(final_allcov, scientific=FALSE, digits=2), "data/03-standard-tidy-cov.csv")# WITHOUT LABELING!!
-```
-
-# save .Rds
-```{r}
-saveRDS(finalDBcov, "data/03-standard-untidy-cov.rds")
-saveRDS(final_allcov, "data/03-standard-tidy-cov.rds")
-```
 
 # References

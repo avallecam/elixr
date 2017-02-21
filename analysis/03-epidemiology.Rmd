@@ -83,6 +83,12 @@ library("knitr")     # To display nice tables
 ##extra
 library("ggplot2")
 library("Rmisc")        #multiploting ggplots
+#tidyverse
+library(dplyr)
+library(readr)
+library(haven)
+library(forcats)
+library(readxl)
 ```
 
 # read .Rds
@@ -105,10 +111,22 @@ ls -sh data/UNAP-*
 ```{r}
 #check sheets
 readxl::excel_sheets("data/UNAP-6-EPI-08feb2017.xlsx")
+```
+
+### sheet 1
+```{r}
 #read xl
 epi <- readxl::read_excel("data/UNAP-6-EPI-08feb2017.xlsx", sheet = 1)
 #filter NA
-epi <- epi[1:sum(epi$id_integrante != "", na.rm = T), 1:sum(colnames(epi) != "")]
+epi <- epi[1:sum(epi$id_integrante != "", na.rm = T), 
+           1:sum(colnames(epi) != "", na.rm= T)]
 #963x109
-epi
+#epi
+str(epi)
+colnames(epi)
 ```
+
+### sheet 2
+
+### sheet 3
+
