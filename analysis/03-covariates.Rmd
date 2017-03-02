@@ -57,6 +57,9 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 * Secondary:
     - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
 
+* TO DO:
+    - re-evaluate 01 patient 02 id after `unap6`
+
 
 # Introduction
 
@@ -157,7 +160,7 @@ ls -sh data/UNAP-*
 # RESULTS
 
 - `unap6` is the **source** for `unap1` age and sex covariates only.
-- `unap1` is the **source** of all other `unap#` DB
+- `unap1` is the **source** of all other `unap#` DB's
 - `unap2` is a **subset** of `unap1` shared with Nuno
 - `unap3` is `unap1` plus **05** more seropositivity covariates
 - `unap4` is `unap1` but with **updated** age and sex covariates
@@ -165,8 +168,8 @@ ls -sh data/UNAP-*
 - `unap5` is **different** from `unap1` only in micro UNAP covariate
 - `unap1` UNAP covariates were arbitrarily **selected** to compare against `unap5` NAMR ones.
 - `unap0` was created as a **merged** DB of covariates
-- `unap0` was **merged** with `std.uty` DB of mean.OD and Ab.units per specie obtained in **02-data-filtering.Rmd**
-- `std.uty.cov` was **written** in a `.csv` and **saved** in a `.rds` for further analysis.
+- `unap0` was **merged** with both `std.nty` and `std.uty` DB of mean.OD and Ab.units per specie obtained in **02-data-filtering.Rmd**
+- `std.nty.cov` and `std.uty.cov` were **written** in a `.csv` and **saved** in a `.rds` for further analysis.
 
 - diagram of DB history
 
@@ -441,11 +444,6 @@ unap6 <- unap6[1:sum(unap6$id_integrante != "", na.rm = T),
 
 # MERGE COVARIATES
 
-TO DO:
-
-- `unap0` is in a **untidy** format!!
-- `unap0` requires to be tidy **before** merging it with `std.nty`
-
 AIM:
 
 - create `unap0`
@@ -496,21 +494,84 @@ str(unap0)
 
 # MERGE AB UNTIS
 
+- `unap0` is in an untidy format
+- `unap0` requires to be tidied before or after merging it with `std.nty`
+- `unap0` can be directly merged with `std.uty`
+
 ## tidy format
 
-- not yet!
+- merge `std.nty` and `unap0`
+- filter by `Specie`
+- recode `micro_` and `pcr_` levels per `Specie`
+- generate `std.nty.cov` in a tidy format by combining all cases per Specie.
 
-```{r, eval=FALSE}
-std.nty.cov <- std.nty %>%
-  select(id=ID, 2:5) %>%
-  full_join(unap0, by="id") #%>%
-#select(1:14,21,15:17,19,20,18)
+```{r}
+std.nty.pre <- std.nty %>%
+  select(id=ID, 4:6) %>%
+  full_join(unap0, by="id") #%>% count("micro_1")
+
+std.nty.pre_Pv <- std.nty.pre %>% 
+  #select(id, Specie, micro_1, micro_n, pcr_1, pcr_n) %>% 
+  filter(Specie=="Pviv") %>% #count("pcr_1")
+  mutate(micro_1=fct_recode(micro_1,
+                            "0"="2",
+                            "1"="3"),
+         micro_n=fct_recode(micro_n,
+                            "0"="2",
+                            "1"="3"),
+         pcr_1=fct_recode(pcr_1,
+                          "0"="2"),
+         pcr_n=fct_recode(pcr_n,
+                          "0"="2",
+                          "1"="3")) #%>% count("pcr_n")
+
+std.nty.pre_Pf <- std.nty.pre %>% 
+  #select(id, Specie, micro_1) %>% 
+  filter(Specie=="Pfal") %>% #count("pcr_n")
+  mutate(micro_1=fct_recode(micro_1,
+                            "1"="2",
+                            "0"="1",
+                            "1"="3"),
+         micro_n=fct_recode(micro_n,
+                            "1"="2",
+                            "0"="1",
+                            "1"="3"),
+         pcr_1=fct_recode(pcr_1,
+                          "1"="2",
+                          "0"="1"),
+         pcr_n=fct_recode(pcr_n,
+                          "1"="2",
+                          "0"="1",
+                          "1"="3")) #%>% count("micro_1")
+
+std.nty.cov <- union(std.nty.pre_Pf, std.nty.pre_Pv)
+
+
 str(std.nty.cov)
-summary(std.nty.cov)
-#View(std.nty.cov)
+#summary(std.nty.cov)
+
+
 readr::write_csv(std.nty.cov %>%
             format(scientific=FALSE, digits=2), "data/03-standard-tidy-cov.csv")
 saveRDS(std.nty.cov, "data/03-standard-tidy-cov.rds")
+```
+
+**CHECK:**
+
+- Note that `micro_` and `pcr_` covariates are now standardized as factors with only **2** labels.
+- Validate the procedure contrasting this subset against `summary(std.uty.cov)`:
+```{r}
+#
+std.nty.cov %>% 
+  select(Specie, micro_1) %>% 
+  group_by(Specie, micro_1) %>% 
+  count()
+
+std.nty.cov %>% 
+  select(Specie, pcr_n) %>% 
+  group_by(Specie, pcr_n) %>% 
+  count()
+
 ```
 
 
@@ -521,9 +582,13 @@ std.uty.cov <- std.uty %>%
   select(id=ID, 2:5) %>%
   full_join(unap0, by="id") #%>%
   #select(1:14,21,15:17,19,20,18)
+
+
 str(std.uty.cov)
 summary(std.uty.cov)
 #View(std.uty.cov)
+
+
 readr::write_csv(std.uty.cov %>%
             format(scientific=FALSE, digits=2), "data/03-standard-untidy-cov.csv")
 saveRDS(std.uty.cov, "data/03-standard-untidy-cov.rds")
@@ -539,6 +604,9 @@ saveRDS(std.uty.cov, "data/03-standard-untidy-cov.rds")
 # previous report
 
 ## EVALUATE 01 patient 02 IDs
+
+- TO DO:
+    + In stand-by until finished with the epidemiological database `unap6`.
 
 - AIM:
     + Contrast the data of the samples mentioned in the 2nd sheet of `UNAP-4-UP-16ene2017.xlsx`

@@ -61,7 +61,7 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
     - Implement `plater` and `readxl` data input
     - Assess the **inter-plate-CV** comparing STD variability across plates to generate a **Limit of Quantification**
         + Actual CV is the **intra-plate-CV**
-        + Generate a tibble of all dilution OD's
+        + Generate a tibble of all STD dilutions OD's
         + Extend `std.par` output to all parameters
     - Other inter-plate measurements:
         + blank, positive and negative controls
