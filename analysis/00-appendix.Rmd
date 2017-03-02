@@ -57,8 +57,6 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 * Secondary:
     - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
 
-**SOLVED PROBLEMS:**
-
 
 # Introduction
 
@@ -87,17 +85,8 @@ library("Rmisc")        #multiploting ggplots
 
 # read .Rds
 ```{r}
-wb11_Ab <- readRDS("data/01-output-raw.rds")
-paramALL <- readRDS("data/01-parameters.rds")
-
-naMAT <- readRDS("data/02-out-of-bounce.rds")
-
-triplMAT <- readRDS("data/02-triplicates.rds")
-dupliMAT <- readRDS("data/02-duplicates.rds")
-triplNEW <- readRDS("data/02-triplicates-filter.rds")
-dupliNEW <- readRDS("data/02-duplicates-filter.rds")
-
 Pf.ID <- readRDS("data/01-dilutions.rds")
+#unlist(Pf.ID[1:12,])
 ```
 
 
@@ -188,74 +177,6 @@ Lastly, when using the nls function to fit the data, [Self-Starter](https://socs
 Here I have shortly compare the equivalent expressions applied by several reference publications [@Miura2008] [@Cook2011] [@Cunha2014] [@Corran2008], all equal to the **four-parameter log-logistic function** applied in this report.
 
 ***
-
-# APPENDIX C: residual NA
-
-```{r}
-#naMAT
-#names(which(table(wb11_Ab$ID)!=2))[1]
-naMATres <- NULL
-for (i in 1:length(names(which(table(wb11_Ab$ID)!=2)))) {
-  naMATres <- rbind(naMATres,naMAT[naMAT$ID==names(which(table(wb11_Ab$ID)!=2))[i],]) # -96
-}
-naMATres
-#dim(naMATres)
-#length(levels(factor(naMATres$ID)))
-```
-
-## re-run
-
-- **03 samples** have OD above the upper limit:
-
-```{r}
-rbind(naMATres[naMATres$ID=="ZG163-2",],
-      naMATres[naMATres$ID=="NN038-6",],
-      naMATres[naMATres$ID=="LL031-6",])
-```
-
-### re-run covariates
-
-In order to evaluate the posibility of a re-run, relevant sample covariates as age should be considered:
-
-```{r}
-rbind(finalDBcov[finalDBcov$id=="ZG163-2",-c(7,8,11)],
-      finalDBcov[finalDBcov$id=="NN038-6",-c(7,8,11)],
-      finalDBcov[finalDBcov$id=="LL031-6",-c(7,8,11)])
-```
-
-# APPENDIX D: Upper/Lower limits
-
-```{r}
-#rownames(paramALL) <- d
-paramALL
-```
-
-# APPENDIX E: Replicates
-
-## PRE selection
-
-### pre triplicates
-```{r}
-triplMAT
-```
-
-### pre duplicates
-```{r}
-dupliMAT
-```
-
-
-## POST selection
-
-### pos triplicates
-```{r}
-triplNEW
-```
-
-### pos duplicates
-```{r}
-dupliNEW
-```
 
 
 # APPENDIX F: Updates

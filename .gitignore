@@ -2,8 +2,10 @@
 .Rhistory
 analysis/*.csl
 analysis/trialerror/*
+analysis/*Hmisc*
 data/*
 data-raw/*
 figure/*
 notrack/*
 report/*
+

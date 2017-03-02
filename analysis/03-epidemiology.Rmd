@@ -57,8 +57,6 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 * Secondary:
     - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
 
-**SOLVED PROBLEMS:**
-
 
 # Introduction
 
@@ -74,21 +72,19 @@ The required R packages for this analysis are:
 
 ```{r, results='hide', message=FALSE}
 ##essential
-library(XLConnect) # to load EXCEL files
-library(drc)       # Dose-Response modeling
+library(XLConnect)    # load EXCEL workbooks
+library(drc)          # Dose-Response modeling
 ##accesory
 library("DiagrammeR") # method Flowchart
-#library("rcompanion") # pseudo R-2
-library("knitr")     # To display nice tables
+library("knitr")      # To display nice tables
+library("tidyverse")
+#ggplot2, tibble, tidyr, readr, purr, dplyyr
 ##extra
-library("ggplot2")
-library("Rmisc")        #multiploting ggplots
-#tidyverse
-library(dplyr)
-library(readr)
-library(haven)
-library(forcats)
-library(readxl)
+library("Rmisc")      # multiplot ggplots
+library("haven")      # import STATA df
+library("readxl")     # import EXCEL df
+library("forcats")    # factor vectors
+library("viridis")    # color visualization
 ```
 
 # read .Rds
@@ -116,15 +112,110 @@ readxl::excel_sheets("data/UNAP-6-EPI-08feb2017.xlsx")
 ### sheet 1
 ```{r}
 #read xl
-epi <- readxl::read_excel("data/UNAP-6-EPI-08feb2017.xlsx", sheet = 1)
+#read xl
+unap6 <- readxl::read_excel("data/UNAP-6-EPI-08feb2017.xlsx", sheet = 1)
 #filter NA
-epi <- epi[1:sum(epi$id_integrante != "", na.rm = T), 
-           1:sum(colnames(epi) != "", na.rm= T)]
+unap6 <- unap6[1:sum(unap6$id_integrante != "", na.rm = T), 
+           1:sum(colnames(unap6) != "", na.rm= T)]
 #963x109
-#epi
-str(epi)
-colnames(epi)
+colnames(unap6)
+str(unap6)
+summary(unap6)
 ```
+```{r}
+unap6
+```
+
+```{r}
+#unap6a <- 
+  unap6 %>%
+  rename(id=id_integrante, 
+         community=barrio, 
+         age= Edad,
+         residence= anios_residencia,
+         sex=sexo) %>%
+  mutate(sex=fct_recode(sex, M="m"), 
+         nivel_educacion=fct_recode(nivel_educacion, 
+                                    "Tecnica Completa"="TÃƒÂ©cnica Completa",
+                                    "Tecnica Incompleta"="TÃƒÂ©cnica Incompleta"),
+         fuente_agua=fct_recode(fuente_agua,
+                                "3. Tuberia publica, fuente fuera de la casa, compartido con la comunidad"="3. TuberiƒÂa publica, fuente fuera de la casa, compartido con la comunidad"),
+         banio_contectado=fct_recode(banio_contectado,
+                                     "0. No tiene banio"="0. No tiene baÃ±o"),
+         recibio_tratamiento_malaria=fct_recode(recibio_tratamiento_malaria,
+                                                "1. Mas de una vez (especifique)"="1.Mas de una vez (especifique)",
+                                                "1. Mas de una vez (especifique)"="1. MAs de una vez (especifique)",
+                                                "1. Mas de una vez (especifique)"="1. MÃ¡s de una vez (especifique)"),
+         no_busco_ayuda_tratamiento=fct_recode(no_busco_ayuda_tratamiento,
+                                               "0. No pensaba que era un problema serio"="0. No pensa que era un problema serio",
+                                               "0. No pensaba que era un problema serio"="0. No pensÃƒÆ’Ã‚Â³ que era un problema serio")
+         ) %>%
+  mutate_each(funs(factor), 3) %>%
+  str()
+  #count(tipo_trabajo)
+  #count(combustible_cocinar)
+  #count(material_paredes)
+  #count(material_piso)
+  #count(fuente_agua)
+  #count(recibio_tratamiento_malaria)
+  #count(drogras_tratamiento_01) #--------------------dirty
+  #count(drogras_tratamiento_02) #--------------------dirty
+  #count(fecha_registro) #--------------------------------------lubridate
+  #count(epi_especie_causo_malaria) %>%
+  #mutate(prop=n/sum(n))
+```
+
+```{r}
+unap6 %>% 
+  tidyr::separate(fecha_registro, 
+                  c("date", "time", "mer"), 
+                  sep = " ") %>% 
+  dplyr::select(date, time, mer)
+```
+
+
+## age checkpoint
+```{r}
+unap6a %>%
+  #ggplot(aes(Edad)) + geom_histogram()
+  #ggplot(aes(anios_residencia)) + geom_histogram()
+  group_by(age, residence) %>%
+  summarise(n=n()) %>%
+  mutate(prop= n/sum(n)) %>%
+  ggplot(aes(age, residence, colour=prop)) + 
+  geom_point() + 
+  scale_color_viridis() #+
+  #facet_grid(. ~ community) #+ theme_bw() # 3D CONTINUOUS VARIABLE PLOT
+```
+
+## malaria checkout
+```{r}
+unap6a %>%
+  ggplot(aes(cuantas_tenido_malaria)) + geom_histogram()
+```
+```{r}
+unap6a %>%
+  group_by(tenido_malaria, opciones_tenido_malaria) %>%
+  summarise(n=n())
+```
+```{r}
+unap6a %>%
+  group_by(tenido_malaria, opciones_tenido_malaria, cuantas_tenido_malaria) %>%
+  summarise(n=n()) %>%
+  filter(tenido_malaria!="Si" | opciones_tenido_malaria!="Si")
+```
+
+
+## problems
+
+covariates with:
+
+- **'otros_...'**
+    + delete "otros""
+    + merge both covariates
+- **"enf_..._si"** and **"enf_..._no"**
+    + merge both covariates
+    
 
 ### sheet 2
 

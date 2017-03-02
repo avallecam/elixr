@@ -157,12 +157,20 @@ With the Antibody Units:
 Here are the required R packages for this analysis:
 ```{r, results='hide', message=FALSE}
 ##essential
-library("XLConnect") # to load EXCEL files
-library("drc")       # Dose-Response modeling
+library(XLConnect)    # load EXCEL workbooks
+library(drc)          # Dose-Response modeling
 ##accesory
-library("DiagrammeR") # method Flowchart
 library("rcompanion") # pseudo R-2
-library("knitr")     # To display nice tables
+library("DiagrammeR") # method Flowchart
+library("knitr")      # To display nice tables
+library("tidyverse")
+#ggplot2, tibble, tidyr, readr, purr, dplyyr
+##extra
+library("Rmisc")      # multiplot ggplots
+library("haven")      # import STATA df
+library("readxl")     # import EXCEL df
+library("forcats")    # factor vectors
+library("viridis")    # color visualization
 ```
 
 

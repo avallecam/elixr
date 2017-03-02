@@ -57,8 +57,6 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 * Secondary:
     - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
 
-**SOLVED PROBLEMS:**
-
 
 # Introduction
 
@@ -74,21 +72,19 @@ The required R packages for this analysis are:
 
 ```{r, results='hide', message=FALSE}
 ##essential
-library(XLConnect) # to load EXCEL files
-library(drc)       # Dose-Response modeling
+library(XLConnect)    # load EXCEL workbooks
+library(drc)          # Dose-Response modeling
 ##accesory
 library("DiagrammeR") # method Flowchart
-#library("rcompanion") # pseudo R-2
-library("knitr")     # To display nice tables
+library("knitr")      # To display nice tables
+library("tidyverse")
+#ggplot2, tibble, tidyr, readr, purr, dplyyr
 ##extra
-library("ggplot2")
-library("Rmisc")        #multiploting ggplots
-#tidyverse
-library(dplyr)
-library(readr)
-library(haven)
-library(forcats)
-library(readxl)
+library("Rmisc")      # multiplot ggplots
+library("haven")      # import STATA df
+library("readxl")     # import EXCEL df
+library("forcats")    # factor vectors
+library("viridis")    # color visualization
 ```
 
 # read .Rds
@@ -97,9 +93,9 @@ std.nty <- readRDS("data/02-standard-tidy.rds")
 std.uty <- readRDS("data/02-standard-untidy.rds")
 ```
 
-- total amount of observations **`r length(std.nty$ID)`**
-- total amount of evaluated patients **`r length(levels(std.nty$ID))`**
-- giving **`r length(std.uty$ID)`** available samples in the `std.uty`.
+- total amount of observations **`r length(std.nty$ID)`** in `std.nty`.
+- total amount of evaluated patients **`r length(levels(std.nty$ID))`** in `std.nty`.
+- giving **`r length(std.uty$ID)`** available samples in `std.uty`.
 
 # Covariates
 
@@ -158,16 +154,28 @@ ls -sh data/UNAP-*
     + `unap6` as prev-EPI
 
 
-## RESULTS
+# RESULTS
+
+- `unap6` is the **source** for `unap1` age and sex covariates only.
+- `unap1` is the **source** of all other `unap#` DB
+- `unap2` is a **subset** of `unap1` shared with Nuno
+- `unap3` is `unap1` plus **05** more seropositivity covariates
+- `unap4` is `unap1` but with **updated** age and sex covariates
+- `unap5` is `unap1` plus **QC** evaluations of micro and pcr covariates
+- `unap5` is **different** from `unap1` only in micro UNAP covariate
+- `unap1` UNAP covariates were arbitrarily **selected** to compare against `unap5` NAMR ones.
+- `unap0` was created as a **merged** DB of covariates
+- `unap0` was **merged** with `std.uty` DB of mean.OD and Ab.units per specie obtained in **02-data-filtering.Rmd**
+- `std.uty.cov` was **written** in a `.csv` and **saved** in a `.rds` for further analysis.
 
 - diagram of DB history
 
-```{r, fig.align='center', fig.width=9}
+```{r, fig.align='center', fig.width=9, fig.height=3}
 #install.packages("DiagrammeR")
 #library(DiagrammeR)
 
 grViz("
-digraph a_nice_graph {
+digraph unap_summary {
 
 graph [layout= dot,
         rankdir= LR]
@@ -180,14 +188,13 @@ c [label = '@@3']
 d [label = '@@4', color= red, fontcolor= red]
 e [label = '@@5', color= red, fontcolor= red]
 f [label = '@@6', color= green, fontcolor= green]
-g [label = '@@7', color= red, fontcolor= red]
-h [label = '@@8', color= red, fontcolor= red]
+g [label = '@@7', color= blue, fontcolor= blue]
 
 # edge definitions with the node IDs
 a -> {b c}
 a -> {d e}  [color= red]
-f -> a [arrowhead= none, color= green]
-e -> {g h} [arrowhead= none, color= red]
+f -> a [color= green]
+{a d e} -> g [color= blue]
 }
 
 [1]: 'unap1 DB (27)'
@@ -196,11 +203,11 @@ e -> {g h} [arrowhead= none, color= red]
 [4]: 'unap4 UP (8)'
 [5]: 'unap5 QC (4)'
 [6]: 'unap6 EPI (109)'
-[7]: 'unap'
-[8]: 'namr'
+[7]: 'unap0 DB (14)'
 ")
 ```
 
+# PROCEDURE
 
 ## UNAP-1-DB-20sep2016.dta
 
@@ -235,14 +242,14 @@ colnames(unap1.out)
 
 discoveries:
 
-- `unap2` is a subset of `unap1`
+- `unap2` is a **subset** of `unap1`
 - `unap2` do not used **pvmsp1n** variable
 - removed columns:
     + OD reads
 
 
 ```{r}
-unap2 <- read_csv("data/UNAP-2-DB-03oct2016.csv") %>%
+unap2 <- readr::read_csv("data/UNAP-2-DB-03oct2016.csv") %>%
   dplyr::mutate_each(funs(factor), 2, 4, 5, 9)
 #str(unap2)
 unap2.out <- unap2 %>% select(matches(".msp.")) # previous removing
@@ -282,7 +289,7 @@ summary(unap3)
 
 ```{r}
 colnames(unap3.out)
-summary(select(unap3.out, (seroposall:ll_pvmsp1pos)))
+#summary(select(unap3.out, (seroposall:ll_pvmsp1pos)))
 ```
 
 
@@ -290,8 +297,9 @@ summary(select(unap3.out, (seroposall:ll_pvmsp1pos)))
 
 discoveries:
 
-- `unap4` is identical to `unap1` with updated `age` and `sex` covariates
-- all the other covariates should be retrieved from `unap1`
+- `unap4` is identical to `unap1` with **updated** `age` and `sex` covariates
+- `unap1` is the original source of all `unap#` covariates
+    + then, all covariates should be retrieved from `unap1`
 
 ```{r}
 #read xl
@@ -351,12 +359,12 @@ summary(unap5 %>%
 
 - `unap1` and `unap5` should have equal **micro** and **pcr** ***UNAP*** covariates
 - suffix:
-    + "_1" unap1
-    + "_5" unap5 **UNAP** covariates
-    + "_0" comparison between "_1" and "_5"
-    + "_n" namru
-    + "_n1" namru vs "_1"
-    + "_n5" namru vs "_5"
+    + `_1`: `unap1`
+    + `_5`: `unap5` **UNAP** covariates
+    + `_0`: comparison between `_1` and `_5`
+    + `_n`: `unap5` **NAMR** covariates
+    + `_n1`: `_n` vs `_1`
+    + `_n5`: `_n` vs `_5`
 
 ```{r}
 unap5c <- unap5 %>%
@@ -422,16 +430,21 @@ summary(unap5d)
 
 ```{r}
 #read xl
-epi <- readxl::read_excel("data/UNAP-6-EPI-08feb2017.xlsx", sheet = 1)
+unap6 <- readxl::read_excel("data/UNAP-6-EPI-08feb2017.xlsx", sheet = 1)
 #filter NA
-epi <- epi[1:sum(epi$id_integrante != "", na.rm = T), 
-           1:sum(colnames(epi) != "", na.rm= T)]
+unap6 <- unap6[1:sum(unap6$id_integrante != "", na.rm = T), 
+           1:sum(colnames(unap6) != "", na.rm= T)]
 #963x109
-#colnames(epi)
-#str(epi)
+#colnames(unap6)
+#str(unap6)
 ```
 
 # MERGE COVARIATES
+
+TO DO:
+
+- `unap0` is in a **untidy** format!!
+- `unap0` requires to be tidy **before** merging it with `std.nty`
 
 AIM:
 
@@ -445,11 +458,11 @@ AIM:
     + `unap1` community
     + avoided: dens1, micro2, dens2, pcr.snounou
 - suffix:
-    + "_1" unap1
-    + "_4" unap4
-    + "_0" comparison between "_1" and "_4"
-    + "_n" namru
-    + "_n1" namru vs "_1"
+    + `_1`: `unap1`
+    + `_4`: `unap4`
+    + `_0`: comparison between `_1` and `_4`
+    + `_n`: `unap5` **NAMR** covariates
+    + `_n1`: `_n` vs `_1`
 
 
 ```{r}
@@ -488,7 +501,6 @@ str(unap0)
 - not yet!
 
 ```{r, eval=FALSE}
-#std.nty
 std.nty.cov <- std.nty %>%
   select(id=ID, 2:5) %>%
   full_join(unap0, by="id") #%>%
@@ -496,7 +508,7 @@ std.nty.cov <- std.nty %>%
 str(std.nty.cov)
 summary(std.nty.cov)
 #View(std.nty.cov)
-write_csv(std.nty.cov %>%
+readr::write_csv(std.nty.cov %>%
             format(scientific=FALSE, digits=2), "data/03-standard-tidy-cov.csv")
 saveRDS(std.nty.cov, "data/03-standard-tidy-cov.rds")
 ```
@@ -505,7 +517,6 @@ saveRDS(std.nty.cov, "data/03-standard-tidy-cov.rds")
 ## untidy format
 
 ```{r}
-#std.nty
 std.uty.cov <- std.uty %>%
   select(id=ID, 2:5) %>%
   full_join(unap0, by="id") #%>%
@@ -513,15 +524,15 @@ std.uty.cov <- std.uty %>%
 str(std.uty.cov)
 summary(std.uty.cov)
 #View(std.uty.cov)
-write_csv(std.uty.cov %>%
+readr::write_csv(std.uty.cov %>%
             format(scientific=FALSE, digits=2), "data/03-standard-untidy-cov.csv")
 saveRDS(std.uty.cov, "data/03-standard-untidy-cov.rds")
 ```
 
 # EXPORT
 
-- `std.uty.cov` output is write as `data/03-standard-untidy-cov.csv`.
-- `std.nty.cov` output is write as `data/03-standard-tidy-cov.csv`:
+- `std.uty.cov` output was written as `data/03-standard-untidy-cov.csv`.
+- `std.nty.cov` output was written as `data/03-standard-tidy-cov.csv`:
 
 ***
 
