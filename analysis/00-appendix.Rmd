@@ -31,9 +31,9 @@ options(width = 110) # CHANGE TO DEFAULT in PDF
 
 # Setup 
 
-This report is writen in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
+This report is written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
 
-This dynamic document integrates **text**, **code** and **results**.
+This dynamic document integrates **text**, **code** and **results**[@CienciaReproducible2016].
 
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
 require(Hmisc)
@@ -47,9 +47,9 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 ```
 `r mu$widescreen()`
 
-# Summary
+# Objectives
 
-**OBJECTIVE:**
+**PROJECT:**
 
 * Principal: 
     - Standardize the OD~450nm~ values across ELISA plates by the estimation of the Antibody Units of each unknown sample.
@@ -57,40 +57,47 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 * Secondary:
     - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
 
+**NOTEBOOK:**
 
-# Introduction
+* Principal: 
+    - Review the methods previously applied to the standarization across ELISA plates in vaccine or serological surveillance research.
 
-This is an R implementation of a pipeline for the standardization of ELISA plates directly from a template matrix.
+* Secondary: 
+    - Register project updates, current problems to solve, project organization and benefits of using Git.
+    
+* **TO DO:**
+
 
 
 # Dependencies
 
-The required R packages for this analysis are:
-
-+ XLConnect [@XLConnect]
-+ drc [@Ritz2015]
+No extra package required.
 
 ```{r, results='hide', message=FALSE}
 ##essential
-library(XLConnect) # to load EXCEL files
-library(drc)       # Dose-Response modeling
+library(XLConnect)    # load EXCEL workbooks
+library(drc)          # Dose-Response modeling
 ##accesory
 library("DiagrammeR") # method Flowchart
-#library("rcompanion") # pseudo R-2
-library("knitr")     # To display nice tables
+library("knitr")      # To display nice tables
+library("tidyverse")
+#ggplot2, tibble, tidyr, readr, purr, dplyyr
 ##extra
-library("ggplot2")
-library("Rmisc")        #multiploting ggplots
+library("Rmisc")      # multiplot ggplots
+library("haven")      # import STATA df
+library("readxl")     # import EXCEL df
+library("forcats")    # factor vectors
+library("viridis")    # color visualization
 ```
 
-# read .Rds
+# Input
 ```{r}
 Pf.ID <- readRDS("data/01-dilution.rds")
 #unlist(Pf.ID[1:12,])
 ```
 
 
-# APPENDIX A: From OD to Ab units
+# APPENDIX: From OD to Ab units
 
 - Sepulveda et.al. [@Seplveda2015] cite two main publications:
     1. **Cook et.al., 2011 in Bioko Island, Equatorial Guinea** [@Cook2011], and
@@ -152,7 +159,7 @@ At Methods, they write the following:
 
 ***
 
-# APPENDIX B: the 4pLL model
+# APPENDIX: the 4pLL model
 
 The **four-parameter log-logistic function** have the following presentations [@weimer2012impact]: $$f(x)=f(x;b,c,d,e)=c+\frac{d-c}{1+\exp[b(log(x)-log(e))]}=c+\frac{d-c}{1+\left(\frac{x}{e}\right)^b}=c+\frac{d-c}{1+{10}^{b(log_{10}(x)-log_{10}(e))}}$$
 
@@ -179,7 +186,9 @@ Here I have shortly compare the equivalent expressions applied by several refere
 ***
 
 
-# APPENDIX F: Updates
+# APPENDIX: Updates
+
+- **From 09dic2016 to 01feb2017**
 
 *09dic2016:*
 
@@ -187,10 +196,10 @@ With the Antibody Units:
 
 - Conversion of the Estimated Reciprocal Dilutions to *Arbitrary Ab units*.
     + *SOL:* Followed NAMRU-6 SOP for ELISA data analysis.
-    + A complementary description is in the [Appendix A](#appendix-a-from-od-to-ab-units)
+    + A complementary description is in the [Appendix](#appendix-from-od-to-ab-units)
 
 - Complete understanding of Cook et.al. [@Cook2011] and Cunha et.al. [@Cunha2014] or Cook et.al. [@Cook2011] methodology.
-    + *SOL:* A complementary description is in the [Appendix B](#appendix-b-the-4pll-model).
+    + *SOL:* A complementary description is in the [Appendix](#appendix-the-4pll-model).
 
 - Blank wells were added as STD with Ab units equal to zero. Then, a 4pLL was the best model to fit STD data.
     + *NOTE:* This allows to avoid background subtraction.
@@ -271,10 +280,10 @@ With the Antibody Units:
         + Better suited for **covariates** addition.
 
 - For a comparison between resting NaN's mean.OD and Upper/Lower limits per ELISA plate:
-    + Complete list of NaN's available in [Appendix C](#appendix-c-residual-na)
-    + Complete list of Upper/Lower limits per ELISA plate in [Appendix D](#appendix-d-upperlower-limits)
+    + Complete list of NaN's available in [02-dtfilter.html](report/02-dtfilter.html#appendix-residual-na)
+    + Complete list of Upper/Lower limits per ELISA plate in [01-standard.html](report/01-standard.html#appendix-upperlower-limits)
 
-- A complete list of previous updates available in [Appendix F](#appendix-f-updates)
+- A complete list of previous updates available in [Appendix](#appendix-updates)
 
 *13ene2017:*
 
@@ -290,12 +299,12 @@ With the Antibody Units:
 
 *20ene2017:*
 
-- After Katty indication, DB typos were corrected in the current [script](#db-typo-corrections):
+- After Katty indication, DB typos were corrected in the current script at [02-dtfilter.html](report/02-dtfilter.html#db-typo-corrections):
     + 2 samples were added: ZG009-3 and NN068-2.
 
-- Complete list of replicates before and after the unbiased selection available at [APPENDIX E](#appendix-e-replicates)
+- Complete list of replicates before and after the unbiased selection available at [02-dtfilter.html](report/02-dtfilter.html#appendix-replicates)
 
-- Covariate DB was added to the [analysis](#new-db-comparison):
+- Covariate DB was added to the analysis at [03-covariat.html](report/03-covariat.html#covariates):
     + Updated covariate DB was merged with the Ab.units per sample:
         + CSV file is available to re-analyse seropositivity in STATA.
     
@@ -349,5 +358,47 @@ With the Antibody Units:
 - *MUST:* Improve code
     + Replace SDCV by an extended MEAN data.frame.
     + This will solve N15 NaN problem
+
+
+
+# APPENDIX: Version Control
+
+- **From 30jan2017 to 06mar2017**
+
+## Project directory
+
+- Following Reproducible Research workflow [procedures](http://blog.jom.link/implementation_basic_reproductible_workflow.html)
+
+```{bash}
+less notrack/project_elixr.md
+```
+
+## Git version control
+
+- For a graphical introduction to Git within Rstudio, check this [link](http://r-pkgs.had.co.nz/git.html).
+
+```{bash}
+git log --oneline
+```
+
+- For a restricted file tracking, e.g. avoiding large files like datasets, add their names to a `.gitignore` file
+```{bash}
+less .gitignore
+```
+
+
+## Git commits in detail
+
+```{bash}
+git log
+```
+
+
+# APPENDIX: README file
+
+```{bash}
+less README.md
+```
+
 
 # References

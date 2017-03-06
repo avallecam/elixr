@@ -31,9 +31,9 @@ options(width = 140) # CHANGE TO DEFAULT in PDF
 
 # Setup 
 
-This report is writen in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
+This report is written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
 
-This dynamic document integrates **text**, **code** and **results**. For more information, I recommend a recent 2016 review in spanish about **Reproducible science: what, why, how?** [@CienciaReproducible2016].
+This dynamic document integrates **text**, **code** and **results**[@CienciaReproducible2016].
 
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
 require(Hmisc)

@@ -31,9 +31,9 @@ options(width = 110) # CHANGE TO DEFAULT in PDF
 
 # Setup 
 
-This report is writen in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
+This report is written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
 
-This dynamic document integrates **text**, **code** and **results**.
+This dynamic document integrates **text**, **code** and **results**[@CienciaReproducible2016].
 
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
 require(Hmisc)
@@ -47,9 +47,9 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 ```
 `r mu$widescreen()`
 
-# Summary
+# Objectives
 
-**OBJECTIVE:**
+**PROJECT:**
 
 * Principal: 
     - Standardize the OD~450nm~ values across ELISA plates by the estimation of the Antibody Units of each unknown sample.
@@ -57,22 +57,28 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 * Secondary:
     - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
 
-* TO DO:
+**NOTEBOOK:**
+
+* Principal: 
+    - Clean and standardize the UNAP-6 Epidemiological and Census database.
+
+* Secondary: 
+    - Check variable consistency across the database.
+
+* **TO DO:**
     - Solve **inconsistencies**
     - introduce a `datetime` class variable
     - `sheet2` and `sheet3` are required?
-
-# Introduction
-
-This is an R implementation of a pipeline for the standardization of ELISA plates directly from a template matrix.
 
 
 # Dependencies
 
 The required R packages for this analysis are:
 
-+ XLConnect [@XLConnect]
-+ drc [@Ritz2015]
++ `tidyverse` [@tidyverse]
++ `readxl` [@readxl]
++ `forcats` [@forcats]
++ `stringr` [@stringr]
 
 ```{r, results='hide', message=FALSE}
 ##essential
@@ -93,14 +99,14 @@ library("stringr")    # for strings
 library("viridis")    # color visualization
 ```
 
-# read .Rds
+# Input
 ```{r}
 std.nty.cov <- readRDS("data/03-covariat-nty.rds")
 std.uty.cov <- readRDS("data/03-covariat-uty.rds")
 ```
 
 
-# RESULTS
+# Results
 
 - `unap6` **109** variables were reduced to **88**
 - a plot `age` vs `residence` show some inconsistencies corrected throughout updates
@@ -631,13 +637,13 @@ unap6a %>%
   glimpse()
 ```
 
-## FINAL
+## Final
 
 ```{r}
 unap6a %>% glimpse()
 ```
 
-# EXPORT
+# Output
 
 ```{r}
 readr::write_csv(unap6a, "data/04-epidemio-cov.csv")
@@ -647,7 +653,7 @@ saveRDS(unap6a, "data/04-epidemio-cov.rds")
 
 ***
 
-# APPENDIX E:
+# APPENDIX: Plots and problems
 
 ```{r, fig.width=10, fig.height=4, fig.align="center"}
 #

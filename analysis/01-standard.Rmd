@@ -31,9 +31,9 @@ options(width = 110) # CHANGE TO DEFAULT in PDF
 
 # Setup 
 
-This report is writen in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
+This report is written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
 
-This dynamic document integrates **text**, **code** and **results**. For more information, I recommend a recent 2016 review in spanish about **Reproducible science: what, why, how?** [@CienciaReproducible2016].
+This dynamic document integrates **text**, **code** and **results**[@CienciaReproducible2016].
 
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
 require(Hmisc)
@@ -47,9 +47,9 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 ```
 `r mu$widescreen()`
 
-# Summary
+# Objectives
 
-**OBJECTIVE:**
+**PROJECT:**
 
 * Principal: 
     - Standardize the OD~450nm~ values across ELISA plates by the estimation of the Antibody Units of each unknown sample.
@@ -57,7 +57,15 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 * Secondary:
     - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
 
-* TO DO:
+**NOTEBOOK:**
+
+* Principal: 
+    - Standardize OD values across ELISA plates following **Miura et.al., 2008**[@Miura2008].
+
+* Secondary: 
+    - Generate useful outputs to compare standardization quality.
+
+* **TO DO:**
     - Implement `plater` and `readxl` data input
     - Assess the **inter-plate-CV** comparing STD variability across plates to generate a **Limit of Quantification**
         + Actual CV is the **intra-plate-CV**
@@ -67,17 +75,14 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
         + blank, positive and negative controls
 
 
-# Introduction
-
-This is an R implementation of a pipeline for the standardization of ELISA plates directly from a template matrix.
-
 
 # Dependencies
 
 The required R packages for this analysis are:
 
-+ XLConnect [@XLConnect]
-+ drc [@Ritz2015]
++ `plater` [@plater]
++ `XLConnect` [@XLConnect]
++ `drc` [@Ritz2015]
 
 ```{r, results='hide', message=FALSE}
 ##essential
@@ -98,6 +103,8 @@ library("viridis")    # color visualization
 
 # Method
 
+- using `DiagrammeR` [@DiagrammeR]
+
 ```{r, fig.align='center', fig.width=9}
 #install.packages("DiagrammeR")
 #library(DiagrammeR)
@@ -105,6 +112,7 @@ library("viridis")    # color visualization
 DiagrammeR("
   graph LR
     A[XLS data] -.-> |XLConnect| B{R data}
+    Z[CSV data] -.-> |plater| B{R data}
     B --> C1[STD]
     B --> E[ctr +/-]
     B --> D1[UNK]
@@ -121,6 +129,7 @@ DiagrammeR("
     F --> G2[Density]
     F --> G3[QQPlot]
 
+    style Z fill:#ffffff, stroke:#000000, stroke-width:2px    
     style A fill:#ffffff, stroke:#000000, stroke-width:2px
     style B fill:#ffffff, stroke:#000000, stroke-width:2px
     style C1 fill:#ffffff, stroke:#000000, stroke-width:2px
@@ -470,7 +479,7 @@ std.par <- rbind(std.par, data_frame(Plate= paste0("N",b[j]),
 
 ```
 
-# save .Rds
+# Output
 ```{r}
 saveRDS(tbl_df(std.raw), "data/01-standard-raw.rds")
 saveRDS(tbl_df(std.par), "data/01-parametr.rds")
@@ -480,7 +489,7 @@ saveRDS(Pf.ID, "data/01-dilution.rds")
 
 ***
 
-# APPENDIX D: Upper/Lower limits
+# APPENDIX: Upper/Lower limits
 
 ```{r}
 #std.par <- readRDS("data/01-parametr.rds")

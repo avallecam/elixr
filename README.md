@@ -1,27 +1,24 @@
 # SeroSurveillance
 
-This is a reproducible workflow in R for the standardization of ELISA reads across plates, following [K. Miura et al. 2008](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2253722/) experimental procedure.
+This is a reproducible workflow in R for the standardization of ELISA reads across plates.
+It follows K. Miura et al. 2008 experimental procedure.
 
-## TO-DO
+## TO DO:
 
-1. Order covariate data sets (Excel and Stata formats)
-2. Manage large covariate dataset (Excel)
-3. Add an alternative initial path: 'plater' instead of 'XLConnect'
-4. Merge histograms by factor Specie
+1. Add an alternative initial path: `plater` instead of `XLConnect`.
+2. Generate inter-plate variability measurements: `inter-plate-CV`, `ctrl+`, `ctrl-`.
+3. Check if `ZG182-1` should be corrected to `ZG181-1`.
+4. Use `relational data` to conect `Serological dataset` and `Covariate+Epidemiological dataset`.
+5. Solve inconsistencies in the Epidemiological dataset.
 
 - Write methodology and limitations
     + Compare against drLumi statistical considerations
     + `medrc` package
 - Add table with expected Template distribution
     + `plater` package
-- Keep a tidy export DF format
-    + each variable is a column
-    + each observation is a row
-    + each type of observational unit forms a table
-- Add note on maximum Ab.unit **previous to filtering**
 - Add details on K.Miura methods (appendix)
 
-## Project suggestions
+## Project suggestions:
 
 - Add STD duplicates on each plate?
     + Provides limits of quantification
@@ -30,12 +27,12 @@ This is a reproducible workflow in R for the standardization of ELISA reads acro
 - Review communities history
     + Rosas-Aguirre rejected ages older than 30
     + Check Maki publication on 'Road construction...'
-- Standard procedure to outliers for re-run
+- Standard procedure to outliers for re-run (based on ctrl comparisons)
 
-## Additional analysis?
+## Additional analysis:
 
-- Study Logistic regression + odds-ratio statistics (handbookstatistics!)
-- Individual level heterogeneity
+- Multinomial Logistic regression
+- Individual level heterogeneity:
     + map location
     + climate, geographical differences, altitude, ...
     + seroprevalence adjusted with covariates
@@ -44,7 +41,7 @@ This is a reproducible workflow in R for the standardization of ELISA reads acro
     + Angel Rosas-Aguirre on VIVAX EPIDEMIO PERU
     + Veronica Soto-Calle on SPATIO-TEMPORAL MALARIA LORETO
     
-## Curiosities
+## Curiosities:
 
 - Some lab replicate patterns:
     + N21 -> N28 -> {N30, N31, N32}

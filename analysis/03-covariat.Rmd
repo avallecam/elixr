@@ -31,9 +31,9 @@ options(width = 110) # CHANGE TO DEFAULT in PDF
 
 # Setup 
 
-This report is writen in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
+This report is written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
 
-This dynamic document integrates **text**, **code** and **results**.
+This dynamic document integrates **text**, **code** and **results**[@CienciaReproducible2016].
 
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
 require(Hmisc)
@@ -47,9 +47,9 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 ```
 `r mu$widescreen()`
 
-# Summary
+# Objectives
 
-**OBJECTIVE:**
+**PROJECT:**
 
 * Principal: 
     - Standardize the OD~450nm~ values across ELISA plates by the estimation of the Antibody Units of each unknown sample.
@@ -57,26 +57,31 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 * Secondary:
     - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
 
-* TO DO:
+**NOTEBOOK:**
+
+* Principal: 
+    - Generate a unified covariate database for the following statistical analysis.
+
+* Secondary: 
+    - Generate a Quality Control report comparing UNAP and NAMR measurements on microscopy and PCR.
+
+* **TO DO:**
     - In order to keep using `std.nty` as a tidy dataset 
         + A [relational data](http://r4ds.had.co.nz/relational-data.html) framework could be used.
         + The **Serological dataset** and **Covariate/Epidemiological** dataset could keep to be separated but **related**, instead.
-        + More details in [APPENDIX F](#appendix-f-tidy-vs-untidy)
+        + More details in [APPENDIX](#appendix-tidy-vs-untidy)
     - re-evaluate 01 patient 02 id after `unap6`
-        + evaluation in [APPENDIX G](#appendix-g-id-errors)
+        + evaluation in [APPENDIX](#appendix-id-errors)
 
-
-# Introduction
-
-This is an R implementation of a pipeline for the standardization of ELISA plates directly from a template matrix.
 
 
 # Dependencies
 
 The required R packages for this analysis are:
 
-+ XLConnect [@XLConnect]
-+ drc [@Ritz2015]
++ `tidyverse` [@tidyverse]
++ `haven` [@haven]
++ `readxl` [@readxl]
 
 ```{r, results='hide', message=FALSE}
 ##essential
@@ -86,7 +91,7 @@ library(drc)          # Dose-Response modeling
 library("DiagrammeR") # method Flowchart
 library("knitr")      # To display nice tables
 library("tidyverse")
-#ggplot2, tibble, tidyr, readr, purr, dplyyr
+#ggplot2, tibble, tidyr, readr, purr, dplyr
 ##extra
 library("Rmisc")      # multiplot ggplots
 library("haven")      # import STATA df
@@ -95,7 +100,7 @@ library("forcats")    # factor vectors
 library("viridis")    # color visualization
 ```
 
-# read .Rds
+# Input
 ```{r}
 std.nty <- readRDS("data/02-dtfilter-nty.rds")
 std.uty <- readRDS("data/02-dtfilter-uty.rds")
@@ -146,7 +151,7 @@ New names include:
 ls -sh data/UNAP-*
 ```
 
-# AIM
+# Priors
 
 - check if `unap1` is equal to `unap2`
 - `unap3` should be equal to `unap2` plus seropositivity agregate columns
@@ -162,7 +167,7 @@ ls -sh data/UNAP-*
     + `unap6` as prev-EPI
 
 
-# RESULTS
+# Results
 
 - `unap6` is the **source** for `unap1` age and sex covariates only.
 - `unap1` is the **source** of all other `unap#` DB's
@@ -173,10 +178,10 @@ ls -sh data/UNAP-*
 - `unap5` is **different** from `unap1` only in micro UNAP covariate
 - `unap1` UNAP covariates were arbitrarily **selected** to compare against `unap5` NAMR ones.
 - `unap0` was created as a **merged** DB of covariates
-- `unap0` was **merged** with both `std.nty` and `std.uty` DB of mean.OD and Ab.units per specie obtained in **02-data-filtering.Rmd**
+- `unap0` was **merged** with both `std.nty` and `std.uty` DB of mean.OD and Ab.units per specie obtained in **02-dtfilter.Rmd**
 - `std.nty.cov` and `std.uty.cov` were **written** in a `.csv` and **saved** in a `.rds` for further analysis.
 
-- diagram of DB history
+- diagram of DB history using `DiagrammeR` [@DiagrammeR]
 
 ```{r, fig.align='center', fig.width=9, fig.height=3}
 #install.packages("DiagrammeR")
@@ -215,7 +220,7 @@ f -> a [color= green]
 ")
 ```
 
-# PROCEDURE
+# Procedure
 
 ## UNAP-1-DB-20sep2016.dta
 
@@ -447,7 +452,7 @@ unap6 <- unap6[1:sum(unap6$id_integrante != "", na.rm = T),
 #str(unap6)
 ```
 
-# MERGE COVARIATES
+# Merge covariates
 
 AIM:
 
@@ -496,7 +501,7 @@ str(unap0)
 #summary(unap0)
 ```
 
-# MERGE AB UNTIS
+# Merge Ab units
 
 - `std.uty` can be directly merged with `unap0`
 - `std.nty` + `unap0` assumes that:
@@ -505,6 +510,7 @@ str(unap0)
 ## untidy format
 
 - At the moment, the most convenient dataset.
+- Check its tidy version summary [here](#validate-tidy)
 
 ```{r}
 std.uty.cov <- std.uty %>%
@@ -600,11 +606,11 @@ str(std.nty.cov)
 **CHECK:**
 
 - Note that `micro_` and `pcr_` covariates are now standardized as factors with only **2** labels.
-- Validation in [APPENDIX F](#appendix-f-tidy-vs-untidy)
+- Validation in [APPENDIX](#appendix-tidy-vs-untidy)
 
 
 
-# QC REPORT
+# QC report
 
 ## using untidy dataset
 ```{r}
@@ -625,7 +631,7 @@ std.uty.cov %>%
 
 - assumes that `micro_` and `pcr_` are independent observations.
 - given the mentioned assumption, percentage increases due to an updated logic variables.
-    + Check details in [APPENDIX F](#appendix-f-tidy-vs-untidy)
+    + Check details in [APPENDIX](#appendix-tidy-vs-untidy)
 
 ```{r}
 std.nty.cov %>% 
@@ -642,10 +648,10 @@ std.nty.cov %>%
 ```
 
 
-# EXPORT
+# Output
 
-- `std.uty.cov` output was written as `data/03-standard-untidy-cov.csv`.
-- `std.nty.cov` output was written as `data/03-standard-tidy-cov.csv`:
+- `std.uty.cov` output was written as `data/03-covariat-uty.csv`.
+- `std.nty.cov` output was written as `data/03-covariat-nty.csv`:
 
 ```{r}
 #
@@ -662,9 +668,9 @@ saveRDS(std.uty.cov, "data/03-covariat-uty.rds")
 
 ***
 
-# APPENDIX F: tidy vs untidy
+# APPENDIX: tidy vs untidy
 
-## subset mixed infections
+## How to subset mixed infections with tidy?
 
 - with regard to `pcr_n`
 
@@ -683,7 +689,7 @@ std.nty.cov %>%
 ```
 
 
-## Validation
+## Validate tidy
 
 - Contrast this subset against `summary(std.uty.cov)` [here](#untidy-format):
 
@@ -701,7 +707,7 @@ std.nty.cov %>% filter(id=="ZG178-5") %>% select(-3)
 std.uty.cov %>% filter(id=="ZG178-5") %>% select(1:3,12:17)
 ```
 
-## Relevant for the QC evaluation 
+## tidy is relevant for the QC evaluation 
 - In case **NAMR** differs in the identification of mixed-infection with respect to **UNAP**, 
 - tidy dataset **QC report** takes **UNAP** mono-infection detections into account.
 ```{r}
@@ -736,7 +742,7 @@ std.nty.cov %>%
 
 
 
-# APPENDIX G: ID errors
+# APPENDIX: ID errors
 
 ## EVALUATE 01 patient 02 IDs
 

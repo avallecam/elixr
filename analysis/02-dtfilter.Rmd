@@ -31,9 +31,9 @@ options(width = 110) # CHANGE TO DEFAULT in PDF
 
 # Setup 
 
-This report is writen in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
+This report is written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
 
-This dynamic document integrates **text**, **code** and **results**.
+This dynamic document integrates **text**, **code** and **results**[@CienciaReproducible2016].
 
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
 require(Hmisc)
@@ -47,9 +47,9 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 ```
 `r mu$widescreen()`
 
-# Summary
+# Objectives
 
-**OBJECTIVE:**
+**PROJECT:**
 
 * Principal: 
     - Standardize the OD~450nm~ values across ELISA plates by the estimation of the Antibody Units of each unknown sample.
@@ -57,25 +57,28 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 * Secondary:
     - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
 
-* TO DO:
+**NOTEBOOK:**
+
+* Principal: 
+    - Identidy and filter the replicated reads across ELISA plates.
+
+* Secondary: 
+    - Visualize OD and AU distributions post ELISA standardization.
+
+* **TO DO:**
     - Is it required to change NaN with 0 and NaN or .?
         + string replacement on data.filtering
         + May not be convinient due to problems in data transformation and statistics.
     - CHECK IF **ZG182-1** should be corrected to **ZG181-1**.
         + Missing reads are complementary between ID's.
-        + More detail in [Appendix C](#appendix-c-residual-na) **NOTE 2**.
-
-# Introduction
-
-This is an R implementation of a pipeline for the standardization of ELISA plates directly from a template matrix.
+        + More detail in [Appendix](#appendix-residual-na) **NOTE 2**.
 
 
 # Dependencies
 
 The required R packages for this analysis are:
 
-+ XLConnect [@XLConnect]
-+ drc [@Ritz2015]
++ `ggplot` [@ggplot2]
 
 ```{r, results='hide', message=FALSE}
 ##essential
@@ -95,7 +98,7 @@ library("stringr")    # strings
 library("viridis")    # color visualization
 ```
 
-# read .Rds
+# Input
 ```{r}
 std.raw <- readRDS("data/01-standard-raw.rds")
 std.par <- readRDS("data/01-parametr.rds")
@@ -220,9 +223,9 @@ std.out %>%
   filter(out.upp==T)
 ```
 
-More details in [Appendix C](#appendix-c-residual-na)
+More details in [Appendix](#appendix-residual-na)
 
-## REPLICATES
+## Replicates
 
 From the **total expected** samples, we calculate that the total amount of reads in excess that came from replicates (duplicates or triplicates) among Templates goes up to **`r repet`**.
 
@@ -275,7 +278,7 @@ dim(std.dupl)
 summary(std.dupl[,-c(3,6)])
 ```
 
-## UNBIASED selection
+## Unbiased selection
 
 Unbiased selection criteria of Ab.units estimate among replicated reads of per sample:
 
@@ -398,7 +401,7 @@ std.dupl_new <- rbind(std.dupl_new,extra[4,]) # +1
 
 ```
 
-## FILTERING
+## Filtering
 
 - Aim:
     + Retrieve of all replicated reads: triplicates, duplicates and NaN.
@@ -537,7 +540,7 @@ After filtering, we obtain
 As seen in the last `checkIN`, 
 
 - **`r checkIN(std.nty)[1]` samples** have only one read because of **Ab.unit NaN**. 
-- For more detail, go to [Appendix C](#appendix-c-residual-na)
+- For more detail, go to [Appendix](#appendix-residual-na)
 
 
 ### Plot after filtering
@@ -590,7 +593,7 @@ abline(h=20, v=0.25, lty=2, col=2)
 
 
 
-## DISTRIBUTIONS
+## Distributions
 
 ### Linear scale
 
@@ -678,7 +681,7 @@ Rmisc::multiplot(a,c,
 ```
 
 
-# EXPORT
+# Output
 
 ## tidy format:
 
@@ -713,7 +716,7 @@ str(std.uty)
 summary(std.uty)
 ```
 
-# save .Rds
+## save .rds
 ```{r}
 saveRDS(std.nty, "data/02-dtfilter-nty.rds")
 saveRDS(std.uty, "data/02-dtfilter-uty.rds")
@@ -728,7 +731,7 @@ saveRDS(std.uty, "data/02-dtfilter-uty.rds")
 
 ***
 
-# APPENDIX C: residual NA
+# APPENDIX: residual NA
 
 **NOTE 1:** 
 
@@ -777,7 +780,7 @@ std.raw[std.raw$ID=="ZG182-1",]
 	+ Missing reads are complementary between ID's.
 
 
-# APPENDIX E: Replicates
+# APPENDIX: Replicates
 
 ## PRE selection
 
