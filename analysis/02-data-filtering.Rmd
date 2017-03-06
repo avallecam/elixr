@@ -97,7 +97,7 @@ library("viridis")    # color visualization
 
 # read .Rds
 ```{r}
-std.raw <- readRDS("data/01-output-raw.rds")
+std.raw <- readRDS("data/01-standard-raw.rds")
 std.par <- readRDS("data/01-parameters.rds")
 ```
 

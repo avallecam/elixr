@@ -9,10 +9,10 @@ knitr::opts_knit$set(root.dir='../.')
 # render -----------------------------------------------------------------------
 
 #library(rmarkdown)
-#rmarkdown::render("analysis/01-standardization.Rmd", clean=TRUE)
+rmarkdown::render("analysis/01-standardization.Rmd", clean=TRUE)
 rmarkdown::render("analysis/02-data-filtering.Rmd", clean=TRUE)
 rmarkdown::render("analysis/03-covariates.Rmd", clean=TRUE)
-#rmarkdown::render("analysis/03-epidemiology.Rmd", clean=TRUE)
+rmarkdown::render("analysis/04-epidemiology.Rmd", clean=TRUE)
 #rmarkdown::render("analysis/00-appendix.Rmd", clean=TRUE)
 
 # move -------------------------------------------------------------------------

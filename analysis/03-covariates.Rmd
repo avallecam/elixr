@@ -58,7 +58,12 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
     - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
 
 * TO DO:
+    - In order to keep using `std.nty` as a tidy dataset 
+        + A [relational data](http://r4ds.had.co.nz/relational-data.html) framework could be used.
+        + The **Serological dataset** and **Covariate/Epidemiological** dataset could keep to be separated but **related**, instead.
+        + More details in [APPENDIX F](#appendix-f-tidy-vs-untidy)
     - re-evaluate 01 patient 02 id after `unap6`
+        + evaluation in [APPENDIX G](#appendix-g-id-errors)
 
 
 # Introduction
@@ -320,7 +325,7 @@ summary(unap4)
 
 ### unap4 covariate labels
 
-Covariate labeling is based on labels available in covariate DB sheet 2. If more clarity is required, we only need to change those cells.
+Covariate labeling is based on labels available in covariate DB sheet 2.
 
 ```{r}
 unap4.xl <- XLConnect::loadWorkbook("data/UNAP-4-UP-16ene2017.xlsx")
@@ -489,21 +494,57 @@ unap0 <-
 #unap0
 str(unap0)
 #summary(unap0)
-
 ```
 
 # MERGE AB UNTIS
 
-- `unap0` is in an untidy format
-- `unap0` requires to be tidied before or after merging it with `std.nty`
-- `unap0` can be directly merged with `std.uty`
+- `std.uty` can be directly merged with `unap0`
+- `std.nty` + `unap0` assumes that:
+    + `micro_` and `pcr_` are `Specie` independent observations.
+
+## untidy format
+
+- At the moment, the most convenient dataset.
+
+```{r}
+std.uty.cov <- std.uty %>%
+  select(id=ID, 2:5) %>%
+  full_join(unap0, by="id") #%>%
+  #select(1:14,21,15:17,19,20,18)
+
+
+str(std.uty.cov)
+summary(std.uty.cov)
+#View(std.uty.cov)
+```
 
 ## tidy format
+
+- `std.nty` + `unap0` assumes that:
+    + `micro_` and `pcr_` are `Specie` independent observations.
+
+**Would require:**
 
 - merge `std.nty` and `unap0`
 - filter by `Specie`
 - recode `micro_` and `pcr_` levels per `Specie`
-- generate `std.nty.cov` in a tidy format by combining all cases per Specie.
+- generate `std.nty.cov` in a tidy format by combining all cases per Specie
+- correct `micro_n1` and `pcr_n1` logic vectors
+
+**Instead:**
+
+- A [Relational data](http://r4ds.had.co.nz/relational-data.html) framework could be used.
+    + The **Serological dataset** and **Covariate/Epidemiological** dataset would be separated but **related**.
+- This would imply:
+    + keep `std.nty` as it is: tidy, and avoid `std.uty`.
+    + keep `unap0` as it is: with no issues that came from the `Specie` covariate.
+    + avoid untiding `std.nty` + `unap0` for `micro_` and `pcr_` coherence.
+- At the moment, the most convenient dataset is `std.uty.cov`.
+
+**By now:**
+
+- `micro_` and `pcr_` are `Specie` related covariates
+- `micro_` and `pcr_` were merged with serological data.
 
 ```{r}
 std.nty.pre <- std.nty %>%
@@ -511,7 +552,7 @@ std.nty.pre <- std.nty %>%
   full_join(unap0, by="id") #%>% count("micro_1")
 
 std.nty.pre_Pv <- std.nty.pre %>% 
-  #select(id, Specie, micro_1, micro_n, pcr_1, pcr_n) %>% 
+  select(1:4, 11:16) %>% 
   filter(Specie=="Pviv") %>% #count("pcr_1")
   mutate(micro_1=fct_recode(micro_1,
                             "0"="2",
@@ -526,7 +567,7 @@ std.nty.pre_Pv <- std.nty.pre %>%
                           "1"="3")) #%>% count("pcr_n")
 
 std.nty.pre_Pf <- std.nty.pre %>% 
-  #select(id, Specie, micro_1) %>% 
+  select(1:4, 11:16) %>% 
   filter(Specie=="Pfal") %>% #count("pcr_n")
   mutate(micro_1=fct_recode(micro_1,
                             "1"="2",
@@ -546,62 +587,156 @@ std.nty.pre_Pf <- std.nty.pre %>%
 
 std.nty.cov <- union(std.nty.pre_Pf, std.nty.pre_Pv)
 
+## correct logic vectors of micro and pcr
+std.nty.cov <- std.nty.cov %>% 
+  mutate(micro_n1= micro_1==micro_n,
+         pcr_n1= pcr_1==pcr_n)
+
 
 str(std.nty.cov)
 #summary(std.nty.cov)
-
-
-readr::write_csv(std.nty.cov %>%
-            format(scientific=FALSE, digits=2), "data/03-standard-tidy-cov.csv")
-saveRDS(std.nty.cov, "data/03-standard-tidy-cov.rds")
 ```
 
 **CHECK:**
 
 - Note that `micro_` and `pcr_` covariates are now standardized as factors with only **2** labels.
-- Validate the procedure contrasting this subset against `summary(std.uty.cov)`:
+- Validation in [APPENDIX F](#appendix-f-tidy-vs-untidy)
+
+
+
+# QC REPORT
+
+## using untidy dataset
 ```{r}
-#
-std.nty.cov %>% 
-  select(Specie, micro_1) %>% 
-  group_by(Specie, micro_1) %>% 
-  count()
-
-std.nty.cov %>% 
-  select(Specie, pcr_n) %>% 
-  group_by(Specie, pcr_n) %>% 
-  count()
-
+std.uty.cov %>% 
+  select(micro_n1) %>% 
+  filter(micro_n1!="NA") %>% 
+  count() %>% 
+  mutate(percent_similarity= (freq/sum(freq))*100)
+  
+std.uty.cov %>% 
+  select(pcr_n1) %>% 
+  filter(pcr_n1!="NA") %>% 
+  count() %>% 
+  mutate(percent_similarity= (freq/sum(freq))*100)
 ```
 
+## using tidy dataset
 
-## untidy format
+- assumes that `micro_` and `pcr_` are independent observations.
+- given the mentioned assumption, percentage increases due to an updated logic variables.
+    + Check details in [APPENDIX F](#appendix-f-tidy-vs-untidy)
 
 ```{r}
-std.uty.cov <- std.uty %>%
-  select(id=ID, 2:5) %>%
-  full_join(unap0, by="id") #%>%
-  #select(1:14,21,15:17,19,20,18)
+std.nty.cov %>% 
+  select(micro_n1) %>% 
+  filter(micro_n1!="NA") %>% 
+  count() %>% 
+  mutate(percent_similarity= (freq/sum(freq))*100)
 
-
-str(std.uty.cov)
-summary(std.uty.cov)
-#View(std.uty.cov)
-
-
-readr::write_csv(std.uty.cov %>%
-            format(scientific=FALSE, digits=2), "data/03-standard-untidy-cov.csv")
-saveRDS(std.uty.cov, "data/03-standard-untidy-cov.rds")
+std.nty.cov %>% 
+  select(pcr_n1) %>% 
+  filter(pcr_n1!="NA") %>% 
+  count() %>% 
+  mutate(percent_similarity= (freq/sum(freq))*100)
 ```
+
 
 # EXPORT
 
 - `std.uty.cov` output was written as `data/03-standard-untidy-cov.csv`.
 - `std.nty.cov` output was written as `data/03-standard-tidy-cov.csv`:
 
+```{r}
+#
+readr::write_csv(std.nty.cov %>%
+            format(scientific=FALSE, digits=2), "data/03-standard-tidy-cov.csv")
+saveRDS(std.nty.cov, "data/03-standard-tidy-cov.rds")
+
+#
+readr::write_csv(std.uty.cov %>%
+            format(scientific=FALSE, digits=2), "data/03-standard-untidy-cov.csv")
+saveRDS(std.uty.cov, "data/03-standard-untidy-cov.rds")
+```
+
+
 ***
 
-# previous report
+# APPENDIX F: tidy vs untidy
+
+## subset mixed infections
+
+- with regard to `pcr_n`
+
+```{r}
+std.nty.cov %>% 
+  select(1,4,9) %>% #count("pcr_n")
+  mutate(pcr_n= as.numeric(pcr_n)) %>% #count("pcr_n") # WARNING: 0 and 1 -> 1 and 2
+  group_by(id) %>%
+  summarise_if(is.numeric,sum) %>% # count("pcr_n")
+  filter(pcr_n=="4") %>% 
+  select(id)
+  #filter(id=="LL013-1")#4 = 2+2 = mixed infection
+  #filter(id=="LL011-3")#3 = 2+1 | 1+2 = mono infections
+  #filter(id=="LL022-3")#2 = 1+1 = no infection
+  
+```
+
+
+## Validation
+
+- Contrast this subset against `summary(std.uty.cov)` [here](#untidy-format):
+
+```{r}
+# ONLY FOR SEROLOGICAL DATA and -if required- for MICRO AND PCR data
+summary(std.nty.cov %>% filter(Specie=="Pfal"))
+summary(std.nty.cov %>% filter(Specie=="Pviv"))
+```
+
+- updated logic variables in `std.nty.cov`
+
+```{r}
+## TIDY DF needs NEW LOGIC vectors
+std.nty.cov %>% filter(id=="ZG178-5") %>% select(-3)
+std.uty.cov %>% filter(id=="ZG178-5") %>% select(1:3,12:17)
+```
+
+## Relevant for the QC evaluation 
+- In case **NAMR** differs in the identification of mixed-infection with respect to **UNAP**, 
+- tidy dataset **QC report** takes **UNAP** mono-infection detections into account.
+```{r}
+# Pvivax + Pfalcip
+std.nty.cov %>% 
+  #select(1,2,4,11:16) %>% 
+  filter(id=="LL013-1") # problem solved!!
+std.uty.cov %>% 
+  select(1:3,12:17) %>% 
+  filter(id=="LL013-1")
+#unap5 %>% 
+#  filter(id=="LL013-1")
+```
+
+```{r, eval=FALSE}
+## TEST all cases
+
+# Pvivax
+std.nty.cov %>% 
+  select(1:4,11:16) %>% 
+  filter(id=="LL003-4") # ok
+# Pfalcip
+std.nty.cov %>% 
+  select(1:4,11:16) %>% 
+  filter(id=="LL038-3") # ok
+# non
+std.nty.cov %>% 
+  select(1:4,11:16) %>% 
+  filter(id=="LL008-8") # ok
+```
+
+
+
+
+# APPENDIX G: ID errors
 
 ## EVALUATE 01 patient 02 IDs
 
@@ -646,5 +781,6 @@ unap4.dlMIX
 Some equalities do not seem to be from the same patient. This step needs more support prior to any sample deletion.
 
 
+***
 
 # References

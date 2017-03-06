@@ -472,7 +472,7 @@ std.par <- rbind(std.par, data_frame(Plate= paste0("N",b[j]),
 
 # save .Rds
 ```{r}
-saveRDS(tbl_df(std.raw), "data/01-output-raw.rds")
+saveRDS(tbl_df(std.raw), "data/01-standard-raw.rds")
 saveRDS(tbl_df(std.par), "data/01-parameters.rds")
 saveRDS(Pf.ID, "data/01-dilutions.rds")
 ```
