@@ -85,7 +85,7 @@ library("Rmisc")        #multiploting ggplots
 
 # read .Rds
 ```{r}
-Pf.ID <- readRDS("data/01-dilutions.rds")
+Pf.ID <- readRDS("data/01-dilution.rds")
 #unlist(Pf.ID[1:12,])
 ```
 

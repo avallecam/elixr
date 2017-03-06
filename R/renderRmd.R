@@ -9,11 +9,11 @@ knitr::opts_knit$set(root.dir='../.')
 # render -----------------------------------------------------------------------
 
 #library(rmarkdown)
-rmarkdown::render("analysis/01-standardization.Rmd", clean=TRUE)
-rmarkdown::render("analysis/02-data-filtering.Rmd", clean=TRUE)
-rmarkdown::render("analysis/03-covariates.Rmd", clean=TRUE)
-rmarkdown::render("analysis/04-epidemiology.Rmd", clean=TRUE)
-#rmarkdown::render("analysis/00-appendix.Rmd", clean=TRUE)
+rmarkdown::render("analysis/01-standard.Rmd", clean=TRUE)
+rmarkdown::render("analysis/02-dtfilter.Rmd", clean=TRUE)
+rmarkdown::render("analysis/03-covariat.Rmd", clean=TRUE)
+rmarkdown::render("analysis/04-epidemio.Rmd", clean=TRUE)
+rmarkdown::render("analysis/00-appendix.Rmd", clean=TRUE)
 
 # move -------------------------------------------------------------------------
 #move file directory path using file.rename 

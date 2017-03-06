@@ -59,7 +59,6 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 
 * TO DO:
     - Solve **inconsistencies**
-    - change factor labels in **`ah_`** variables?
     - introduce a `datetime` class variable
     - `sheet2` and `sheet3` are required?
 
@@ -96,8 +95,8 @@ library("viridis")    # color visualization
 
 # read .Rds
 ```{r}
-std.nty.cov <- readRDS("data/03-standard-tidy-cov.rds")
-std.uty.cov <- readRDS("data/03-standard-untidy-cov.rds")
+std.nty.cov <- readRDS("data/03-covariat-nty.rds")
+std.uty.cov <- readRDS("data/03-covariat-uty.rds")
 ```
 
 
@@ -318,11 +317,26 @@ Rmisc::multiplot(a,b,c,cols = 3)
 
 ### ah_
 
+- change `ah_` factor labels
+
 ```{r}
+unap6a <- unap6a %>% 
+  mutate_at(vars(ah_radio:ah_auto), factor) %>% #select(1, contains("enf")) %>% glimpse()
+  mutate(ah_radio=fct_recode(ah_radio,"si"="1","no"="0"), 
+         ah_television=fct_recode(ah_television,"si"="1","no"="0"), 
+         ah_estereo=fct_recode(ah_estereo,"si"="1","no"="0"), 
+         ah_refrigerador=fct_recode(ah_refrigerador,"si"="1","no"="0"), 
+         ah_motocicleta=fct_recode(ah_motocicleta,"si"="1","no"="0"), 
+         ah_mototaxi=fct_recode(ah_mototaxi,"si"="1","no"="0"), 
+         ah_auto=fct_recode(ah_auto,"si"="1","no"="0")) #%>% select(enf_diabetes_si,enf_diabetes_no) %>% count()
+
 unap6a %>% 
-  select(1, starts_with("ah_")) %>% 
+  select(1, starts_with("ah_")) %>%
   gather(key= ah, value = ah_m, -id, na.rm = T) %>% 
-  filter(ah_m==1) %>% dplyr::count(ah)
+  filter(ah_m=="si") %>% dplyr::count(ah, sort = T)
+  #group_by(ah, ah_m) %>% 
+  #dplyr::summarise(n=n()) %>%
+  #mutate(prop= (n/sum(n)*100))
 ```
 
 ### otro_
@@ -622,6 +636,14 @@ unap6a %>%
 ```{r}
 unap6a %>% glimpse()
 ```
+
+# EXPORT
+
+```{r}
+readr::write_csv(unap6a, "data/04-epidemio-cov.csv")
+saveRDS(unap6a, "data/04-epidemio-cov.rds")
+```
+
 
 ***
 

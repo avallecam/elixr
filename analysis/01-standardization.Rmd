@@ -473,8 +473,8 @@ std.par <- rbind(std.par, data_frame(Plate= paste0("N",b[j]),
 # save .Rds
 ```{r}
 saveRDS(tbl_df(std.raw), "data/01-standard-raw.rds")
-saveRDS(tbl_df(std.par), "data/01-parameters.rds")
-saveRDS(Pf.ID, "data/01-dilutions.rds")
+saveRDS(tbl_df(std.par), "data/01-parametr.rds")
+saveRDS(Pf.ID, "data/01-dilution.rds")
 ```
 
 
@@ -483,7 +483,7 @@ saveRDS(Pf.ID, "data/01-dilutions.rds")
 # APPENDIX D: Upper/Lower limits
 
 ```{r}
-std.par <- readRDS("data/01-parameters.rds")
+#std.par <- readRDS("data/01-parametr.rds")
 std.par
 ```
 

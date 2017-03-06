@@ -98,7 +98,7 @@ library("viridis")    # color visualization
 # read .Rds
 ```{r}
 std.raw <- readRDS("data/01-standard-raw.rds")
-std.par <- readRDS("data/01-parameters.rds")
+std.par <- readRDS("data/01-parametr.rds")
 ```
 
 ***
@@ -715,8 +715,8 @@ summary(std.uty)
 
 # save .Rds
 ```{r}
-saveRDS(std.nty, "data/02-standard-tidy.rds")
-saveRDS(std.uty, "data/02-standard-untidy.rds")
+saveRDS(std.nty, "data/02-dtfilter-nty.rds")
+saveRDS(std.uty, "data/02-dtfilter-uty.rds")
 
 #saveRDS(std.nan, "data/02-out-of-bounce.rds")
 
