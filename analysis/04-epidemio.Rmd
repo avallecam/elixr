@@ -67,6 +67,7 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 
 * **TO DO:**
     - Solve **inconsistencies**
+    - CHECK IF **intersections** outside the core **959 samples** have ID typos.
     - introduce a `datetime` class variable
     - `sheet2` and `sheet3` are required?
 
@@ -101,6 +102,10 @@ library("viridis")    # color visualization
 
 # Input
 ```{r}
+std.nty <- readRDS("data/02-dtfilter-nty.rds")
+std.uty <- readRDS("data/02-dtfilter-uty.rds")
+
+unap0 <- readRDS("data/03-covariat-uap.rds")
 std.nty.cov <- readRDS("data/03-covariat-nty.rds")
 std.uty.cov <- readRDS("data/03-covariat-uty.rds")
 ```
@@ -637,17 +642,86 @@ unap6a %>%
   glimpse()
 ```
 
-## Final
+## Merge datasets
+
+### rows differ
+
+```{r, fig.align='center', fig.width=5, fig.height=5}
+unapid <- unap0 %>% select(id)      # 960
+seroid <- std.uty %>% select(id=ID) # 969
+epidid <- unap6a %>% select(id)     # 963
+
+id_unap= unlist(as.list(unapid))
+id_sero= unlist(as.list(seroid))
+id_epid= unlist(as.list(epidid))
+
+tmp <- gplots::venn(list(unap=id_unap,epid=id_epid,sero=id_sero))
+```
+**INTERSECTIONS**
+
+- **epid** only
+```{r}
+attr(tmp, "intersections")$epid
+```
+- **sero** only
+```{r}
+attr(tmp, "intersections")$sero
+```
+- **unap:sero** only
+```{r}
+attr(tmp, "intersections")$`unap:sero`
+```
+
+### merge
+
+- Merge `data/03-covariat-uty.csv` and `unap6a`
+- This is the final unified dataset.
+
+dicoveries:
+
+- `unap6a` and `std.uty.cov` differs in `age`, `sex`, `community`
+- `age`, `sex`, `community` were removed from `unap6a` 
+- then it was merged with `std.uty.cov`
+- logics such as `_0` and `_n1` were removed from `std.uty.cov` previously
 
 ```{r}
-unap6a %>% glimpse()
+unap6b <- unap6a %>% 
+  select(-age, -sex, -community) %>% 
+  full_join(std.uty.cov
+              %>% select(-sex_0, 
+                         -micro_n1, 
+                         #-sex_1, 
+                         #-micro_1,
+                         #-pcr_1, 
+                         #-age_1, 
+                         -pcr_n1,
+                         -age_0)
+            , by="id") # 973
+unap6b %>% glimpse()
+
+unap6c <- unap6a %>% 
+  select(-age, -sex, -community) %>% 
+  inner_join(std.uty.cov
+              %>% select(-sex_0, 
+                         -micro_n1, 
+                         #-sex_1, 
+                         #-micro_1, 
+                         #-pcr_1, 
+                         #-age_1, 
+                         -pcr_n1,
+                         -age_0)
+             , by="id")# 959
+#unap6c %>% glimpse()
 ```
 
 # Output
 
 ```{r}
-readr::write_csv(unap6a, "data/04-epidemio-cov.csv")
-saveRDS(unap6a, "data/04-epidemio-cov.rds")
+readr::write_csv(unap6b, "data/04-epidemio-fll.csv")
+saveRDS(unap6b, "data/04-epidemio-fll.rds")
+
+readr::write_csv(unap6c, "data/04-epidemio-inn.csv")
+saveRDS(unap6c, "data/04-epidemio-inn.rds")
 ```
 
 

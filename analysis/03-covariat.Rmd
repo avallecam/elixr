@@ -465,12 +465,15 @@ AIM:
     + `unap5` all (micro, pcr)
     + `unap1` community
     + avoided: dens1, micro2, dens2, pcr.snounou
+- lastly, 
+    + create a concensus for `micro_` and `pcr_`
 - suffix:
     + `_1`: `unap1`
     + `_4`: `unap4`
     + `_0`: comparison between `_1` and `_4`
     + `_n`: `unap5` **NAMR** covariates
     + `_n1`: `_n` vs `_1`
+    + `_c`: consensus variable between `_n` vs `_1`
 
 
 ```{r}
@@ -495,11 +498,36 @@ unap0 <-
                      #micro_1= micro1, dens_1= dens1, pcr_1=pcrrubio
                      ),
             by="id")
+```
+
+## Generate consensus
+
+- `micro` and `pcr` consensus variables
+- criteria:
+    + NAMR measurement had preference
+
+```{r}
+unap0 <- unap0 %>% 
+  #select(contains("micro")) %>% #, -micro_n1
+  tidyr::unite(micro_c, micro_1, micro_n,remove = F) %>% #count()
+  mutate(micro_c=str_replace(micro_c,"(\\d)_\\1", "\\1")) %>%
+  mutate(micro_c=str_replace(micro_c,"(.+)_NA", "\\1")) %>% 
+  mutate(micro_c=str_replace(micro_c,"(\\d)_(\\d)", "\\2")) %>%  #%>% count()
+  mutate(micro_c=str_replace(micro_c,"NA", replacement = NA_character_)) %>%  #%>% count()
+  #select(contains("pcr")) %>% #, -micro_n1
+  tidyr::unite(pcr_c, pcr_1, pcr_n,remove = F) %>% #count()
+  mutate(pcr_c=str_replace(pcr_c,"(\\d)_\\1", "\\1")) %>%
+  mutate(pcr_c=str_replace(pcr_c,"(.+)_NA", "\\1")) %>%   #count()
+  mutate(pcr_c=str_replace(pcr_c,"(\\d)_(\\d)", "\\2")) %>% #summary()
+  mutate(pcr_c=str_replace(pcr_c,"NA", replacement = NA_character_)) %>% dplyr::mutate_each(funs(factor),8,12)
+
 #
 #unap0
 str(unap0)
 #summary(unap0)
 ```
+
+
 
 # Merge Ab units
 
@@ -552,13 +580,17 @@ summary(std.uty.cov)
 - `micro_` and `pcr_` are `Specie` related covariates
 - `micro_` and `pcr_` were merged with serological data.
 
+**TO DO:**
+
+- A concensus, as in untidy, is missing.
+
 ```{r}
 std.nty.pre <- std.nty %>%
   select(id=ID, 4:6) %>%
   full_join(unap0, by="id") #%>% count("micro_1")
 
 std.nty.pre_Pv <- std.nty.pre %>% 
-  select(1:4, 11:16) %>% 
+  select(1:4, micro_1:pcr_n1, -pcr_c) %>% 
   filter(Specie=="Pviv") %>% #count("pcr_1")
   mutate(micro_1=fct_recode(micro_1,
                             "0"="2",
@@ -573,7 +605,7 @@ std.nty.pre_Pv <- std.nty.pre %>%
                           "1"="3")) #%>% count("pcr_n")
 
 std.nty.pre_Pf <- std.nty.pre %>% 
-  select(1:4, 11:16) %>% 
+  select(1:4, micro_1:pcr_n1, -pcr_c) %>% 
   filter(Specie=="Pfal") %>% #count("pcr_n")
   mutate(micro_1=fct_recode(micro_1,
                             "1"="2",
@@ -591,7 +623,7 @@ std.nty.pre_Pf <- std.nty.pre %>%
                           "0"="1",
                           "1"="3")) #%>% count("micro_1")
 
-std.nty.cov <- union(std.nty.pre_Pf, std.nty.pre_Pv)
+std.nty.cov <- dplyr::union(std.nty.pre_Pf, std.nty.pre_Pv)
 
 ## correct logic vectors of micro and pcr
 std.nty.cov <- std.nty.cov %>% 
@@ -655,13 +687,12 @@ std.nty.cov %>%
 
 ```{r}
 #
-readr::write_csv(std.nty.cov %>%
-            format(scientific=FALSE, digits=2), "data/03-covariat-nty.csv")
-saveRDS(std.nty.cov, "data/03-covariat-nty.rds")
-
+saveRDS(unap0, "data/03-covariat-uap.rds")
 #
-readr::write_csv(std.uty.cov %>%
-            format(scientific=FALSE, digits=2), "data/03-covariat-uty.csv")
+#readr::write_csv(std.nty.cov %>% format(scientific=FALSE, digits=2), "data/03-covariat-nty.csv")
+saveRDS(std.nty.cov, "data/03-covariat-nty.rds")
+#
+#readr::write_csv(std.uty.cov %>% format(scientific=FALSE, digits=2), "data/03-covariat-uty.csv")
 saveRDS(std.uty.cov, "data/03-covariat-uty.rds")
 ```
 
