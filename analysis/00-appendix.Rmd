@@ -20,36 +20,30 @@ csl: american-medical-association.csl
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, # CHANGE TO FALSE IN PDF_DOCUMENTS
+knitr::opts_chunk$set(echo = TRUE,     # CHANGE TO FALSE IN PDF_DOCUMENTS
                       warning = FALSE) 
-knitr::opts_knit$set(root.dir = '../.') #gsub("/analysis","",getwd())
-#getwd()
-options(width = 110) # CHANGE TO DEFAULT in PDF
+knitr::opts_knit$set(root.dir = '../.')
+options(width = 110) # expand limits of CONSOLE output  # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
 # FOR PDF add new page USE: four \newpage BEFORE #SETUP #APPENDIX #COMPUTER.env #REFERENCES
 ```
 
-# Setup 
-
-This report is written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
-
-This dynamic document integrates **text**, **code** and **results**[@CienciaReproducible2016].
-
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
-require(Hmisc)
-#require(plotly)
-#options(#grType='plotly',  # for certain graphics functions
-#        width = 110) # to expand the limits of CONSOLE output
-mu <- markupSpecs$html   # markupSpecs is in Hmisc
-
-# The following hidden command (<code>r mu$widescreen()</code>), causes the html notebook to use an entire wide screen.
+require(Hmisc) # to call markupSpecs
+mu <- markupSpecs$html # expand limits of HTML SCREEN output to use an entire wide screen
+# with the following hidden command (<code>r mu$widescreen()</code>).
 #mu$widescreen()
 ```
 `r mu$widescreen()`
 
-# Objectives
+# General Setup 
 
-**PROJECT:**
+All the reports are written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
+
+This dynamic document format integrates **text**, **code** and **results**[@CienciaReproducible2016].
+
+
+# Project Objectives
 
 * Principal: 
     - Standardize the OD~450nm~ values across ELISA plates by the estimation of the Antibody Units of each unknown sample.
@@ -57,7 +51,8 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 * Secondary:
     - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
 
-**NOTEBOOK:**
+
+# Notebook Objectives
 
 * Principal: 
     - Review the methods previously applied to the standarization across ELISA plates in vaccine or serological surveillance research.
@@ -65,9 +60,8 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 * Secondary: 
     - Register project updates, current problems to solve, project organization and benefits of using Git.
     
-* **TO DO:**
 
-
+# To Do
 
 # Dependencies
 
@@ -364,6 +358,10 @@ With the Antibody Units:
 # APPENDIX: Version Control
 
 - **From 30jan2017 to 06mar2017**
+
+- Some link of interest
+    + [Git for humans](https://speakerdeck.com/alicebartlett/git-for-humans)
+    + [Git and Github with Rstudio](http://r-pkgs.had.co.nz/git.html)
 
 ## Project directory
 

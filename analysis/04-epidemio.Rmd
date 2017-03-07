@@ -20,44 +20,23 @@ csl: american-medical-association.csl
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, # CHANGE TO FALSE IN PDF_DOCUMENTS
+knitr::opts_chunk$set(echo = TRUE,     # CHANGE TO FALSE IN PDF_DOCUMENTS
                       warning = FALSE) 
-knitr::opts_knit$set(root.dir = '../.') #gsub("/analysis","",getwd())
-#getwd()
-options(width = 110) # CHANGE TO DEFAULT in PDF
+knitr::opts_knit$set(root.dir = '../.')
+options(width = 110) # expand limits of CONSOLE output  # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
 # FOR PDF add new page USE: four \newpage BEFORE #SETUP #APPENDIX #COMPUTER.env #REFERENCES
 ```
 
-# Setup 
-
-This report is written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
-
-This dynamic document integrates **text**, **code** and **results**[@CienciaReproducible2016].
-
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
-require(Hmisc)
-#require(plotly)
-#options(#grType='plotly',  # for certain graphics functions
-#        width = 110) # to expand the limits of CONSOLE output
-mu <- markupSpecs$html   # markupSpecs is in Hmisc
-
-# The following hidden command (<code>r mu$widescreen()</code>), causes the html notebook to use an entire wide screen.
+require(Hmisc) # to call markupSpecs
+mu <- markupSpecs$html # expand limits of HTML SCREEN output to use an entire wide screen
+# with the following hidden command (<code>r mu$widescreen()</code>).
 #mu$widescreen()
 ```
 `r mu$widescreen()`
 
-# Objectives
-
-**PROJECT:**
-
-* Principal: 
-    - Standardize the OD~450nm~ values across ELISA plates by the estimation of the Antibody Units of each unknown sample.
-
-* Secondary:
-    - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
-
-**NOTEBOOK:**
+# Notebook Objectives
 
 * Principal: 
     - Clean and standardize the UNAP-6 Epidemiological and Census database.
@@ -65,11 +44,13 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 * Secondary: 
     - Check variable consistency across the database.
 
-* **TO DO:**
-    - Solve **inconsistencies**
-    - CHECK IF **intersections** outside the core **959 samples** have ID typos.
-    - introduce a `datetime` class variable
-    - `sheet2` and `sheet3` are required?
+
+# To Do
+
+- Solve **inconsistencies**
+- CHECK IF **intersections** outside the core **959 samples** have ID typos.
+- introduce a `datetime` class variable
+- `sheet2` and `sheet3` are required?
 
 
 # Dependencies
@@ -113,11 +94,15 @@ std.uty.cov <- readRDS("data/03-covariat-uty.rds")
 
 # Results
 
-- `unap6` **109** variables were reduced to **88**
-- a plot `age` vs `residence` show some inconsistencies corrected throughout updates
+- The **109 variables** of the Epidemiological database were reduced to **88** after cleaning.
 - typos were corrected:
-    + some variables were renamed, and some factors recoded
-- inconsistencies between variables are shown
+    + some variables were renamed, and some factors recoded.
+- previous datasets share **959 ID's** with the current Epidemiological dataset.
+- Two unified dataset were generated:
+    + One with the **full 973** ID's
+    + One with only the **core 959** ID's
+- a plot `age` vs `residence` show some inconsistencies corrected throughout updates.
+- **inconsistencies** between other variables are shown as table summaries.
 
 # Covariate datasets
 
@@ -142,6 +127,7 @@ unap6 <- unap6[1:sum(unap6$id_integrante != "", na.rm = T),
            1:sum(colnames(unap6) != "", na.rm= T)]
 #963x109
 unap6 %>% glimpse()
+#colnames(unap6)
 #str(unap6)
 #summary(unap6)
 ```
@@ -282,6 +268,10 @@ dplyr::setdiff(ad,xd)
 discovery:
 
 - `unap6` differs from `unap1` in **age** variable
+
+TO DO:
+
+- CHECK WHY some `age_4` are still lower than patient `residence` time.
 
 ```{r ageres, fig.width=12, fig.height=3, fig.align="center"}
 unap60ar <- std.uty.cov %>% 
@@ -642,9 +632,23 @@ unap6a %>%
   glimpse()
 ```
 
-## Merge datasets
+# Merge datasets
 
-### rows differ
+- new DB names:
+    + **`epid`**: current `unap6a` of Epidemiological variables **(963x88)**
+    + **`unap`**: previous `unap0` **(960x16)** stored in `data/03-covariat-uap.rds` with:
+        + undated `age`, `sex`, `community`
+        + consensus `micro`, `pcr`
+    + **`sero`**: previous `std.uty` **(969x5)** stored in `data/02-dtfilter-uty.rds` with: 
+        + `Ab.units`, `mean.OD` per `Specie`
+
+## rows differ
+
+- all the datasets share **959 core ID's**.
+
+TO DO:
+
+- CHECK IF **intersections** outside the core **959 samples** have ID typos.
 
 ```{r, fig.align='center', fig.width=5, fig.height=5}
 unapid <- unap0 %>% select(id)      # 960
@@ -672,17 +676,16 @@ attr(tmp, "intersections")$sero
 attr(tmp, "intersections")$`unap:sero`
 ```
 
-### merge
+## merge
 
-- Merge `data/03-covariat-uty.csv` and `unap6a`
-- This is the final unified dataset.
+- Merge **`unap + sero`** stored in `data/03-covariat-uty.csv` (`std.uty.cov`) with current **`epid`** (`unap6a`)
+- This will be the final unified dataset.
 
 dicoveries:
 
-- `unap6a` and `std.uty.cov` differs in `age`, `sex`, `community`
-- `age`, `sex`, `community` were removed from `unap6a` 
-- then it was merged with `std.uty.cov`
-- logics such as `_0` and `_n1` were removed from `std.uty.cov` previously
+- **`epid`** and **`unap + sero`** differs in `age`, `sex`, `community`
+    + `age`, `sex`, `community` were removed from **`epid`** 
+    + logical vectors such as `_0` and `_n1` were removed from **`unap+sero`** previous merging
 
 ```{r}
 unap6b <- unap6a %>% 
@@ -716,12 +719,15 @@ unap6c <- unap6a %>%
 
 # Output
 
-```{r}
-readr::write_csv(unap6b, "data/04-epidemio-fll.csv")
-saveRDS(unap6b, "data/04-epidemio-fll.rds")
+- a **`full`** dataset **(973x100)** was written as `data/04-epidemio-full.csv`.
+- a **`core`** dataset **(959x100)** was written as `data/04-epidemio-core.csv`.
 
-readr::write_csv(unap6c, "data/04-epidemio-inn.csv")
-saveRDS(unap6c, "data/04-epidemio-inn.rds")
+```{r}
+readr::write_csv(unap6b, "data/04-epidemio-full.csv")
+saveRDS(unap6b, "data/04-epidemio-full.rds")
+
+readr::write_csv(unap6c, "data/04-epidemio-core.csv")
+saveRDS(unap6c, "data/04-epidemio-core.rds")
 ```
 
 
@@ -768,7 +774,10 @@ Rmisc::multiplot(a, b, cols=2)
 
 ## problems 3
 
-### malaria checkout
+### malaria incidence plot
+
+- check [above](#malaria) for a plot relating `age`, `residence` and `malaria`
+
 ```{r, fig.height=3, fig.width=6, fig.align="center"}
 unap6a %>%
   ggplot(aes(cuantas_tenido_malaria)) + geom_histogram()
@@ -783,7 +792,7 @@ unap6a %>%
   filter(tenido_malaria!="Si" | opciones_tenido_malaria!="Si")
 ```
 
-### date and time
+### date and time class
 
 ```{r}
 unap6at <- unap6 %>% 

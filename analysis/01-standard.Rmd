@@ -20,60 +20,40 @@ csl: american-medical-association.csl
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, # CHANGE TO FALSE IN PDF_DOCUMENTS
+knitr::opts_chunk$set(echo = TRUE,     # CHANGE TO FALSE IN PDF_DOCUMENTS
                       warning = FALSE) 
-knitr::opts_knit$set(root.dir = '../.') #gsub("/analysis","",getwd())
-#getwd()
-options(width = 110) # CHANGE TO DEFAULT in PDF
+knitr::opts_knit$set(root.dir = '../.')
+options(width = 110) # expand limits of CONSOLE output  # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
 # FOR PDF add new page USE: four \newpage BEFORE #SETUP #APPENDIX #COMPUTER.env #REFERENCES
 ```
 
-# Setup 
-
-This report is written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
-
-This dynamic document integrates **text**, **code** and **results**[@CienciaReproducible2016].
-
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
-require(Hmisc)
-#require(plotly)
-#options(#grType='plotly',  # for certain graphics functions
-#        width = 110) # to expand the limits of CONSOLE output
-mu <- markupSpecs$html   # markupSpecs is in Hmisc
-
-# The following hidden command (<code>r mu$widescreen()</code>), causes the html notebook to use an entire wide screen.
+require(Hmisc) # to call markupSpecs
+mu <- markupSpecs$html # expand limits of HTML SCREEN output to use an entire wide screen
+# with the following hidden command (<code>r mu$widescreen()</code>).
 #mu$widescreen()
 ```
 `r mu$widescreen()`
 
-# Objectives
-
-**PROJECT:**
+# Notebook Objectives
 
 * Principal: 
-    - Standardize the OD~450nm~ values across ELISA plates by the estimation of the Antibody Units of each unknown sample.
-
-* Secondary:
-    - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
-
-**NOTEBOOK:**
-
-* Principal: 
-    - Standardize OD values across ELISA plates following **Miura et.al., 2008**[@Miura2008].
+    - Implement a reproducible standardization of OD values across ELISA plates following **Miura et.al., 2008**[@Miura2008].
 
 * Secondary: 
     - Generate useful outputs to compare standardization quality.
 
-* **TO DO:**
-    - Implement `plater` and `readxl` data input
-    - Assess the **inter-plate-CV** comparing STD variability across plates to generate a **Limit of Quantification**
-        + Actual CV is the **intra-plate-CV**
-        + Generate a tibble of all STD dilutions OD's
-        + Extend `std.par` output to all parameters
-    - Other inter-plate measurements:
-        + blank, positive and negative controls
 
+# To Do
+
+- Implement `plater` and `readxl` data input
+- Assess the **inter-plate-CV** comparing STD variability across plates to generate a **Limit of Quantification**
+    + Actual CV is the **intra-plate-CV**
+    + Generate a tibble of all STD dilutions OD's
+    + Extend `std.par` output to all parameters
+- Other inter-plate measurements:
+    + blank, positive and negative controls
 
 
 # Dependencies

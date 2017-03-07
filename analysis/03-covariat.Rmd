@@ -20,44 +20,23 @@ csl: american-medical-association.csl
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, # CHANGE TO FALSE IN PDF_DOCUMENTS
+knitr::opts_chunk$set(echo = TRUE,     # CHANGE TO FALSE IN PDF_DOCUMENTS
                       warning = FALSE) 
-knitr::opts_knit$set(root.dir = '../.') #gsub("/analysis","",getwd())
-#getwd()
-options(width = 110) # CHANGE TO DEFAULT in PDF
+knitr::opts_knit$set(root.dir = '../.')
+options(width = 110) # expand limits of CONSOLE output  # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
 # FOR PDF add new page USE: four \newpage BEFORE #SETUP #APPENDIX #COMPUTER.env #REFERENCES
 ```
 
-# Setup 
-
-This report is written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
-
-This dynamic document integrates **text**, **code** and **results**[@CienciaReproducible2016].
-
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
-require(Hmisc)
-#require(plotly)
-#options(#grType='plotly',  # for certain graphics functions
-#        width = 110) # to expand the limits of CONSOLE output
-mu <- markupSpecs$html   # markupSpecs is in Hmisc
-
-# The following hidden command (<code>r mu$widescreen()</code>), causes the html notebook to use an entire wide screen.
+require(Hmisc) # to call markupSpecs
+mu <- markupSpecs$html # expand limits of HTML SCREEN output to use an entire wide screen
+# with the following hidden command (<code>r mu$widescreen()</code>).
 #mu$widescreen()
 ```
 `r mu$widescreen()`
 
-# Objectives
-
-**PROJECT:**
-
-* Principal: 
-    - Standardize the OD~450nm~ values across ELISA plates by the estimation of the Antibody Units of each unknown sample.
-
-* Secondary:
-    - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
-
-**NOTEBOOK:**
+# Notebook Objectives
 
 * Principal: 
     - Generate a unified covariate database for the following statistical analysis.
@@ -65,14 +44,15 @@ mu <- markupSpecs$html   # markupSpecs is in Hmisc
 * Secondary: 
     - Generate a Quality Control report comparing UNAP and NAMR measurements on microscopy and PCR.
 
-* **TO DO:**
-    - In order to keep using `std.nty` as a tidy dataset 
-        + A [relational data](http://r4ds.had.co.nz/relational-data.html) framework could be used.
-        + The **Serological dataset** and **Covariate/Epidemiological** dataset could keep to be separated but **related**, instead.
-        + More details in [APPENDIX](#appendix-tidy-vs-untidy)
-    - re-evaluate 01 patient 02 id after `unap6`
-        + evaluation in [APPENDIX](#appendix-id-errors)
 
+# To Do
+
+- In order to keep using `std.nty` as a tidy dataset 
+    + A [relational data](http://r4ds.had.co.nz/relational-data.html) framework could be used.
+    + The **Serological dataset** and **Covariate/Epidemiological** dataset could keep to be separated but **related**, instead.
+    + More details in [APPENDIX](#appendix-tidy-vs-untidy)
+- re-evaluate 01 patient 02 id after `unap6`
+    + evaluation in [APPENDIX](#appendix-id-errors)
 
 
 # Dependencies
@@ -82,6 +62,8 @@ The required R packages for this analysis are:
 + `tidyverse` [@tidyverse]
 + `haven` [@haven]
 + `readxl` [@readxl]
++ `forcats` [@forcats]
++ `stringr` [@stringr]
 
 ```{r, results='hide', message=FALSE}
 ##essential
@@ -97,6 +79,7 @@ library("Rmisc")      # multiplot ggplots
 library("haven")      # import STATA df
 library("readxl")     # import EXCEL df
 library("forcats")    # factor vectors
+library("stringr")    # for strings
 library("viridis")    # color visualization
 ```
 
@@ -153,18 +136,12 @@ ls -sh data/UNAP-*
 
 # Priors
 
-- check if `unap1` is equal to `unap2`
+- `unap1` should be equal to `unap2`
 - `unap3` should be equal to `unap2` plus seropositivity agregate columns
 - `unap3` was used in the online meeting with Nuno
 - `unap4` have updated covariates and differs from `unap3`
 - `unap5` have QC evaluations
-- contrast:
-    + `unap3` as prev-DB
-    + `unap4` as post-DB
-    + `unap5` as data-QC
-- `unap6` will be edited in another .Rmd
-- contrast:
-    + `unap6` as prev-EPI
+- `unap6` was the original epidemilogical dataset.
 
 
 # Results
@@ -178,10 +155,13 @@ ls -sh data/UNAP-*
 - `unap5` is **different** from `unap1` only in micro UNAP covariate
 - `unap1` UNAP covariates were arbitrarily **selected** to compare against `unap5` NAMR ones.
 - `unap0` was created as a **merged** DB of covariates
-- `unap0` was **merged** with both `std.nty` and `std.uty` DB of mean.OD and Ab.units per specie obtained in **02-dtfilter.Rmd**
+- `unap0` was **merged** with both `std.nty` and `std.uty` DB of **mean.OD** and **Ab.units** per specie obtained in **`02-dtfilter.Rmd`**
+- At the moment, **`std.uty.cov`** is the most convenient dataset.
 - `std.nty.cov` and `std.uty.cov` were **written** in a `.csv` and **saved** in a `.rds` for further analysis.
+- A **QC report** shows 97.5% similarity for `microscopy` and 73.4% for `pcr`. Percentages increases assuming independent observations with regard to the `specie`.
+- **Consensus variable** was generated for `micro` and `pcr` giving preference to **NAMR** measurement.
 
-- diagram of DB history using `DiagrammeR` [@DiagrammeR]
+A diagram of DB history using `DiagrammeR` [@DiagrammeR]
 
 ```{r, fig.align='center', fig.width=9, fig.height=3}
 #install.packages("DiagrammeR")
@@ -475,6 +455,7 @@ AIM:
     + `_n1`: `_n` vs `_1`
     + `_c`: consensus variable between `_n` vs `_1`
 
+A plot showing How `age` updating changed with respect to the patient `Ab.units` is in the [APPENDIX](#appendix-age-vs-ab-unit)
 
 ```{r}
 #str(unap1)
@@ -533,7 +514,7 @@ str(unap0)
 
 - `std.uty` can be directly merged with `unap0`
 - `std.nty` + `unap0` assumes that:
-    + `micro_` and `pcr_` are `Specie` independent observations.
+    + `micro_` and `pcr_` are independent observations with regard to the `specie`.
 
 ## untidy format
 
@@ -555,7 +536,7 @@ summary(std.uty.cov)
 ## tidy format
 
 - `std.nty` + `unap0` assumes that:
-    + `micro_` and `pcr_` are `Specie` independent observations.
+    + `micro_` and `pcr_` are independent observations with regard to the `specie`.
 
 **Would require:**
 
@@ -661,7 +642,7 @@ std.uty.cov %>%
 
 ## using tidy dataset
 
-- assumes that `micro_` and `pcr_` are independent observations.
+- assumes that `micro_` and `pcr_` are independent observations with regard to the `specie`.
 - given the mentioned assumption, percentage increases due to an updated logic variables.
     + Check details in [APPENDIX](#appendix-tidy-vs-untidy)
 
@@ -683,7 +664,7 @@ std.nty.cov %>%
 # Output
 
 - `std.uty.cov` output was written as `data/03-covariat-uty.csv`.
-- `std.nty.cov` output was written as `data/03-covariat-nty.csv`:
+- `std.nty.cov` output was written as `data/03-covariat-nty.csv`.
 
 ```{r}
 #
@@ -698,6 +679,40 @@ saveRDS(std.uty.cov, "data/03-covariat-uty.rds")
 
 
 ***
+
+# APPENDIX: age vs Ab unit
+
+- the difference between `age_1` and `age_4` was stored in `age_d` and plotted against `Ab.units`.
+
+```{r, fig.align='center', fig.width=8, fig.height=5}
+db_ageAb <- std.uty.cov %>% 
+  select(1:5,contains("age")) %>% 
+  filter(age_0==FALSE) %>% 
+  mutate(age_d= age_4-age_1) 
+
+a <- db_ageAb %>% 
+  ggplot(aes(Ab.unit_Pviv,age_d)) +
+  geom_point()+
+  geom_hline(aes(yintercept=0), colour="red")
+
+b <- db_ageAb %>% 
+  ggplot(aes(Ab.unit_Pfal,age_d)) +
+  geom_point()+
+  geom_hline(aes(yintercept=0), colour="red")
+
+c <- db_ageAb %>% 
+  ggplot(aes(mean.OD_Pviv,age_d)) +
+  geom_point()+
+  geom_hline(aes(yintercept=0), colour="red")
+
+d <- db_ageAb %>% 
+  ggplot(aes(mean.OD_Pfal,age_d)) +
+  geom_point()+
+  geom_hline(aes(yintercept=0), colour="red")
+
+Rmisc::multiplot(c,d,a,b,cols = 2)
+```
+
 
 # APPENDIX: tidy vs untidy
 

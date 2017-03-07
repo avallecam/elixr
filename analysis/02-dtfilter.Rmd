@@ -20,65 +20,46 @@ csl: american-medical-association.csl
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, # CHANGE TO FALSE IN PDF_DOCUMENTS
-                      warning = FALSE) #fig.path = "02-"
-knitr::opts_knit$set(root.dir = '../.') #gsub("/analysis","",getwd())
-#getwd()
-options(width = 110) # CHANGE TO DEFAULT in PDF
+knitr::opts_chunk$set(echo = TRUE,     # CHANGE TO FALSE IN PDF_DOCUMENTS
+                      warning = FALSE) 
+knitr::opts_knit$set(root.dir = '../.')
+options(width = 110) # expand limits of CONSOLE output  # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
 # FOR PDF add new page USE: four \newpage BEFORE #SETUP #APPENDIX #COMPUTER.env #REFERENCES
 ```
 
-# Setup 
-
-This report is written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
-
-This dynamic document integrates **text**, **code** and **results**[@CienciaReproducible2016].
-
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
-require(Hmisc)
-#require(plotly)
-#options(#grType='plotly',  # for certain graphics functions
-#        width = 110) # to expand the limits of CONSOLE output
-mu <- markupSpecs$html   # markupSpecs is in Hmisc
-
-# The following hidden command (<code>r mu$widescreen()</code>), causes the html notebook to use an entire wide screen.
+require(Hmisc) # to call markupSpecs
+mu <- markupSpecs$html # expand limits of HTML SCREEN output to use an entire wide screen
+# with the following hidden command (<code>r mu$widescreen()</code>).
 #mu$widescreen()
 ```
 `r mu$widescreen()`
 
-# Objectives
-
-**PROJECT:**
+# Notebook Objectives
 
 * Principal: 
-    - Standardize the OD~450nm~ values across ELISA plates by the estimation of the Antibody Units of each unknown sample.
-
-* Secondary:
-    - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
-
-**NOTEBOOK:**
-
-* Principal: 
-    - Identidy and filter the replicated reads across ELISA plates.
+    - Identify and filter the replicated reads across ELISA plates.
 
 * Secondary: 
     - Visualize OD and AU distributions post ELISA standardization.
 
-* **TO DO:**
-    - Is it required to change NaN with 0 and NaN or .?
-        + string replacement on data.filtering
-        + May not be convinient due to problems in data transformation and statistics.
-    - CHECK IF **ZG182-1** should be corrected to **ZG181-1**.
-        + Missing reads are complementary between ID's.
-        + More detail in [Appendix](#appendix-residual-na) **NOTE 2**.
+
+# To Do
+
+- Is it required to change NaN with 0 and NaN or .?
+    + string replacement on data.filtering
+    + May not be convinient due to problems in data transformation and statistics.
+- CHECK IF **ZG182-1** should be corrected to **ZG181-1**.
+    + Missing reads are complementary between ID's.
+    + More detail in [Appendix](#appendix-residual-na) **NOTE 2**.
 
 
 # Dependencies
 
 The required R packages for this analysis are:
 
-+ `ggplot` [@ggplot2]
++ `ggplot2` [@ggplot2]
 
 ```{r, results='hide', message=FALSE}
 ##essential
@@ -107,6 +88,16 @@ std.par <- readRDS("data/01-parametr.rds")
 ***
 
 # Results
+
+- **02 typos** were corrected
+- This experiment made **1937** observations for **969** ID's
+- Among the **73** NA observations, **04** had an OD higher than the upper limit given by its STD.
+- **63** observations had duplicates, **16** had triplicates.
+- A unbiased selection criteria was used to filter replicates.
+- Log transformed Ab.units shows a normal distribution.
+- Outputs were stored in both tidy and untidy formats.
+
+# Procedure
 
 ## DB typo corrections
 
@@ -595,7 +586,33 @@ abline(h=20, v=0.25, lty=2, col=2)
 
 ## Distributions
 
-### Linear scale
+### ggplot
+
+```{r ggplot, fig.align='center', fig.width=8, fig.height=6, message=FALSE, warning=FALSE}
+#library(ggplot2)
+#library(Rmisc)        #multiploting ggplots
+a <- ggplot(std.nty, aes(x=mean.OD, fill=Specie)) + 
+  geom_histogram(alpha=.5, position = "identity") + 
+  labs(title="OD in linear scale")
+b <- ggplot(std.nty, aes(x=Ab.unit, fill=Specie)) + 
+  geom_histogram(alpha=.5, position = "identity") + 
+  labs(title="AU in linear scale")
+
+c <- ggplot(std.nty, aes(x=log(mean.OD), fill=Specie)) + 
+  geom_histogram(alpha=.5, position = "identity") + 
+  labs(title="OD in log scale")
+d <- ggplot(std.nty, aes(x=log(Ab.unit), fill=Specie)) + 
+  geom_histogram(alpha=.5, position = "identity") + 
+  labs(title="AU in log scale")
+
+Rmisc::multiplot(a,c, 
+                 b,d,
+                 cols = 2)
+```
+
+### base
+
+#### Linear scale
 
 ```{r linear-scale, fig.align='center', fig.height=6, fig.width=9}
 ### OD distribution
@@ -629,7 +646,7 @@ hist(std.nty[std.nty$Specie=="Pfal",]$Ab.unit, ylim = c(0,my),
      main = "P.falciparum", xlab = "Ab.units")#, xlim = c(0,15000)
 ```
 
-### Log scale
+#### Log scale
 
 ```{r log-scale, fig.align='center', fig.height=6, fig.width=9}
 par(mfrow=c(2,3))
@@ -654,30 +671,6 @@ hist(log(std.nty[std.nty$Specie=="Pviv",]$Ab.unit), ylim = c(0,my), xlim = c(-6,
      main = "P.vivax", xlab = "log(Ab.units)")
 hist(log(std.nty[std.nty$Specie=="Pfal",]$Ab.unit), ylim = c(0,my), xlim = c(-6,10),
      main = "P.falciparum", xlab = "log(Ab.units)")
-```
-
-### ggplot
-
-```{r ggplot, fig.align='center', fig.width=8, fig.height=6, message=FALSE, warning=FALSE}
-#library(ggplot2)
-#library(Rmisc)        #multiploting ggplots
-a <- ggplot(std.nty, aes(x=mean.OD, fill=Specie)) + 
-  geom_histogram(alpha=.5, position = "identity") + 
-  labs(title="OD in linear scale")
-b <- ggplot(std.nty, aes(x=Ab.unit, fill=Specie)) + 
-  geom_histogram(alpha=.5, position = "identity") + 
-  labs(title="AU in linear scale")
-
-c <- ggplot(std.nty, aes(x=log(mean.OD), fill=Specie)) + 
-  geom_histogram(alpha=.5, position = "identity") + 
-  labs(title="OD in log scale")
-d <- ggplot(std.nty, aes(x=log(Ab.unit), fill=Specie)) + 
-  geom_histogram(alpha=.5, position = "identity") + 
-  labs(title="AU in log scale")
-
-Rmisc::multiplot(a,c, 
-                 b,d,
-                 cols = 2)
 ```
 
 
