@@ -733,6 +733,30 @@ saveRDS(unap6c, "data/04-epidemio-core.rds")
 
 ***
 
+# APPENDIX: age updates
+
+```{r, fig.height=8, fig.width=6, fig.align='center'}
+x <- unap6a %>% 
+  select(1,contains("age")) %>% 
+  full_join(std.uty.cov %>% 
+              select(1,contains("age"), -age_0), 
+            by="id") %>% 
+  mutate(age_0= age==age_1 & age_1==age_4) %>% 
+  filter(age_0==FALSE) %>% 
+  select(-age_0)
+
+y <- x$id
+z <- x %>% select(-id) %>% as.data.frame()
+rownames(z) <- y
+
+slopegraph::ggslopegraph(z, 
+                         offset.x = 0.06,
+                         xlim = c(.5,3.5),
+                         xlabels = c("unap6", "unap1", "unap4")) + theme_minimal() +
+  labs(title="Age updates across datasets")
+```
+
+
 # APPENDIX: Plots and problems
 
 ```{r, fig.width=10, fig.height=4, fig.align="center"}
