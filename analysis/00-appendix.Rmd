@@ -25,7 +25,7 @@ knitr::opts_chunk$set(echo = TRUE,     # CHANGE TO FALSE IN PDF_DOCUMENTS
 knitr::opts_knit$set(root.dir = '../.')
 options(width = 110) # expand limits of CONSOLE output  # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
-# FOR PDF add new page USE: four \newpage BEFORE #SETUP #APPENDIX #COMPUTER.env #REFERENCES
+# FOR PDF add new page USE: \newpage
 ```
 
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
@@ -38,27 +38,34 @@ mu <- markupSpecs$html # expand limits of HTML SCREEN output to use an entire wi
 
 # General Setup 
 
-All the reports are written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] and `Hmisc` [@Hmisc] packages for the `html` setup.
+All the reports are written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook 
+using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] 
+and `Hmisc` [@Hmisc] packages for the `html` setup.
 
-This dynamic document format integrates **text**, **code** and **results**[@CienciaReproducible2016].
+This dynamic document format integrates **text**, **code** and **results** 
+[@CienciaReproducible2016].
 
 
 # Project Objectives
 
 * Principal: 
-    - Standardize the OD~450nm~ values across ELISA plates by the estimation of the Antibody Units of each unknown sample.
+    - Standardize the OD~450nm~ values across ELISA plates by the estimation of 
+    the Antibody Units of each unknown sample.
 
 * Secondary:
-    - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) for standardization of ELISA plates from a template matrix.
+    - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) 
+    for standardization of ELISA plates from a template matrix.
 
 
 # Notebook Objectives
 
 * Principal: 
-    - Review the methods previously applied to the standarization across ELISA plates in vaccine or serological surveillance research.
+    - Review the methods previously applied to the standarization across ELISA plates 
+    in vaccine or serological surveillance research.
 
 * Secondary: 
-    - Register project updates, current problems to solve, project organization and benefits of using Git.
+    - Register project updates, current problems to solve, project organization 
+    and benefits of using Git.
     
 
 # To Do
@@ -96,7 +103,9 @@ Pf.ID <- readRDS("data/01-dilution.rds")
 - Sepulveda et.al. [@Seplveda2015] cite two main publications:
     1. **Cook et.al., 2011 in Bioko Island, Equatorial Guinea** [@Cook2011], and
     2. **Cunha et.al., 2014 in Jacareacanga, Brazil** [@Cunha2014].
-- Both papers followed the same experimental procedure to standardize the data across plates. Althought, non of them cite **Miura et.al., 2008**[@Miura2008].
+- Both papers followed the same experimental procedure to standardize the data 
+across plates. 
+Althought, non of them cite **Miura et.al., 2008**[@Miura2008].
 - Nuno Sepulveda is co-author of the second paper [@Cunha2014].
 
 
@@ -116,7 +125,8 @@ for (i in 1:(length(t)-1)) {
 
 The method provided by Julio followed this procedure, making two main assumptions:
 
-1. An **endpoint titer** equal to the last dilution of the STD, in this case `r format(x[length(x)], scientific=FALSE)`.
+1. An **endpoint titer** equal to the last dilution of the STD, in this case 
+`r format(x[length(x)], scientific=FALSE)`.
 2. An equal **endpoint titer** among *P.falciparum* and *P.vivax* STD's.
 
 ```{r}
@@ -131,51 +141,95 @@ kable(example)
 
 ## K.Miura method
 
-K.Miura et.al. [@Miura2008] previously assigned Antibody Units to the STD (as the reciprocal dilution giving an OD~450nm~=1*). After this step, the STD was applied to each ELISA plate.
+K.Miura et.al. [@Miura2008] previously assigned Antibody Units to the STD 
+(as the reciprocal dilution giving an OD~450nm~=1*). After this step, the STD 
+was applied to each ELISA plate.
 
-  (@) For example, for the **Anti-Pvs25 mokey sera**, after generating aliquotes of 1:100 from the initial pool, four-fold serial dilution was perfomed. Here, an OD~450nm~=1 had a Rec.Dilution of 20,000. Then STD Ab units was equal to 20,000. 
+  (@) For example, for the **Anti-Pvs25 mokey sera**, after generating aliquotes 
+  of 1:100 from the initial pool, four-fold serial dilution was perfomed. Here, 
+  an OD~450nm~=1 had a Rec.Dilution of 20,000. Then STD Ab units was equal to 20,000. 
 
-  (@) After the assignation of Ab units to the STD, a two-fold serial dilution starting with a dilution of 20 Ab units, equivalent to 1:1000 dilution, was applied on each ELISA plate.
+  (@) After the assignation of Ab units to the STD, a two-fold serial dilution starting 
+  with a dilution of 20 Ab units, equivalent to 1:1000 dilution, was applied on each 
+  ELISA plate.
 
-  (@) As an example, in the paper is said that the 5th dilution of the STD sera is suppoused to have 1.25 Ab units. So, if $1.25=\frac{STD}{16000}$ then the STD Ab units are equal to 20,000.
+  (@) As an example, in the paper is said that the 5th dilution of the STD sera 
+  is suppoused to have 1.25 Ab units. 
+  So, if $1.25=\frac{STD}{16000}$ then the STD Ab units are equal to 20,000.
 
-*The reason behind an OD~450nm~=1 may be in the variability of the STD curve Upper and Lower limits. This behaviour also is observed in the comparoson of the STD OD values across ELISA plates.
+*The reason behind an OD~450nm~=1 may be in the variability of the STD curve Upper 
+and Lower limits. This behaviour also is observed in the comparoson of the STD OD 
+values across ELISA plates.
 
 ## Corran method
 
-Cook et.al.[@Cook2011] cite Corran et.al. [@Corran2008] which have a full description of the methods.
+Cook et.al.[@Cook2011] cite Corran et.al. [@Corran2008] which have a full description 
+of the methods.
 
-Corran et.al.[@Corran2008] make the assumption of an undiluted (initial) concentration of the sera pool previous to a 3pLL model fitting. By this way, the OD is directly proportional to the independent variable. [suppl.file 1](https://static-content.springer.com/esm/art%3A10.1186%2F1475-2875-7-195/MediaObjects/12936_2008_670_MOESM1_ESM.pdf)
+Corran et.al.[@Corran2008] make the assumption of an undiluted (initial) concentration 
+of the sera pool previous to a 3pLL model fitting. By this way, the OD is directly 
+proportional to the independent variable. 
+[suppl.file 1](https://static-content.springer.com/esm/art%3A10.1186%2F1475-2875-7-195/MediaObjects/12936_2008_670_MOESM1_ESM.pdf)
 
 At Methods, they write the following:
 
-> "A titration curve was fitted to the ODs obtained for the standard plasma dilutions by least squares minimisation using a three variable sigmoid model and the solver add-in in Excel (Microsoft), assuming an arbitrary value of **1000 Units/ml** of antibody against each antigen in the **standard pool**. OD values for the spot extracts were converted to units/ml using this fitted curve."
+> "A titration curve was fitted to the ODs obtained for the standard plasma dilutions 
+> by least squares minimisation using a three variable sigmoid model and the solver 
+> add-in in Excel (Microsoft), assuming an arbitrary value of **1000 Units/ml** of 
+> antibody against each antigen in the **standard pool**. OD values for the spot 
+> extracts were converted to units/ml using this fitted curve."
 
 ***
 
 # APPENDIX: the 4pLL model
 
-The **four-parameter log-logistic function** have the following presentations [@weimer2012impact]: $$f(x)=f(x;b,c,d,e)=c+\frac{d-c}{1+\exp[b(log(x)-log(e))]}=c+\frac{d-c}{1+\left(\frac{x}{e}\right)^b}=c+\frac{d-c}{1+{10}^{b(log_{10}(x)-log_{10}(e))}}$$
+The **four-parameter log-logistic function** have the following presentations [@weimer2012impact]: 
+$$f(x)=f(x;b,c,d,e)=c+\frac{d-c}{1+\exp[b(log(x)-log(e))]}=c+\frac{d-c}{1+\left(\frac{x}{e}\right)^b}=c+\frac{d-c}{1+{10}^{b(log_{10}(x)-log_{10}(e))}}$$
 
-By isolating $x$, equivalent expressions are commonly reported as inverse functions of the 4pLL equation, assuming `b=-1` and then `c=0`:
+By isolating $x$, equivalent expressions are commonly reported as inverse functions 
+of the 4pLL equation, assuming `b=-1` and then `c=0`:
 $$x=e\left[{\left(\frac{d-f(x)}{f(x)-c}\right)}^{1/b}\right] \qquad \Rightarrow \qquad x=\frac{e}{\frac{d-c}{f(x)-c}-1} \qquad  \Rightarrow \qquad x=\frac{e}{\frac{d}{f(x)}-1}$$
 
-If no log-transformation is required, then the following expression are often employed, depending on the scale of `x`: $$f(x)=c+\frac{d-c}{1+\exp[b(x-e)]} \qquad or \qquad f(x)=c+\frac{d-c}{1+{10}^{b(x-e)}}$$ For example, this last expression, with `x` in decimal-log scale, is present in the page 7 of the *drLumi* [@drLumi] package vignette.
+If no log-transformation is required, then the following expression are often employed, 
+depending on the scale of `x`: 
+$$f(x)=c+\frac{d-c}{1+\exp[b(x-e)]} \qquad or \qquad f(x)=c+\frac{d-c}{1+{10}^{b(x-e)}}$$ 
+For example, this last expression, with `x` in decimal-log scale, is present in the 
+page 7 of the *drLumi* [@drLumi] package vignette.
 
-Lastly, when using the nls function to fit the data, [Self-Starter](https://socserv.socsci.mcmaster.ca/jfox/Books/Companion/appendix/Appendix-Nonlinear-Regression.pdf) functions are required. This functions, in contrast with the last example, requires `x` in natural-log scale. E.g. the logistic model have the following parameters $$f(x)=\frac{\phi_1}{1+\exp\left[ \frac{\phi_2-x}{\phi_3}\right]} \qquad \Rightarrow \qquad f(x)=0+\frac{\phi_1-0}{1+\exp\left[ \frac{-1}{\phi_3} (x-\phi_2) \right]} $$
+Lastly, when using the nls function to fit the data, 
+[Self-Starter](https://socserv.socsci.mcmaster.ca/jfox/Books/Companion/appendix/Appendix-Nonlinear-Regression.pdf) functions are required. 
+This functions, in contrast with the last example, requires `x` in natural-log scale. 
+E.g. the logistic model have the following parameters 
+$$f(x)=\frac{\phi_1}{1+\exp\left[ \frac{\phi_2-x}{\phi_3}\right]} \qquad \Rightarrow \qquad f(x)=0+\frac{\phi_1-0}{1+\exp\left[ \frac{-1}{\phi_3} (x-\phi_2) \right]} $$
 
 ## Publications
 
-  1. **Miura et.al, 2008** [@Miura2008] reported a "four-parameter hyperbolic curve" in this form: $$x=e\left[{\left(\frac{d-f(x)}{f(x)-c}\right)}^{1/b}\right]$$ where $x={Ab}_{units}$ and $f(x)={OD}_{450nm}$ without parameter letters definition. Those parameter letters have been changed in order to keep concordance with the extended description gave [above](#method).
+  1. **Miura et.al, 2008** [@Miura2008] reported a "four-parameter hyperbolic curve" in this form: 
+  $$x=e\left[{\left(\frac{d-f(x)}{f(x)-c}\right)}^{1/b}\right]$$ 
+  where $x={Ab}_{units}$ and $f(x)={OD}_{450nm}$ without parameter letters definition. 
+  Those parameter letters have been changed in order to keep concordance with the 
+  extended description gave [above](#method).
 
-  1. **Cook et.al., 2011 in Bioko Island, Equatorial Guinea** [@Cook2011] cite Corran et.al. [@Corran2008] which have a full description of the methods [suppl.file 1](https://static-content.springer.com/esm/art%3A10.1186%2F1475-2875-7-195/MediaObjects/12936_2008_670_MOESM1_ESM.pdf). Briefly, they report a ligand-binding equation, with the following inverse function: $$A=\frac{A_{max}*B}{B+k} \qquad \Rightarrow \qquad B=\frac{C}{D}=\frac{k}{\frac{A_{max}}{A}-1}$$ That equation takes a recognizable form after a rearrangement, showing a 4pLL assuming `c=0` and `b=-1`, the same as with the inverse form: $$A=0+\frac{A_{max}-0}{1+\left(\frac{B}{k}\right)^{-1}} \equiv f(x)=0+\frac{d-0}{1+\left(\frac{x}{e}\right)^b}  \qquad and \qquad B=\frac{k}{\frac{A_{max}-0}{A-0}-1} \equiv x=\frac{e}{\frac{d-0}{f(x)-0}-1} $$
+  1. **Cook et.al., 2011 in Bioko Island, Equatorial Guinea** [@Cook2011] cite 
+  Corran et.al. [@Corran2008] which have a full description of the methods 
+  [suppl.file 1](https://static-content.springer.com/esm/art%3A10.1186%2F1475-2875-7-195/MediaObjects/12936_2008_670_MOESM1_ESM.pdf). 
+  Briefly, they report a ligand-binding equation, with the following inverse function: 
+  $$A=\frac{A_{max}*B}{B+k} \qquad \Rightarrow \qquad B=\frac{C}{D}=\frac{k}{\frac{A_{max}}{A}-1}$$ 
+  That equation takes a recognizable form after a rearrangement, showing a 4pLL assuming `c=0` and `b=-1`, the same as with the inverse form: 
+  $$A=0+\frac{A_{max}-0}{1+\left(\frac{B}{k}\right)^{-1}} \equiv f(x)=0+\frac{d-0}{1+\left(\frac{x}{e}\right)^b}  \qquad and \qquad B=\frac{k}{\frac{A_{max}-0}{A-0}-1} \equiv x=\frac{e}{\frac{d-0}{f(x)-0}-1} $$
     
-  2. **Cunha & Sepulveda et.al., 2014 in Jacareacanga, Brazil** [@Cunha2014] report a formula without any details, as in the cited publication [@Bousema2010]: $$ {titer}= \frac{dilution}{ \frac{maximum.OD}{OD.test.serum - minimum.OD} -1} \qquad \neq \qquad x=\frac{e}{\frac{d-c}{f(x)-c}-1} $$ Eventually, they tried to write the inverse of the 4pLL model but fail in the description of the variables.
+  2. **Cunha & Sepulveda et.al., 2014 in Jacareacanga, Brazil** [@Cunha2014] report 
+  a formula without any details, as in the cited publication [@Bousema2010]: 
+  $$ {titer}= \frac{dilution}{ \frac{maximum.OD}{OD.test.serum - minimum.OD} -1} \qquad \neq \qquad x=\frac{e}{\frac{d-c}{f(x)-c}-1} $$ 
+  Eventually, they tried to write the inverse of the 4pLL model but fail in the 
+  description of the variables.
   
 
 **CONCLUSION:**
 
-Here I have shortly compare the equivalent expressions applied by several reference publications [@Miura2008] [@Cook2011] [@Cunha2014] [@Corran2008], all equal to the **four-parameter log-logistic function** applied in this report.
+Here I have shortly compare the equivalent expressions applied by several reference 
+publications [@Miura2008; @Cook2011; @Cunha2014; @Corran2008], all equal to the 
+**four-parameter log-logistic function** applied in this report.
 
 ***
 
@@ -192,10 +246,12 @@ With the Antibody Units:
     + *SOL:* Followed NAMRU-6 SOP for ELISA data analysis.
     + A complementary description is in the [Appendix](#appendix-from-od-to-ab-units)
 
-- Complete understanding of Cook et.al. [@Cook2011] and Cunha et.al. [@Cunha2014] or Cook et.al. [@Cook2011] methodology.
+- Complete understanding of Cook et.al. [@Cook2011] and Cunha et.al. [@Cunha2014] or 
+Cook et.al. [@Cook2011] methodology.
     + *SOL:* A complementary description is in the [Appendix](#appendix-the-4pll-model).
 
-- Blank wells were added as STD with Ab units equal to zero. Then, a 4pLL was the best model to fit STD data.
+- Blank wells were added as STD with Ab units equal to zero. Then, a 4pLL was the 
+best model to fit STD data.
     + *NOTE:* This allows to avoid background subtraction.
     
 - Positive Control added to graph and Dose estimation
@@ -204,7 +260,8 @@ With the Antibody Units:
 *16dic2016:*
 
 - A comparison between both states of Background Subtraction [ON] vs [OFF].
-    + *SOL:* An [OFF] state after a Box-Cox transformation results in lower amount of NaN's among the first 5 plates.
+    + *SOL:* An [OFF] state after a Box-Cox transformation results in lower amount 
+    of NaN's among the first 5 plates.
 
 - Addition of residual variance and QQ-plots before and after Box-Cox transformation.
 
@@ -229,7 +286,8 @@ With the Antibody Units:
     + Both generated NaNs at the end. Needs to be solved.
 
 - Some XLS file modifications:
-    + from N20 to N37 and from N39 to N41, 03 extra rows after "Plate 1 QTSR Pf" were deleted.
+    + from N20 to N37 and from N39 to N41, 03 extra rows after "Plate 1 QTSR Pf" 
+    were deleted.
     + N39 typo at cell M36 corrected.
     + N18 typo at cell J30 corrected.
     + from N23 to N26, STD cell format changed from 'character' to 'number'.
@@ -238,9 +296,11 @@ With the Antibody Units:
 *30dic2016:*
 
 - Unbiased selection of Ab.units estimate among replicated samples:
-    + *NOTE:* This assumes that no dilution to the original evaluated sample has been performed.
+    + *NOTE:* This assumes that no dilution to the original evaluated sample has 
+    been performed.
   
-- About **73 NaN** Ab.units, since only one is above its model Upper Limit, I suggest to avoid all this measurement.
+- About **73 NaN** Ab.units, since only one is above its model Upper Limit, I suggest 
+to avoid all this measurement.
     + Requires discussion!
     
 *06ene2017:*
@@ -255,7 +315,8 @@ With the Antibody Units:
 - Ab.units data frame filtering:
     + Retrieve of all replicated reads: triplicates, duplicates and NaN.
     + Addition of selected reads among triplicates and duplicates.
-    + Visualization of mean.OD-Ab.unit non-linearity and whole %CV before and after the procedure
+    + Visualization of mean.OD-Ab.unit non-linearity and whole %CV before and 
+    after the procedure
 
 - Brefly: 
     + 964 samples are **in** with 02 reads each, 01 per specie
@@ -270,12 +331,15 @@ With the Antibody Units:
 
 - Done with 02 main outputs:
     + a SIMPLE **.html** report to share with collaborators.
-    + a FINAL **.csv** with the obtained Ab.units with the *Zungarococha_database1_3Oct2016.csv* file format
+    + a FINAL **.csv** with the obtained Ab.units with the 
+    *Zungarococha_database1_3Oct2016.csv* file format
         + Better suited for **covariates** addition.
 
 - For a comparison between resting NaN's mean.OD and Upper/Lower limits per ELISA plate:
-    + Complete list of NaN's available in [02-dtfilter.html](report/02-dtfilter.html#appendix-residual-na)
-    + Complete list of Upper/Lower limits per ELISA plate in [01-standard.html](report/01-standard.html#appendix-upperlower-limits)
+    + Complete list of NaN's available in 
+    [02-dtfilter.html](report/02-dtfilter.html#appendix-residual-na)
+    + Complete list of Upper/Lower limits per ELISA plate in 
+    [01-standard.html](report/01-standard.html#appendix-upperlower-limits)
 
 - A complete list of previous updates available in [Appendix](#appendix-updates)
 
@@ -293,12 +357,15 @@ With the Antibody Units:
 
 *20ene2017:*
 
-- After Katty indication, DB typos were corrected in the current script at [02-dtfilter.html](report/02-dtfilter.html#db-typo-corrections):
+- After Katty indication, DB typos were corrected in the current script at 
+[02-dtfilter.html](report/02-dtfilter.html#db-typo-corrections):
     + 2 samples were added: ZG009-3 and NN068-2.
 
-- Complete list of replicates before and after the unbiased selection available at [02-dtfilter.html](report/02-dtfilter.html#appendix-replicates)
+- Complete list of replicates before and after the unbiased selection available at 
+[02-dtfilter.html](report/02-dtfilter.html#appendix-replicates)
 
-- Covariate DB was added to the analysis at [03-covariat.html](report/03-covariat.html#covariates):
+- Covariate DB was added to the analysis at 
+[03-covariat.html](report/03-covariat.html#covariates):
     + Updated covariate DB was merged with the Ab.units per sample:
         + CSV file is available to re-analyse seropositivity in STATA.
     
@@ -332,20 +399,31 @@ With the Antibody Units:
     + Check if "NaN" data cells creates dificulties. (easy to correct)
     + Contrast mean.OD and standardized Ab.units serpositivity patters per community.
 
-- Share code via [Git(Hub)](https://speakerdeck.com/alicebartlett/git-for-humans) with Nuno.
+- Share code via [Git(Hub)](https://speakerdeck.com/alicebartlett/git-for-humans) 
+with Nuno.
     + BENEFITS:
         + Will improve collaboration:
             + code review, version control, error tracking and paper writing.
         + Will improve publication process: 
-            + journal peer-review process, preference on [plain-text manustripts](https://github.com/rstudio/rticles) with code available.
+            + journal peer-review process, preference on 
+            [plain-text manustripts](https://github.com/rstudio/rticles) 
+            with code available.
         + Will improve publication quality and impact:
             + sharing a reproducible workflow acelerates scientific progress
-                + Remember that standardized open-access procedures are still a deficit in this field.
-                + Recent "open-acces" publications by Biggs[@biggs2017] and Dewasurendra [@dewasurendra2017effectiveness] *do not* provide open-acces methods 
-                + only in the last[@dewasurendra2017effectiveness] specifies that "datasets and scripts are available under reasonable request".
-            + This type of reports, relevant for malaria surveillance[@elliott2014surveillance], would be highly improved with standardize open-acess lab/comp protocols.
-        + Will ease the transition from the Rproject to a Rpackage aim to analyse this specific data.
-            + Nuno have already made most of the require methods[@Seplveda2015] and simulations[@sepulveda2015sample] with open-access tools.
+                + Remember that standardized open-access procedures are still a 
+                deficit in this field.
+                + Recent "open-acces" publications by Biggs [@biggs2017] and 
+                Dewasurendra [@dewasurendra2017effectiveness] *do not* provide 
+                open-acces methods 
+                + only in the last [@dewasurendra2017effectiveness] specifies that 
+                "datasets and scripts are available under reasonable request".
+            + This type of reports, relevant for malaria surveillance 
+            [@elliott2014surveillance], would be highly improved with standardize 
+            open-acess lab/comp protocols.
+        + Will ease the transition from the Rproject to a Rpackage aim to analyse 
+        this specific data.
+            + Nuno have already made most of the require methods [@Seplveda2015] 
+            and simulations [@sepulveda2015sample] with open-access tools.
 
 **PROBLEMS TO BE SOLVED:**
 
@@ -365,7 +443,8 @@ With the Antibody Units:
 
 ## Project directory
 
-- Following Reproducible Research workflow [procedures](http://blog.jom.link/implementation_basic_reproductible_workflow.html)
+- Following Reproducible Research workflow 
+[procedures](http://blog.jom.link/implementation_basic_reproductible_workflow.html)
 
 ```{bash}
 less notrack/project_elixr.md
@@ -373,13 +452,15 @@ less notrack/project_elixr.md
 
 ## Git version control
 
-- For a graphical introduction to Git within Rstudio, check this [link](http://r-pkgs.had.co.nz/git.html).
+- For a graphical introduction to Git within Rstudio, check this 
+[link](http://r-pkgs.had.co.nz/git.html).
 
 ```{bash}
 git log --oneline
 ```
 
-- For a restricted file tracking, e.g. avoiding large files like datasets, add their names to a `.gitignore` file
+- For a restricted file tracking, e.g. avoiding large files like datasets, 
+add their names to a `.gitignore` file
 ```{bash}
 less .gitignore
 ```

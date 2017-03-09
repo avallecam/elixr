@@ -25,7 +25,7 @@ knitr::opts_chunk$set(echo = TRUE,     # CHANGE TO FALSE IN PDF_DOCUMENTS
 knitr::opts_knit$set(root.dir = '../.')
 options(width = 110) # expand limits of CONSOLE output  # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
-# FOR PDF add new page USE: four \newpage BEFORE #SETUP #APPENDIX #COMPUTER.env #REFERENCES
+# FOR PDF add new page USE: \newpage
 ```
 
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
@@ -48,8 +48,10 @@ mu <- markupSpecs$html # expand limits of HTML SCREEN output to use an entire wi
 # To Do
 
 - In order to keep using `std.nty` as a tidy dataset 
-    + A [relational data](http://r4ds.had.co.nz/relational-data.html) framework could be used.
-    + The **Serological dataset** and **Covariate/Epidemiological** dataset could keep to be separated but **related**, instead.
+    + A [relational data](http://r4ds.had.co.nz/relational-data.html) framework 
+    could be used.
+    + The **Serological dataset** and **Covariate/Epidemiological** dataset could 
+    keep to be separated but **related**, instead.
     + More details in [APPENDIX](#appendix-tidy-vs-untidy)
 - re-evaluate 01 patient 02 id after `unap6`
     + evaluation in [APPENDIX](#appendix-id-errors)
@@ -155,10 +157,13 @@ ls -sh data/UNAP-*
 - `unap5` is **different** from `unap1` only in micro UNAP covariate
 - `unap1` UNAP covariates were arbitrarily **selected** to compare against `unap5` NAMR ones.
 - `unap0` was created as a **merged** DB of covariates
-- `unap0` was **merged** with both `std.nty` and `std.uty` DB of **mean.OD** and **Ab.units** per specie obtained in **`02-dtfilter.Rmd`**
+- `unap0` was **merged** with both `std.nty` and `std.uty` DB of **mean.OD** and **Ab.units** 
+per specie obtained in **`02-dtfilter.Rmd`**
 - At the moment, **`std.uty.cov`** is the most convenient dataset.
-- `std.nty.cov` and `std.uty.cov` were **written** in a `.csv` and **saved** in a `.rds` for further analysis.
-- A **QC report** shows 97.5% similarity for `microscopy` and 73.4% for `pcr`. Percentages increases assuming independent observations with regard to the `specie`.
+- `std.nty.cov` and `std.uty.cov` were **written** in a `.csv` and **saved** in a `.rds` for 
+further analysis.
+- A **QC report** shows 97.5% similarity for `microscopy` and 73.4% for `pcr`. Percentages 
+increases assuming independent observations with regard to the `specie`.
 - **Consensus variable** was generated for `micro` and `pcr` giving preference to **NAMR** measurement.
 
 A diagram of DB history using `DiagrammeR` [@DiagrammeR]
@@ -455,7 +460,8 @@ AIM:
     + `_n1`: `_n` vs `_1`
     + `_c`: consensus variable between `_n` vs `_1`
 
-A plot showing How `age` updating changed with respect to the patient `Ab.units` is in the [APPENDIX](#appendix-age-vs-ab-unit)
+A plot showing How `age` updating changed with respect to the patient `Ab.units` is in the 
+[APPENDIX](#appendix-age-vs-ab-unit)
 
 ```{r}
 #str(unap1)
@@ -549,7 +555,8 @@ summary(std.uty.cov)
 **Instead:**
 
 - A [Relational data](http://r4ds.had.co.nz/relational-data.html) framework could be used.
-    + The **Serological dataset** and **Covariate/Epidemiological** dataset would be separated but **related**.
+    + The **Serological dataset** and **Covariate/Epidemiological** dataset would be 
+    separated but **related**.
 - This would imply:
     + keep `std.nty` as it is: tidy, and avoid `std.uty`.
     + keep `unap0` as it is: with no issues that came from the `Specie` covariate.

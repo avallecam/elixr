@@ -26,7 +26,7 @@ knitr::opts_knit$set(root.dir = gsub("/analysis","",getwd()))
 #getwd()
 options(width = 140) # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
-# FOR PDF add new page USE: four \newpage BEFORE #SETUP #APPENDIX #COMPUTER.env #REFERENCES
+# FOR PDF add new page USE: \newpage
 ```
 
 # Setup 

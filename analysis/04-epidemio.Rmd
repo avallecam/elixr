@@ -25,7 +25,7 @@ knitr::opts_chunk$set(echo = TRUE,     # CHANGE TO FALSE IN PDF_DOCUMENTS
 knitr::opts_knit$set(root.dir = '../.')
 options(width = 110) # expand limits of CONSOLE output  # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
-# FOR PDF add new page USE: four \newpage BEFORE #SETUP #APPENDIX #COMPUTER.env #REFERENCES
+# FOR PDF add new page USE: \newpage
 ```
 
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
@@ -94,7 +94,8 @@ std.uty.cov <- readRDS("data/03-covariat-uty.rds")
 
 # Results
 
-- The **109 variables** of the Epidemiological database were reduced to **88** after cleaning.
+- The **109 variables** of the Epidemiological database were reduced to **88** 
+after cleaning.
 - typos were corrected:
     + some variables were renamed, and some factors recoded.
 - previous datasets share **959 ID's** with the current Epidemiological dataset.
@@ -175,19 +176,29 @@ unap6a <- unap6 %>%
                                     "Tripley"="tripley",
                                     "Tripley"="tripleyy"),
          fuente_agua= fct_recode(fuente_agua,
-                                "3. Tuberia publica, fuente fuera de la casa, compartido con la comunidad"="3. TuberiƒÂa publica, fuente fuera de la casa, compartido con la comunidad"),
+                                "3. Tuberia publica, fuente fuera de la casa, 
+                                compartido con la comunidad"=
+                                  "3. TuberiƒÂa publica, fuente fuera de la casa, 
+                                compartido con la comunidad"),
          banio_conectado= fct_recode(banio_conectado,
                                      "0. No tiene banio"="0. No tiene baÃ±o"),
          recibio_tratamiento_malaria= fct_recode(recibio_tratamiento_malaria,
-                                                "1. Mas de una vez (especifique)"="1.Mas de una vez (especifique)",
-                                                "1. Mas de una vez (especifique)"="1. MAs de una vez (especifique)",
-                                                "1. Mas de una vez (especifique)"="1. MÃ¡s de una vez (especifique)"),
+                                                "1. Mas de una vez (especifique)"=
+                                                  "1.Mas de una vez (especifique)",
+                                                "1. Mas de una vez (especifique)"=
+                                                  "1. MAs de una vez (especifique)",
+                                                "1. Mas de una vez (especifique)"=
+                                                  "1. MÃ¡s de una vez (especifique)"),
          epi_alguien_tuvo_malaria= fct_recode(epi_alguien_tuvo_malaria,
-                                             "2. Si, hace algunos anos"="2. Si, hace algunos aÃ±os",
-                                             "3. Si, el ultimo ano"="3. Si, el ultimo aÃ±o"),
+                                             "2. Si, hace algunos anos"=
+                                               "2. Si, hace algunos aÃ±os",
+                                             "3. Si, el ultimo ano"=
+                                               "3. Si, el ultimo aÃ±o"),
          no_busco_ayuda_tratamiento= fct_recode(no_busco_ayuda_tratamiento,
-                                               "0. No pensaba que era un problema serio"="0. No pensa que era un problema serio",
-                                               "0. No pensaba que era un problema serio"="0. No pensÃƒÆ’Ã‚Â³ que era un problema serio"),
+                                               "0. No pensaba que era un problema serio"=
+                                                 "0. No pensa que era un problema serio",
+                                               "0. No pensaba que era un problema serio"=
+                                                 "0. No pensÃƒÆ’Ã‚Â³ que era un problema serio"),
          drogas_tratamiento_01= fct_recode(drogas_tratamiento_01,
                                            "artesunato"="artesunatu",
                                            "artesunato"="Artesunatu",
@@ -481,9 +492,15 @@ unap6a %>%
 unap6a <- unap6a %>% 
   #select(-contains("tratamiento_03")) %>% 
   #select(1, contains("tratamiento")) %>% #str() #dplyr::count(busco_ayuda_tratamiento)
-  mutate(no_busco_ayuda_tratamiento= str_replace(no_busco_ayuda_tratamiento,"\\d+\\.\\s", "")) %>% #dplyr::count(no_busco_ayuda_tratamiento)
-  mutate(donde_busco_tratamiento= str_replace(donde_busco_tratamiento,"\\d+\\.\\s", "")) %>% #dplyr::count(donde_busco_tratamiento)
-  mutate(respuesta_drogas_tratamiento= str_replace(respuesta_drogas_tratamiento,"\\d+\\.\\s", ""))#%>%#dplyr::count(respuesta_drogas_tratamiento)
+  mutate(no_busco_ayuda_tratamiento= str_replace(no_busco_ayuda_tratamiento,
+                                                 "\\d+\\.\\s", "")) %>% 
+  #dplyr::count(no_busco_ayuda_tratamiento)
+  mutate(donde_busco_tratamiento= str_replace(donde_busco_tratamiento,
+                                              "\\d+\\.\\s", "")) %>% 
+  #dplyr::count(donde_busco_tratamiento)
+  mutate(respuesta_drogas_tratamiento=str_replace(respuesta_drogas_tratamiento,
+                                                  "\\d+\\.\\s","")) # %>% 
+  #dplyr::count(respuesta_drogas_tratamiento)
   #dplyr::count(drogas_tratamiento_01)
   #str()
 
@@ -493,11 +510,13 @@ unap6a %>%
 
 #unap6a %>% dplyr::count(drogas_tratamiento_01, sort = T)
 unap6a %>% 
-  group_by(drogas_tratamiento_01, ndias_drogas_tratamiento_01) %>% dplyr::count(sort = T)
+  group_by(drogas_tratamiento_01, ndias_drogas_tratamiento_01) %>% 
+  dplyr::count(sort = T)
 
 #unap6a %>% dplyr::count(drogas_tratamiento_02, sort = T)
 unap6a %>% 
-  group_by(drogas_tratamiento_02, ndias_drogas_tratamiento_02) %>% dplyr::count(sort = T)
+  group_by(drogas_tratamiento_02, ndias_drogas_tratamiento_02) %>% 
+  dplyr::count(sort = T)
 ```
 
 
@@ -516,37 +535,58 @@ unap6a <- unap6a %>% #str()
   select(-enf_especifique_neurologica,
          -enf_especifique_pulmonar,
          -enf_especifique_cardiaca) %>% 
-  mutate_at(vars(enf_diabetes_si:enf_renal_no), factor) %>% #select(1, contains("enf")) %>% glimpse()
+  mutate_at(vars(enf_diabetes_si:enf_renal_no), factor) %>% 
+  #select(1, contains("enf")) %>% glimpse()
   
   mutate(enf_diabetes_si=fct_recode(enf_diabetes_si,"si"="1","no"="0"), 
-         enf_diabetes_no=fct_recode(enf_diabetes_no,"no"="1","si"="0")) %>% #select(enf_diabetes_si,enf_diabetes_no) %>% count()
-  unite(enf_diabetes, enf_diabetes_si, enf_diabetes_no, sep = "") %>% #dplyr::count(enf_diabetes)
-  mutate(enf_diabetes= str_replace_all(enf_diabetes, "nono","no")) %>% #dplyr::count(enf_diabetes)
-  mutate(enf_diabetes= str_replace_all(enf_diabetes, "..si|si..","si")) %>% #dplyr::count(enf_diabetes)
+         enf_diabetes_no=fct_recode(enf_diabetes_no,"no"="1","si"="0")) %>% 
+  #select(enf_diabetes_si,enf_diabetes_no) %>% count()
+  unite(enf_diabetes, enf_diabetes_si, enf_diabetes_no, sep = "") %>% 
+  #dplyr::count(enf_diabetes)
+  mutate(enf_diabetes= str_replace_all(enf_diabetes, "nono","no")) %>% 
+  #dplyr::count(enf_diabetes)
+  mutate(enf_diabetes= str_replace_all(enf_diabetes, "..si|si..","si")) %>% 
+  #dplyr::count(enf_diabetes)
 
   mutate(enf_neurologica_si=fct_recode(enf_neurologica_si,"si"="1","no"="0"),
-         enf_neurologica_no=fct_recode(enf_neurologica_no,"no"="1","si"="0")) %>% #select(enf_neurologica_si,enf_neurologica_no) %>% count()
-  unite(enf_neurologica, enf_neurologica_si, enf_neurologica_no, sep = "") %>% #dplyr::count(enf_neurologica)
-  mutate(enf_neurologica= str_replace_all(enf_neurologica, "nono","no")) %>% #dplyr::count(enf_neurologica)
-  mutate(enf_neurologica= str_replace_all(enf_neurologica, "..si|si..","si")) %>% #dplyr::count(enf_neurologica)
+         enf_neurologica_no=fct_recode(enf_neurologica_no,"no"="1","si"="0")) %>% 
+  #select(enf_neurologica_si,enf_neurologica_no) %>% count()
+  unite(enf_neurologica, enf_neurologica_si, enf_neurologica_no, sep = "") %>% 
+  #dplyr::count(enf_neurologica)
+  mutate(enf_neurologica= str_replace_all(enf_neurologica, "nono","no")) %>% 
+  #dplyr::count(enf_neurologica)
+  mutate(enf_neurologica= str_replace_all(enf_neurologica, "..si|si..","si")) %>% 
+  #dplyr::count(enf_neurologica)
     
   mutate(enf_pulmonar_si=fct_recode(enf_pulmonar_si,"si"="1","no"="0"), 
-         enf_pulmonar_no=fct_recode(enf_pulmonar_no,"no"="1","si"="0")) %>% #select(enf_pulmonar_si,enf_pulmonar_no) %>% count()
-  unite(enf_pulmonar, enf_pulmonar_si, enf_pulmonar_no, sep = "") %>% #dplyr::count(enf_pulmonar)
-  mutate(enf_pulmonar= str_replace_all(enf_pulmonar, "nono","no")) %>% #dplyr::count(enf_pulmonar)
-  mutate(enf_pulmonar= str_replace_all(enf_pulmonar, "..si|si..","si")) %>% #dplyr::count(enf_pulmonar)
+         enf_pulmonar_no=fct_recode(enf_pulmonar_no,"no"="1","si"="0")) %>% 
+  #select(enf_pulmonar_si,enf_pulmonar_no) %>% count()
+  unite(enf_pulmonar, enf_pulmonar_si, enf_pulmonar_no, sep = "") %>% 
+  #dplyr::count(enf_pulmonar)
+  mutate(enf_pulmonar= str_replace_all(enf_pulmonar, "nono","no")) %>% 
+  #dplyr::count(enf_pulmonar)
+  mutate(enf_pulmonar= str_replace_all(enf_pulmonar, "..si|si..","si")) %>% 
+  #dplyr::count(enf_pulmonar)
   
   mutate(enf_cardiaca_si=fct_recode(enf_cardiaca_si,"si"="1","no"="0"), 
-         enf_cardiaca_no=fct_recode(enf_cardiaca_no,"no"="1","si"="0")) %>% #select(enf_cardiaca_si,enf_cardiaca_no) %>% count()
-  unite(enf_cardiaca, enf_cardiaca_si, enf_cardiaca_no, sep = "") %>% #dplyr::count(enf_cardiaca)
-  mutate(enf_cardiaca= str_replace_all(enf_cardiaca, "nono|NAno|noNA","no")) %>% #dplyr::count(enf_cardiaca)
-  mutate(enf_cardiaca= str_replace_all(enf_cardiaca, "NANA",replacement = NA_character_)) %>% #dplyr::count(enf_cardiaca)
-  mutate(enf_cardiaca= str_replace_all(enf_cardiaca, "..si|si..","si")) %>% #dplyr::count(enf_cardiaca)
+         enf_cardiaca_no=fct_recode(enf_cardiaca_no,"no"="1","si"="0")) %>% 
+  #select(enf_cardiaca_si,enf_cardiaca_no) %>% count()
+  unite(enf_cardiaca, enf_cardiaca_si, enf_cardiaca_no, sep = "") %>% 
+  #dplyr::count(enf_cardiaca)
+  mutate(enf_cardiaca= str_replace_all(enf_cardiaca, "nono|NAno|noNA","no")) %>% 
+  #dplyr::count(enf_cardiaca)
+  mutate(enf_cardiaca= str_replace_all(enf_cardiaca, "NANA",replacement = NA_character_)) %>% 
+  #dplyr::count(enf_cardiaca)
+  mutate(enf_cardiaca= str_replace_all(enf_cardiaca, "..si|si..","si")) %>% 
+  #dplyr::count(enf_cardiaca)
 
   mutate(enf_renal_si=fct_recode(enf_renal_si,"si"="1","no"="0"), 
-         enf_renal_no=fct_recode(enf_renal_no,"no"="1","si"="0")) %>% #select(enf_renal_si,enf_renal_no) %>% count()
-  unite(enf_renal, enf_renal_si, enf_renal_no, sep = "") %>% #dplyr::count(enf_renal)
-  mutate(enf_renal= str_replace_all(enf_renal, "nono","no")) %>% #dplyr::count(enf_renal)
+         enf_renal_no=fct_recode(enf_renal_no,"no"="1","si"="0")) %>% 
+  #select(enf_renal_si,enf_renal_no) %>% count()
+  unite(enf_renal, enf_renal_si, enf_renal_no, sep = "") %>% 
+  #dplyr::count(enf_renal)
+  mutate(enf_renal= str_replace_all(enf_renal, "nono","no")) %>% 
+  #dplyr::count(enf_renal)
   mutate(enf_renal= str_replace_all(enf_renal, "..si|si..","si")) 
 
 unap6a %>% #dplyr::count(enf_renal)
@@ -568,28 +608,45 @@ unap6a %>%
 ```{r}
 unap6a <- unap6a %>%
   select(-epi_especifique_viajo_fuera_villa) %>% 
-  mutate(epi_tipo_fuente_agua= str_replace(epi_tipo_fuente_agua,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_tipo_fuente_agua)
-  mutate(epi_distancia_fuente_agua= str_replace(epi_distancia_fuente_agua,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_distancia_fuente_agua)
+  mutate(epi_tipo_fuente_agua= str_replace(epi_tipo_fuente_agua,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_tipo_fuente_agua)
+  mutate(epi_distancia_fuente_agua= str_replace(epi_distancia_fuente_agua,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_distancia_fuente_agua)
   
-  mutate(epi_uso_repelente_mosquito= str_replace(epi_uso_repelente_mosquito,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_uso_repelente_mosquito)
-  mutate(epi_uso_mangas_largas= str_replace(epi_uso_mangas_largas,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_uso_mangas_largas)
-  mutate(epi_uso_ropa_impregnada= str_replace(epi_uso_ropa_impregnada,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_uso_ropa_impregnada)
-  mutate(epi_cercania_fuente_agua= str_replace(epi_cercania_fuente_agua,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_cercania_fuente_agua)
-  mutate(epi_estuvo_campo_antes= str_replace(epi_estuvo_campo_antes,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_estuvo_campo_antes)
+  mutate(epi_uso_repelente_mosquito= str_replace(epi_uso_repelente_mosquito,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_uso_repelente_mosquito)
+  mutate(epi_uso_mangas_largas= str_replace(epi_uso_mangas_largas,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_uso_mangas_largas)
+  mutate(epi_uso_ropa_impregnada= str_replace(epi_uso_ropa_impregnada,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_uso_ropa_impregnada)
+  mutate(epi_cercania_fuente_agua= str_replace(epi_cercania_fuente_agua,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_cercania_fuente_agua)
+  mutate(epi_estuvo_campo_antes= str_replace(epi_estuvo_campo_antes,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_estuvo_campo_antes)
   
-  mutate(epi_uso_redes_cama= str_replace(epi_uso_redes_cama,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_uso_redes_cama)
-  mutate(epi_duerme_ventanas_abiertas= str_replace(epi_duerme_ventanas_abiertas,"\\d+\\.\\s", "")) %>%#dplyr::count(epi_duerme_ventanas_abiertas)
-  mutate(epi_duerme_cerca_monte= str_replace(epi_duerme_cerca_monte,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_duerme_cerca_monte)
-  mutate(epi_rocia_con_insecticida= str_replace(epi_rocia_con_insecticida,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_rocia_con_insecticida)
-  mutate(epi_ultimas_semanas_viajo= str_replace(epi_ultimas_semanas_viajo,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_ultimas_semanas_viajo)
+  mutate(epi_uso_redes_cama= str_replace(epi_uso_redes_cama,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_uso_redes_cama)
+  mutate(epi_duerme_ventanas_abiertas= str_replace(epi_duerme_ventanas_abiertas,"\\d+\\.\\s", "")) %>%
+  #dplyr::count(epi_duerme_ventanas_abiertas)
+  mutate(epi_duerme_cerca_monte= str_replace(epi_duerme_cerca_monte,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_duerme_cerca_monte)
+  mutate(epi_rocia_con_insecticida= str_replace(epi_rocia_con_insecticida,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_rocia_con_insecticida)
+  mutate(epi_ultimas_semanas_viajo= str_replace(epi_ultimas_semanas_viajo,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_ultimas_semanas_viajo)
   
-  mutate(epi_frecuencia_rocia_casa= str_replace(epi_frecuencia_rocia_casa,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_frecuencia_rocia_casa)
+  mutate(epi_frecuencia_rocia_casa= str_replace(epi_frecuencia_rocia_casa,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_frecuencia_rocia_casa)
   
-  mutate(epi_estado_campos_agricultura= str_replace(epi_estado_campos_agricultura,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_estado_campos_agricultura)
-  mutate(epi_estado_canal_agua= str_replace(epi_estado_canal_agua,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_estado_canal_agua)
-  mutate(epi_adquirio_redes_dormir= str_replace(epi_adquirio_redes_dormir,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_adquirio_redes_dormir)
+  mutate(epi_estado_campos_agricultura= str_replace(epi_estado_campos_agricultura,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_estado_campos_agricultura)
+  mutate(epi_estado_canal_agua= str_replace(epi_estado_canal_agua,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_estado_canal_agua)
+  mutate(epi_adquirio_redes_dormir= str_replace(epi_adquirio_redes_dormir,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_adquirio_redes_dormir)
   
-  mutate(epi_uso_red_dormir= str_replace(epi_uso_red_dormir,"\\d+\\.\\s", "")) %>% #dplyr::count(epi_uso_red_dormir)
+  mutate(epi_uso_red_dormir= str_replace(epi_uso_red_dormir,"\\d+\\.\\s", "")) %>% 
+  #dplyr::count(epi_uso_red_dormir)
   mutate(epi_redes_usadas_actualmente= str_replace(epi_redes_usadas_actualmente,"\\d+\\.\\s", "")) 
 
 unap6a %>%#dplyr::count(epi_redes_usadas_actualmente)
@@ -678,14 +735,16 @@ attr(tmp, "intersections")$`unap:sero`
 
 ## merge
 
-- Merge **`unap + sero`** stored in `data/03-covariat-uty.csv` (`std.uty.cov`) with current **`epid`** (`unap6a`)
+- Merge **`unap + sero`** stored in `data/03-covariat-uty.csv` (`std.uty.cov`) 
+with current **`epid`** (`unap6a`)
 - This will be the final unified dataset.
 
 dicoveries:
 
 - **`epid`** and **`unap + sero`** differs in `age`, `sex`, `community`
     + `age`, `sex`, `community` were removed from **`epid`** 
-    + logical vectors such as `_0` and `_n1` were removed from **`unap+sero`** previous merging
+    + logical vectors such as `_0` and `_n1` were removed from **`unap+sero`** 
+    previous merging
 
 ```{r}
 unap6b <- unap6a %>% 

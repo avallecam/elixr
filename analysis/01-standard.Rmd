@@ -25,7 +25,7 @@ knitr::opts_chunk$set(echo = TRUE,     # CHANGE TO FALSE IN PDF_DOCUMENTS
 knitr::opts_knit$set(root.dir = '../.')
 options(width = 110) # expand limits of CONSOLE output  # CHANGE TO DEFAULT in PDF
 # FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
-# FOR PDF add new page USE: four \newpage BEFORE #SETUP #APPENDIX #COMPUTER.env #REFERENCES
+# FOR PDF add new page USE: \newpage
 ```
 
 ```{r setup0, results='hide', message=FALSE, eval=TRUE}
@@ -39,7 +39,8 @@ mu <- markupSpecs$html # expand limits of HTML SCREEN output to use an entire wi
 # Notebook Objectives
 
 * Principal: 
-    - Implement a reproducible standardization of OD values across ELISA plates following **Miura et.al., 2008**[@Miura2008].
+    - Implement a reproducible standardization of OD values across ELISA plates following 
+    **Miura et.al., 2008**[@Miura2008].
 
 * Secondary: 
     - Generate useful outputs to compare standardization quality.
@@ -48,7 +49,8 @@ mu <- markupSpecs$html # expand limits of HTML SCREEN output to use an entire wi
 # To Do
 
 - Implement `plater` and `readxl` data input
-- Assess the **inter-plate-CV** comparing STD variability across plates to generate a **Limit of Quantification**
+- Assess the **inter-plate-CV** comparing STD variability across plates to generate a 
+**Limit of Quantification**
     + Actual CV is the **intra-plate-CV**
     + Generate a tibble of all STD dilutions OD's
     + Extend `std.par` output to all parameters
@@ -128,7 +130,8 @@ DiagrammeR("
 
 ## Log-Logistic (4pLL) model
 
-The curve of the **log-logistic symetric** model describe the *response* `f(x)` dependent of the *dose* `x` and **04 parameters**: $$ f(x)=f(x;b,c,d,e)=c+\frac{d-c}{1+\exp[b(log(x)-log(e))]}\ $$ where: 
+The curve of the **log-logistic symetric** model describe the *response* `f(x)` dependent of the *dose* `x` 
+and **04 parameters**: $$ f(x)=f(x;b,c,d,e)=c+\frac{d-c}{1+\exp[b(log(x)-log(e))]}\ $$ where: 
   
 - `c` is the **lower limit** of the response when the *dose* `x` approaches infinity, 
 - `d` is the **upper limit** when the *dose* `x` approaches zero,
