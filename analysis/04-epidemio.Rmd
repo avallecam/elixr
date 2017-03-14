@@ -789,6 +789,24 @@ readr::write_csv(unap6c, "data/04-epidemio-core.csv")
 saveRDS(unap6c, "data/04-epidemio-core.rds")
 ```
 
+To check the data in R, use the following commands:
+
+
+```r
+# load data
+data <- readRDS("path-to-file/04-epidemio-core.rds")
+
+# attach specialized package
+library(tidyverse) 
+# if not installed, run the following:
+# install.packages("tidyverse")
+
+# repetitive strings are recognized as factors (as shown in APPENDIX: Plots and problems)
+# in order to ease summary output, coerce them to factors:
+data %>% mutate_if(is.character, factor) %>% glimpse()
+data %>% mutate_if(is.character, factor) %>% summary()
+```
+
 
 ***
 
