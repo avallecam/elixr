@@ -803,8 +803,9 @@ library(tidyverse)
 
 # repetitive strings are recognized as factors (as shown in APPENDIX: Plots and problems)
 # in order to ease summary output, coerce them to factors:
-data %>% mutate_if(is.character, factor) %>% glimpse()
-data %>% mutate_if(is.character, factor) %>% summary()
+data %>% mutate_if(is.character, factor) %>% glimpse()  # all variables and class
+data %>% mutate_if(is.character, factor) %>% str()      # all variables and structure
+data %>% mutate_if(is.character, factor) %>% summary()  # all variables and descriptive stats
 ```
 
 
