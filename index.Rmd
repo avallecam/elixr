@@ -1,0 +1,66 @@
+---
+title: "PROJECT: ELISA standardization"
+author: "Andree Valle Campos"
+date: '`r Sys.Date()`'
+site: bookdown::bookdown_site
+documentclass: book
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: yes
+    code_folding: "hide"
+  #bookdown::pdf_book: default
+bibliography: analysis/SeroMarker.bib
+biblio-style: apalike
+link-citations: yes
+csl: analysis/american-medical-association.csl
+description: "This is a project notebook using the bookdown package."
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,     # CHANGE TO FALSE IN PDF_DOCUMENTS
+                      warning = FALSE) 
+#knitr::opts_knit$set(root.dir = '../.')
+options(width = 110) # expand limits of CONSOLE output  # CHANGE TO DEFAULT in PDF
+# FOR PDF CHANGE: html_document, toc_float, number_sections, echo, width
+# FOR PDF add new page USE: \newpage
+```
+
+```{r, results='hide', message=FALSE, eval=TRUE}
+require(Hmisc) # to call markupSpecs
+mu <- markupSpecs$html # expand limits of HTML SCREEN output to use an entire wide screen
+# with the following hidden command (<code>r mu$widescreen()</code>).
+#mu$widescreen()
+```
+`r mu$widescreen()`
+
+# Project notebook {-}
+
+This is a project notebook using the bookdown package.
+
+## Last update
+
+- **[Data Dictionary](#data-dictionary)** available
+- Data epidemiological covariates output as a `.dta` without data labels. [reasons](#write-dta)
+
+## Urgent To do's
+
+- CHECK IF **ZG182-1** should be corrected to **ZG181-1**.
+    + Missing reads are complementary between ID's.
+    
+- Assess the **inter-plate-CV** comparing STD variability across plates to generate a 
+**Limit of Quantification**
+    + Actual CV w.r.t OD is the **intra-plate-CV**
+    + Generate a tibble of all STD dilutions OD's
+    + Extend `std.par` output to all parameters
+    + Include other inter-plate measurements:
+        + blank, positive and negative controls
+
+## README file
+
+```{bash}
+less README.md
+```
+

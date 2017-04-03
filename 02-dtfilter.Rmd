@@ -1,0 +1,789 @@
+# DATA FILTERING {#filter}
+
+## Notebook Objectives
+
+* Principal: 
+    - Identify and filter the replicated reads across ELISA plates.
+
+* Secondary: 
+    - Visualize OD and AU distributions post ELISA standardization.
+
+
+## To Do
+
+- Is it required to change NaN with 0 and NaN or .?
+    + string replacement on data.filtering
+    + May not be convinient due to problems in data transformation and statistics.
+- CHECK IF **ZG182-1** should be corrected to **ZG181-1**.
+    + Missing reads are complementary between ID's.
+    + More detail in [Appendix](#appendix-residual-na) **NOTE 2**.
+
+
+## Dependencies
+
+The required R packages for this analysis are:
+
++ `ggplot2` [@ggplot2]
+
+```{r, results='hide', message=FALSE}
+##essential
+library(XLConnect)    # load EXCEL workbooks
+library(drc)          # Dose-Response modeling
+##accesory
+library("DiagrammeR") # method Flowchart
+library("knitr")      # To display nice tables
+library("tidyverse")
+#ggplot2, tibble, tidyr, readr, purr, dplyyr
+##extra
+library("Rmisc")      # multiplot ggplots
+library("haven")      # import STATA df
+library("readxl")     # import EXCEL df
+library("forcats")    # factor vectors
+library("stringr")    # strings
+library("viridis")    # color visualization
+```
+
+## Input
+```{r}
+std.raw <- readRDS("data/01-standard-raw.rds")
+std.par <- readRDS("data/01-parametr.rds")
+```
+
+***
+
+## Results
+
+- **02 typos** were corrected
+- This experiment made **1937** observations for **969** ID's
+- Among the **73** NA observations, **04** had an OD higher than the upper limit 
+given by its STD.
+- **63** observations had duplicates, **16** had triplicates.
+- A unbiased selection criteria was used to filter replicates.
+- Log transformed Ab.units shows a normal distribution.
+- Outputs were stored in both tidy and untidy formats.
+
+## Procedure
+
+### DB typo corrections
+
+After showing the missing of **02** samples in the Templates, typos were identified 
+and the corresponding modifications were made following Reproducible Reseach paradigms, 
+i.e. avoiding any editing on the original DB.
+
+This correction introduced the following samples:
+
+- **ZG009-3**, by changing *ZG009-1* in plate **N17**, and
+
+```{r}
+#str(std.raw)
+std.raw$ID <- as.character(std.raw$ID)
+
+std.raw[std.raw$ID=="ZG009-1",]
+#std.raw[std.raw$ID=="ZG009-1" & std.raw$Plate=="N17",]
+std.raw[std.raw$ID=="ZG009-1" & std.raw$Plate=="N17",2] <- rep("ZG009-3",2)
+#std.raw[std.raw$ID=="ZG009-1",]
+std.raw[std.raw$ID=="ZG009-3",]
+```
+
+- **NN068-2**, by changing *NN082-5* in plate **N33**.
+
+```{r}
+std.raw[std.raw$ID=="NN082-5",]
+#std.raw[std.raw$ID=="NN082-5" & std.raw$Plate=="N33",]
+std.raw[std.raw$ID=="NN082-5" & std.raw$Plate=="N33",2] <- rep("NN068-2",2)
+std.raw[std.raw$ID=="NN068-2",]
+#std.raw[std.raw$ID=="NN082-5",]
+
+std.raw$ID <- as.factor(std.raw$ID)
+#str(std.raw)
+```
+
+As expected, this reduced the number of duplicates.
+
+### ALL
+
+```{r}
+## total de ID evaluados
+mue <- length(levels(as.factor(std.raw$ID))) # TOTAL MUESTRAS EVALUADAS
+## total ESPERADO + REPLICAS
+rep <- dim(std.raw)[1] # TOTAL INICIAL
+## total ESPERADO de ID x2 SPECIES-REPLICATES (uno de P.VIVAX y uno de P.FALCIPARUM)
+esp <- 2*length(levels(as.factor(std.raw$ID))) # TOTAL ESPERADO
+## total de ID REPETIDOS (corridos por duplicado o triplicado en nuevos PLATES) y que se deben retirar
+repet <- rep - esp
+```
+
+The total amount of evaluated samples is **`r mue`**. However, due to the presence of 
+replicates among Templates, the initial number of reported reads with both `mean.OD` 
+and estimated `Ab.unit` goes up to **`r rep`**.
+
+If each sample have 02 reads, 01 per specie, then the **total expected** amount of 
+samples is **`r esp`**. The rest are replicates (**`r repet`**).
+
+Here is the total amount of evaluated samples in both Pv/Pf plates of each Template file:
+
+```{r}
+## total de muestras por TEMPLATE (P.VIVAX igual a P.FALCIPARUM)
+table(std.raw[std.raw$Specie=="Pviv",]$Plate)
+```
+
+- 04 Templates with lower samples than expected:
+    + N12 (n=39), N18 (n=36), N23 (n=10), N41 (n=18).
+
+- 01 Template with more samples than expected:
+    + N15 (n=41)
+        - **ZG181-1** sampled against **Pviv** plate only
+        - **ZG182-1** sampled against **Pfal** plate only.
+    + Both generated NaNs at the end.
+    + Further dicussion at the end of the next section.
+
+### NA
+
+The total amount of samples with **unestimated `Ab.unit` goes up to 
+`r sum(is.na(std.raw$Ab.unit))`**:
+```{r}
+## muestras con Ab.units NO estimadas
+table(std.raw[is.na(std.raw$Ab.unit)==TRUE,]$Plate)
+## REASON: above plate-specific model upper limit or below its lower limit
+
+# a table of NaN only
+std.nan <- std.raw %>% 
+  filter(Ab.unit=="NaN")
+```
+
+```{r}
+# tidy parameter tibble
+std.par_t <- std.par %>% 
+  gather(parSp, par.value, -Plate) %>% 
+  separate(parSp,
+           c("par","par.Specie"),
+           sep="_")
+
+# differentiate between the ones out by lower or upper limmit
+std.out <- std.nan %>% 
+  select(Plate, ID, Ab.unit, mean.OD, Specie) %>% 
+  full_join(std.par_t,by = "Plate") %>% 
+  filter(Specie == par.Specie) %>% 
+  spread(par, par.value) %>% 
+  mutate(out.low= c>mean.OD,
+         out.upp= d<mean.OD) 
+```
+
+- **67 samples** have OD below the lower limit:
+
+```{r}
+# below lower limit
+std.out %>% 
+  filter(out.low==T)
+```
+
+- **04 samples** have OD above the upper limit:
+
+```{r}
+# above upeer limit
+std.out %>% 
+  filter(out.upp==T)
+```
+
+More details in [Appendix](#appendix-residual-na)
+
+### Replicates
+
+From the **total expected** samples, we calculate that the total amount of reads in excess that came from replicates (duplicates or triplicates) among Templates goes up to **`r repet`**.
+
+```{r}
+## FRECUENCIA por ID
+Ab_freq <- data.frame(table(as.factor(std.raw$ID)))
+```
+
+The total amount of samples with **duplicated** reads is 
+**`r dim(Ab_freq[Ab_freq$Freq==4,])[1]`** and with **triplicated** reads is 
+**`r dim(Ab_freq[Ab_freq$Freq==6,])[1]`**.
+
+```{r}
+summary(factor(Ab_freq$Freq))
+```
+
+#### Triplicates
+
+Listado de muestras **triplicadas** (n=`r dim(Ab_freq[Ab_freq$Freq==6,])[1]`):
+```{r}
+## LISTADO de muestras TRIPLICADAS
+trpl.od <- Ab_freq[Ab_freq$Freq==6,]$Var1
+
+std.trpl <- data.frame()
+for (i in 1:length(trpl.od)) {
+  std.trpl <- rbind(std.trpl,std.raw[std.raw$ID==trpl.od[i],])
+}
+
+as.character(trpl.od)
+
+dim(std.trpl)
+#head(std.trpl,12)
+summary(std.trpl[,-c(3,6)])
+```
+
+#### Duplicates
+
+Listado de muestras **duplicadas** (n=`r dim(Ab_freq[Ab_freq$Freq==4,])[1]`):
+```{r}
+## LISTADO de muestras DUPLICADAS
+dupl.od <- Ab_freq[Ab_freq$Freq==4,]$Var1
+
+std.dupl <- data.frame()
+for (i in 1:length(dupl.od)) {
+  std.dupl <- rbind(std.dupl,std.raw[std.raw$ID==dupl.od[i],])
+}
+
+as.character(dupl.od)
+
+dim(std.dupl)
+#head(std.dupl, 12)
+summary(std.dupl[,-c(3,6)])
+```
+
+### Unbiased selection
+
+Unbiased selection criteria of Ab.units estimate among replicated reads of per sample:
+
++ **NOTE:** This assumes that no dilution to the original evaluated sample has been performed.
+    + For triplicates, the closest value to the mean among replicates was selected
+    + Reads with mean.OD with a %CV higher than 20% were rejected
+    + For duplicates, the replicate with lower %CV was preferred.
+    + If a selection was not acomplished, the last read performed was preferred.
+
+This criteria have been implemented in a **function** called `Unbiased()`:
+
+```{r}
+#### FUNCION PARA LA APLICACION DEL CRITERIO
+Unbiased <- function(repliMAT) {
+  # LOOP: closest value to the mean
+  z <- NULL
+  # for each ID with replicates
+  for(i in 1:length(levels(repliMAT$ID))){
+    # for each Specie
+    for (j in 1:length(levels(repliMAT$Specie))) {
+      # extrae Ab.unit y %CV para cada especie
+      x <- repliMAT[repliMAT$ID==levels(repliMAT$ID)[i] & 
+                    repliMAT$Specie==levels(repliMAT$Specie)[j], c(4,8)]
+      if (any(x$cv.OD>=20, na.rm = TRUE)) {
+        # lecturas con %CV>=20% seran descartadas (independiente de OD>0.25)
+        x <- x[-which(x$cv.OD>=20),]
+      }
+      y <- mean(x$Ab.unit, na.rm = TRUE)
+      # elije cual de los valores es igual a la menor diferencia con la media aritmetica
+      a <- x[which(min(abs(x$Ab.unit - y), na.rm = TRUE)==abs(x$Ab.unit - y)),]
+    
+      if (dim(a)[1]>1) {
+        # para 2 lecturas, elegir la que tenga menor %CV
+        a <- a[which(a$cv.OD==min(a$cv.OD, na.rm = TRUE)),]$Ab.unit
+        if (length(a)>1) {
+          # si no hay diferencias por %CV, entonces optar por la ultima lectura
+          a <- a[2] 
+        }
+      } else {
+        # si la dimension es igual a 1, entonces extraer las Ab.units
+        a <- a$Ab.unit
+      }
+    
+      z <- c(z,a)
+    }
+  }
+  # LOOP para asignar eleccion a una tabla
+  w <- NULL
+  for(i in 1:length(z)){
+    # evita IDENTIDAD entre Ab.Units de distintas muestras
+    # seleccion por bloques
+    v <- repliMAT[repliMAT$ID==levels(repliMAT$ID)[ceiling(i/2)],] 
+    w <- rbind(w,subset(v, Ab.unit==z[i])) 
+  }
+  # output
+  return(w)
+}
+####
+```
+
+
+The results will be shown as follows:
+
+- First, the number of reads per samples: equal to 06 for triplicates and 04 for duplicates. 
+
+- After criteria execution, the same table is presented with only 02 remaining reads per sample, 01 per specie.
+
+- Finally, a table is presented with the samples and selected reads.
+
+#### Triplicates
+```{r}
+std.trpl$ID <- factor(std.trpl$ID)
+table(std.trpl$ID)
+#std.trpl[std.trpl$ID==levels(std.trpl$ID)[1],]
+
+w <- Unbiased(std.trpl)
+# output
+table(w$ID)
+dim(w)
+summary(w[,-c(3,6)])
+#w
+
+std.trpl_new <- w
+
+## CHECK
+#length(z) == dim(w)[1]
+#sum(table(w$ID)!=2)
+```
+
+#### Duplicates
+
+Sample **ZG177-4** is initially removed due to both reads for **Pfal** with **NaN**. 
+After criteria execution, the selected replicated read for **Pviv** is going to be added.
+
+```{r}
+std.dupl$ID <- factor(std.dupl$ID)
+#table(std.dupl$ID)
+extra <- std.dupl[std.dupl$ID=="ZG177-4",]
+extra
+std.dupl <- std.dupl[std.dupl$ID!="ZG177-4",] # RETIRAR debido a que tiene DOS lecturas con NAN para FALCIPARUM
+std.dupl$ID <- factor(std.dupl$ID)
+table(std.dupl$ID)
+#std.dupl[std.dupl$ID==levels(std.dupl$ID)[1],]
+
+w <- Unbiased(std.dupl)
+# output
+table(w$ID)
+dim(w)
+summary(w[,-c(3,6)])
+#w
+std.dupl_new <- w
+
+## CHECK:
+#length(z) == dim(w)[1]
+#sum(table(w$ID)!=2)
+#
+
+# ADD EXTRA "ZG177-4" only VIVAX
+std.dupl_new <- rbind(std.dupl_new,extra[4,]) # +1
+#dim(std.raw)
+
+```
+
+### Filtering
+
+- Aim:
+    + Retrieve of all replicated reads: triplicates, duplicates and NaN.
+    + Addition of selected reads among triplicates and duplicates.
+    + Visualization of mean.OD-Ab.unit non-linearity and whole %CV before and after the procedure
+
+#### Plot previous to filtering
+
+```{r prefil, fig.align='center', fig.height=3, fig.width=9}
+summary(std.raw[,-c(1:2)])
+par(mfrow=c(1,3))
+### NON LINEAR RELATIONSHIP
+plot(mean.OD ~ Ab.unit,std.raw,
+     ylim = c(0,1.5), 
+     xlim = c(0,5e3),
+     main="OD-Ab.unit Non-linearity", pch=4) 
+with(subset(std.raw, Specie=="Pviv"), 
+     points(Ab.unit, mean.OD, col="blue", pch=4))
+with(subset(std.raw, Specie=="Pfal"), 
+     points(Ab.unit, mean.OD, col="red", pch=4))
+legend("topright", c("P.vivax","P.falcip"), #, "C+/-", "blank"
+       col = c( "blue", "red"), #, "black", "black"
+       pch = c(4, 4), #, NA, NA #lwd= c(1,1),
+       #lty = c(NA, NA), #, 3, 2
+       cex = 0.8,
+       inset = .01#, merge = TRUE
+)
+plot(mean.OD ~ log(Ab.unit),std.raw,
+     ylim = c(0,1.5), 
+     xlim = c(-6,10),
+     main="OD-Ab.unit Non-linearity", pch=4) 
+with(subset(std.raw, Specie=="Pviv"), 
+     points(log(Ab.unit), mean.OD, col="blue", pch=4))
+with(subset(std.raw, Specie=="Pfal"), 
+     points(log(Ab.unit), mean.OD, col="red", pch=4))
+legend("topleft", c("P.vivax","P.falcip"), #, "C+/-", "blank"
+       col = c( "blue", "red"), #, "black", "black"
+       pch = c(4, 4), #, NA, NA #lwd= c(1,1),
+       #lty = c(NA, NA), #, 3, 2
+       cex = 0.8,
+       inset = .01#, merge = TRUE
+)
+### %CV
+plot(cv.OD ~ mean.OD,std.raw, 
+     ylim=c(0,100), xlim=c(0,1.5),
+     xlab="mean OD 450nm of duplicates",
+     ylab="%CV of duplicates",
+     main="Percentage Coefficient of Variation")
+abline(h=20, v=0.25, lty=2, col=2)
+## SD
+#plot(sd.OD ~ mean.OD,std.raw,
+#     ylim = c(0,0.27),
+#     main="Heteroskedasticity?") 
+```
+
+#### Data filtering
+
+```{r}
+#mue # TOTAL MUESTRAS EVALUADAS
+#rep # TOTAL INICIAL
+#esp # TOTAL ESPERADO
+```
+
+**`r mue` is the total amount of evaluated samples**. For each one, 02 read were made: 
+01 per specie. Before any filtering, the total amount of reads goes up to 
+**`r rep` including replicates**. After filtering is applied, the **expected amount 
+of left reads is `r esp`**.
+
+A **function** called `checkIN()` would allow to evaluate the retrieving of replicated 
+reads and addition of selected ones:
+
+```{r}
+#CHECK FUNCTION
+checkIN <- function(a) {
+  evalREP <- NULL
+  for (i in 1:6) {
+    evalREP <- c(evalREP, sum(table(a$ID)==i))
+  }
+  evalREP
+}
+```
+
+First, replicates are retrieve:
+```{r, eval=TRUE}
+# a COPY is used throughout FILTERING
+std.fil <- std.raw
+
+## RETRIEVE
+dim(std.fil)[1]
+checkIN(std.fil)
+
+# triplicates
+for (i in 1:length(as.character(trpl.od))) {
+  std.fil <- std.fil[std.fil$ID!=as.character(trpl.od)[i],] # -96
+}
+checkIN(std.fil)
+#dim(std.fil)[1]
+
+# duplicates
+for (i in 1:length(as.character(dupl.od))) {
+  std.fil <- std.fil[std.fil$ID!=as.character(dupl.od)[i],] # -256
+}
+checkIN(std.fil)
+#dim(std.fil)[1]
+
+# END of retrieving
+
+## NA
+#std.fil <- std.fil[is.na(std.fil$Ab.unit)!=TRUE,] # -73
+#checkIN(std.fil)
+##
+#dim(std.fil)[1]
+#
+```
+
+Then, selected reads added:
+```{r}
+## ADDITION to `std.nty` as a filtered and tidy df
+
+# ADD NEW TRIPLICATES
+std.nty <- rbind(std.fil,std.trpl_new) # + 32 = 16x2
+checkIN(std.nty)
+#dim(std.fil)
+
+# ADD NEW DUPLICATES
+std.nty <- rbind(std.nty,std.dupl_new) # +128 + 1 = 64x2 + 1
+checkIN(std.nty)
+dim(std.nty)[1]
+
+# END of addition
+```
+
+#### Filtering evaluation
+
+After filtering, we obtain 
+
+- **`r length(levels(std.nty$ID))` samples** of **`r mue` expected**, 
+- giving a **total of `r dim(std.nty)[1]` reads** on the data frame.
+
+As seen in the last `checkIN`, 
+
+- **`r checkIN(std.nty)[1]` samples** have only one read because of **Ab.unit NaN**. 
+- For more detail, go to [Appendix](#appendix-residual-na)
+
+
+#### Plot after filtering
+```{r posfil, fig.align='center', fig.height=3, fig.width=9}
+summary(std.nty[,-c(1:2)])
+par(mfrow=c(1,3))
+### NON LINEAR RELATIONSHIP
+plot(mean.OD ~ Ab.unit,std.nty,
+     ylim = c(0,1.5), 
+     xlim = c(0,5e3),
+     main="OD-Ab.unit Non-linearity", pch=4) 
+with(subset(std.nty, Specie=="Pviv"), 
+     points(Ab.unit, mean.OD, col="blue", pch=4))
+with(subset(std.nty, Specie=="Pfal"), 
+     points(Ab.unit, mean.OD, col="red", pch=4))
+legend("topright", c("P.vivax","P.falcip"), #, "C+/-", "blank"
+       col = c( "blue", "red"), #, "black", "black"
+       pch = c(4, 4), #, NA, NA #lwd= c(1,1),
+       #lty = c(NA, NA), #, 3, 2
+       cex = 0.8,
+       inset = .01#, merge = TRUE
+)
+plot(mean.OD ~ log(Ab.unit),std.nty,
+     ylim = c(0,1.5), 
+     xlim = c(-6,10),
+     main="OD-Ab.unit Non-linearity", pch=4) 
+with(subset(std.nty, Specie=="Pviv"), 
+     points(log(Ab.unit), mean.OD, col="blue", pch=4))
+with(subset(std.nty, Specie=="Pfal"), 
+     points(log(Ab.unit), mean.OD, col="red", pch=4))
+legend("topleft", c("P.vivax","P.falcip"), #, "C+/-", "blank"
+       col = c( "blue", "red"), #, "black", "black"
+       pch = c(4, 4), #, NA, NA #lwd= c(1,1),
+       #lty = c(NA, NA), #, 3, 2
+       cex = 0.8,
+       inset = .01#, merge = TRUE
+)
+### %CV
+plot(cv.OD ~ mean.OD,std.nty, 
+     ylim=c(0,100), xlim=c(0,1.5),
+     xlab="mean OD 450nm of duplicates",
+     ylab="%CV of duplicates",
+     main="Percentage Coefficient of Variation")
+abline(h=20, v=0.25, lty=2, col=2)
+## SD
+#plot(sd.OD ~ mean.OD,std.nty,
+#     ylim = c(0,0.27),
+#     main="Heteroskedasticity?") 
+```
+
+
+
+### Distributions
+
+#### ggplot
+
+```{r ggplot, fig.align='center', fig.width=8, fig.height=6, message=FALSE, warning=FALSE}
+#library(ggplot2)
+#library(Rmisc)        #multiploting ggplots
+a <- ggplot(std.nty, aes(x=mean.OD, fill=Specie)) + 
+  geom_histogram(alpha=.5, position = "identity") + 
+  labs(title="OD in linear scale")
+b <- ggplot(std.nty, aes(x=Ab.unit, fill=Specie)) + 
+  geom_histogram(alpha=.5, position = "identity") + 
+  labs(title="AU in linear scale")
+
+c <- ggplot(std.nty, aes(x=log(mean.OD), fill=Specie)) + 
+  geom_histogram(alpha=.5, position = "identity") + 
+  labs(title="OD in log scale")
+d <- ggplot(std.nty, aes(x=log(Ab.unit), fill=Specie)) + 
+  geom_histogram(alpha=.5, position = "identity") + 
+  labs(title="AU in log scale")
+
+Rmisc::multiplot(a,c, 
+                 b,d,
+                 cols = 2)
+```
+
+#### base
+
+##### Linear scale
+
+```{r linplt, fig.align='center', fig.height=6, fig.width=9}
+### OD distribution
+par(mfrow=c(2,3))
+
+my <- max(hist(std.nty$mean.OD, plot = F)$counts, na.rm=TRUE)
+
+hist(std.nty$mean.OD, xlim = c(0,1.4), 
+     main = "mean.OD Histogram", xlab = "mean.OD")
+
+hist(std.nty[std.nty$Specie=="Pviv",]$mean.OD, ylim = c(0,my), xlim = c(0,1.4), 
+     main = "P.vivax", xlab = "mean.OD")
+
+hist(std.nty[std.nty$Specie=="Pfal",]$mean.OD, ylim = c(0,my), xlim = c(0,1.4),
+     main = "P.falciparum", xlab = "mean.OD")
+
+
+
+### Ab distribution
+#par(mfrow=c(1,3))
+
+my <- max(hist(std.nty$Ab.unit, plot = F)$counts, na.rm=TRUE)
+
+hist(std.nty$Ab.unit, 
+     main = "Ab.units Histogram", xlab = "Ab.units")#, xlim = c(0,15000)
+
+hist(std.nty[std.nty$Specie=="Pviv",]$Ab.unit, ylim = c(0,my),
+     main = "P.vivax", xlab = "Ab.units")#, xlim = c(0,15000)
+
+hist(std.nty[std.nty$Specie=="Pfal",]$Ab.unit, ylim = c(0,my),
+     main = "P.falciparum", xlab = "Ab.units")#, xlim = c(0,15000)
+```
+
+##### Log scale
+
+```{r logplt, fig.align='center', fig.height=6, fig.width=9}
+par(mfrow=c(2,3))
+
+my <- max(hist(log(std.nty$mean.OD), plot = F)$counts, na.rm=TRUE)
+
+hist(log(std.nty$mean.OD), xlim = c(-3.5,1),
+     main = "mean.OD Histogram", xlab = "log(mean.OD)")
+hist(log(std.nty[std.nty$Specie=="Pviv",]$mean.OD), ylim = c(0,my), xlim = c(-3.5,1),
+     main = "P.vivax", xlab = "log(mean.OD)")
+hist(log(std.nty[std.nty$Specie=="Pfal",]$mean.OD), ylim = c(0,my), xlim = c(-3.5,1),
+     main = "P.falciparum", xlab = "log(mean.OD)")
+
+############
+#par(mfrow=c(1,3))
+
+my <- max(hist(log(std.nty$Ab.unit), plot = F)$counts, na.rm=TRUE)
+
+hist(log(std.nty$Ab.unit), xlim = c(-6,10),
+     main = "Ab.units Histogram", xlab = "log(Ab.units)")
+hist(log(std.nty[std.nty$Specie=="Pviv",]$Ab.unit), ylim = c(0,my), xlim = c(-6,10),
+     main = "P.vivax", xlab = "log(Ab.units)")
+hist(log(std.nty[std.nty$Specie=="Pfal",]$Ab.unit), ylim = c(0,my), xlim = c(-6,10),
+     main = "P.falciparum", xlab = "log(Ab.units)")
+```
+
+
+## Output
+
+### tidy format:
+
++ 01 row, 01 observation, 01 read
+
+```{r}
+#summary(std.nty[,-c(1:2)])
+str(std.nty)
+summary(std.nty)
+```
+
+### untidy format:
+
++ 01 row, 01 patient, 02 observations, 02 reads
++ done in a tidy-way.
+
+```{r}
+std.uty_ab <- std.nty %>% 
+  tbl_df() %>% 
+  select(ID, Ab.unit, Specie) %>% 
+  spread(key = Specie, value = Ab.unit) %>% 
+  dplyr::rename(Ab.unit_Pfal=Pfal, Ab.unit_Pviv=Pviv)
+
+std.uty_od <- std.nty %>% 
+  tbl_df() %>% 
+  select(ID, mean.OD, Specie) %>% 
+  spread(key = Specie, value = mean.OD) %>% 
+  dplyr::rename(mean.OD_Pfal=Pfal, mean.OD_Pviv=Pviv)
+
+std.uty <- full_join(std.uty_ab, std.uty_od, by="ID")
+str(std.uty)
+summary(std.uty)
+```
+
+### save .rds
+```{r}
+saveRDS(std.nty, "data/02-dtfilter-nty.rds")
+saveRDS(std.uty, "data/02-dtfilter-uty.rds")
+
+#saveRDS(std.nan, "data/02-out-of-bounce.rds")
+
+#saveRDS(std.trpl, "data/02-triplicates.rds")
+#saveRDS(std.dupl, "data/02-duplicates.rds")
+#saveRDS(std.trpl_new, "data/02-triplicates-filter.rds")
+#saveRDS(std.dupl_new, "data/02-duplicates-filter.rds")
+```
+
+***
+
+## APPENDIX: residual NA
+
+**NOTE 1:** 
+
+- Only **4 samples** with NaN in both reads. 
+- All `mean.OD` are below the respective lower limit
+- Sample **ZG177-4** was specially evaluated in the `Duplicates` section of 
+[UNBIASED selection](#unbiased-selection):
+
+```{r}
+std.nan_both <- std.nan %>% 
+  count("ID") %>% 
+  filter(freq > 1) %>% 
+  select(ID) %>% 
+  inner_join(std.raw %>% 
+               select(Plate, ID, Ab.unit, mean.OD, Specie)) 
+std.nan_both
+```
+
+```{r}
+# NaN in both PFAL and PVIV ----> PRE filtering
+std.nan_both %>% 
+  left_join(std.out) #%>% 
+  #count("ID")
+```
+
+**NOTE 2:** 
+
+On the other hand, only **`r sum(is.na(std.raw$mean.OD))`** samples have 
+`mean.OD` as `NA`:
+```{r}
+## muestras con OD con valor NA?
+std.raw %>% filter(mean.OD=="NaN") ## ZG181 ZG182
+```
+
+Both samples belong to **N15**. The problem here was that in this Template, 
+one sample was evaluates in the Pf plate, and the other one in the Pv plate: 
+
+- **ZG181-1**, since it is a replicate, it have reads for both species.
+```{r}
+std.raw[std.raw$ID=="ZG181-1",]
+```
+
+- However, **ZG182-1** was only evaluated once, for one ELISA plate and for one specie.
+```{r}
+std.raw[std.raw$ID=="ZG182-1",]
+```
+
+- CHECK IF **ZG182-1** should be corrected to **ZG181-1**.
+	+ Missing reads are complementary between ID's.
+
+
+## APPENDIX: Replicates
+
+### PRE selection
+
+#### pre triplicates
+```{r}
+as.data.frame(std.trpl %>%
+            format(scientific=FALSE, digits=2))
+```
+
+#### pre duplicates
+```{r}
+as.data.frame(std.dupl %>%
+            format(scientific=FALSE, digits=2))
+```
+
+
+### POST selection
+
+#### pos triplicates
+```{r}
+as.data.frame(std.trpl_new %>%
+            format(scientific=FALSE, digits=2))
+```
+
+#### pos duplicates
+```{r}
+as.data.frame(std.dupl_new %>%
+            format(scientific=FALSE, digits=2))
+```
+
+
+<!--## References-->

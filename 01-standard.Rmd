@@ -1,0 +1,448 @@
+# ELISA STANDARDIZATION
+
+## Notebook Objectives
+
+* Principal: 
+    - Implement a reproducible standardization of OD values across ELISA plates following 
+    **Miura et.al., 2008**[@Miura2008].
+
+* Secondary: 
+    - Generate useful outputs to compare standardization quality.
+
+
+## To Do
+
+- Implement `plater` and `readxl` data input
+- Assess the **inter-plate-CV** comparing STD variability across plates to generate a 
+**Limit of Quantification**
+    + Actual CV is the **intra-plate-CV**
+    + Generate a tibble of all STD dilutions OD's
+    + Extend `std.par` output to all parameters
+- Other inter-plate measurements:
+    + blank, positive and negative controls
+
+
+## Dependencies
+
+The required R packages for this analysis are:
+
++ `plater` [@plater]
++ `XLConnect` [@XLConnect]
++ `drc` [@Ritz2015]
+
+```{r, results='hide', message=FALSE}
+##essential
+library(XLConnect)    # load EXCEL workbooks
+library(drc)          # Dose-Response modeling
+##accesory
+library("DiagrammeR") # method Flowchart
+library("knitr")      # To display nice tables
+library("tidyverse")
+#ggplot2, tibble, tidyr, readr, purr, dplyyr
+##extra
+library("Rmisc")      # multiplot ggplots
+library("haven")      # import STATA df
+library("readxl")     # import EXCEL df
+library("forcats")    # factor vectors
+library("viridis")    # color visualization
+```
+
+## Method
+
+- using `DiagrammeR` [@DiagrammeR]
+
+```{r, fig.align='center', fig.width=9}
+#install.packages("DiagrammeR")
+#library(DiagrammeR)
+
+DiagrammeR("
+  graph LR
+    A[XLS data] -.-> |XLConnect| B{R data}
+    Z[CSV data] -.-> |plater| B{R data}
+    B --> C1[STD]
+    B --> E[ctr +/-]
+    B --> D1[UNK]
+    
+    C1 -.-> |drc| C2[4pLL model]
+    C2 --> C3[Box-Cox]
+    C3 --> F{UNK Ab.units}
+
+    D1 --> D2[mean.OD]
+    D2 --> D3[OD %CV]
+    D3 --> F
+    
+    F --> G1[Histogram]
+    F --> G2[Density]
+    F --> G3[QQPlot]
+
+    style Z fill:#ffffff, stroke:#000000, stroke-width:2px    
+    style A fill:#ffffff, stroke:#000000, stroke-width:2px
+    style B fill:#ffffff, stroke:#000000, stroke-width:2px
+    style C1 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style C2 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style C3 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style D1 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style D2 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style D3 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style E fill:#ffffff, stroke:#000000, stroke-width:2px
+    style F fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G1 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G2 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G3 fill:#ffffff, stroke:#000000, stroke-width:2px
+")
+```
+
+### Log-Logistic (4pLL) model
+
+The curve of the **log-logistic symetric** model describe the *response* `f(x)` dependent of the *dose* `x` 
+and **04 parameters**: $$ f(x)=f(x;b,c,d,e)=c+\frac{d-c}{1+\exp[b(log(x)-log(e))]}\ $$ where: 
+  
+- `c` is the **lower limit** of the response when the *dose* `x` approaches infinity, 
+- `d` is the **upper limit** when the *dose* `x` approaches zero,
+- `b` is the **slope** around the **point of inflection**, represented by 
+- `e` defined as **effective dose** and commmonly denoted as [@Ritz2015]:
+    + `ED50`, `EC50` or `IC50` for continuous responses,
+    + `LD50` or `LC50` for binomial responses, and
+    + $T_{50}$ for event-time responses.
+
+## Procedure
+
+**12 summary plots** per ELISA Template:
+
+- **3x3 plots** of STD and UNK distribution, residual variance distribution, and model transformation.
+- **1x3 plots** of OD~450nm~, mean.OD and Ab.units distributions by Density plots.
+
+
+```{r}
+#
+## CREATE A LIST WITH THE FILE.NAMES
+#
+a <- "Template_ELISA_N"
+b <- seq(11,41,1)
+b <- b[-c(3,4,9)] # NO TEMPLATE AVAILABLE
+c <- ".xlsx"
+#
+d <- paste0(a,b,c)
+#d[j]
+data.frame(d)
+#
+e <- rep("data-raw/",length(d))
+#e <- rep("~/Documents/Valle_GnB/000_R_script_MIRRORS/R_test/SeroMarkerMir/data-raw/",length(d))
+d <- paste0(e,d)
+```
+
+```{r}
+## A NULL DATA.FRAME TO FEED WITH DATA.ANALYSIS OUTCOMES
+std.raw <- data_frame()
+std.par <- data_frame()
+```
+
+```{r, fig.align='center', fig.height=12, fig.width=9}
+#
+## A LOOP TO ANALYSE EACH TEMPLATE
+#
+for (j in 1:length(d)) {
+#
+####
+#### START ANALYSIS
+####
+# 1 UPLOAD excel data
+wb <- loadWorkbook(d[j])
+#
+wb_Pf_main <- readWorksheet(wb, 
+                         sheet = 1, 
+                         startRow = 22, endRow = 30,
+                         startCol = 3, endCol = 14)
+wb_Pf <- readWorksheet(wb, 
+                         sheet = 1, 
+                         startRow = 33, endRow = 41,
+                         startCol = 3, endCol = 14)
+wb_Pv_main <- readWorksheet(wb, 
+                         sheet = 1, 
+                         startRow = 79, endRow = 87,
+                         startCol = 3, endCol = 14)
+wb_Pv <- readWorksheet(wb, 
+                         sheet = 1, 
+                         startRow = 90, endRow = 98,
+                         startCol = 3, endCol = 14)
+# 2 GENERATE R DATA.FRAME
+Pf.OD <- matrix(wb_Pf[1,])
+Pf.ID <- matrix(wb_Pf_main[1,])
+Pv.OD <- matrix(wb_Pv[1,])
+Pv.ID <- matrix(wb_Pv_main[1,])
+
+for (i in 2:nrow(wb_Pf)) {
+  Pf.OD <- rbind(Pf.OD,matrix(wb_Pf[i,]))
+  Pf.ID <- rbind(Pf.ID,matrix(wb_Pf_main[i,]))
+  Pv.OD <- rbind(Pv.OD,matrix(wb_Pv[i,]))
+  Pv.ID <- rbind(Pv.ID,matrix(wb_Pv_main[i,]))
+}
+#
+t<-seq(1,12,1)
+x <- c()
+x0 <- 50
+f <- function(x){x*2}
+x[1]<-x0
+for (i in 1:(length(t)-1)) {
+  x[i+1] = f(x[i])
+}
+#
+
+wb_ALL <- data.frame(paste0("N",b[j]),
+                      rbind(Pf.ID,Pv.ID),
+                      rbind(matrix(rep("std",12)),
+                            matrix(rep("unk",80)),"std",
+                            matrix(rep("ctr",2)),"std"), 
+                      rep(x[length(x)]/x), ##FACTOR for AB.UNITS
+                      rbind(Pf.OD,Pv.OD), 
+                      gl(2,96, labels = c("Pfal","Pviv")))
+colnames(wb_ALL) <- c("Plate", "ID", "Type", "Ab.unit", "OD", "Specie")
+wb_ALL$ID <- unlist(wb_ALL$ID)
+wb_ALL$OD <- unlist(wb_ALL$OD)
+wb_ALL$ID <- factor(wb_ALL$ID)
+# 2.1 AVOID NA's
+wb_ALL <- wb_ALL[complete.cases(wb_ALL[,2]),]
+# 2.2 CLEAN data.frame
+wb_ALL[wb_ALL$Type!="std","Ab.unit"] <- NA
+wb_ALL[wb_ALL$ID=="Blank","Ab.unit"] <- 0
+# 2.3 CORRECT variable class
+wb_ALL$OD <- as.numeric(wb_ALL$OD)
+#
+# 2.4 IDENTIFY blank ctrl+ ctrl-
+blank.Pfal <- mean(as.numeric(wb_ALL[wb_ALL$ID=="Blank" & wb_ALL$Specie=="Pfal",5]))
+blank.Pviv <- mean(as.numeric(wb_ALL[wb_ALL$ID=="Blank" & wb_ALL$Specie=="Pviv",5]))
+ctrPos.Pfal <- mean(as.numeric(wb_ALL[wb_ALL$ID=="C+" & wb_ALL$Specie=="Pfal",5]))
+ctrPos.Pviv <- mean(as.numeric(wb_ALL[wb_ALL$ID=="C+" & wb_ALL$Specie=="Pviv",5]))
+ctrNeg.Pfal <- mean(as.numeric(wb_ALL[wb_ALL$ID=="C-" & wb_ALL$Specie=="Pfal",5]))
+ctrNeg.Pviv <- mean(as.numeric(wb_ALL[wb_ALL$ID=="C-" & wb_ALL$Specie=="Pviv",5]))
+# 3 UNK MEAN OD
+wb_UNK <- subset(wb_ALL, Type=="unk")
+wb_UNK$ID <- factor(wb_UNK$ID) # unk goes from 
+n <- length(levels(wb_UNK$ID))
+# 3.1 MEAN DATA.FRAME
+wb_MEAN <- data.frame(paste0("N",b[j]),
+                        levels(wb_UNK$ID),
+                        rep("unk",length(levels(wb_UNK$ID))), 
+                        rep(NA,length(levels(wb_UNK$ID))),#Ab.unit
+                        rep(NA,length(levels(wb_UNK$ID))),#mean.OD
+                        gl(2,length(levels(wb_UNK$ID)), 
+                           labels = c("Pfal","Pviv")))
+colnames(wb_MEAN) <- c("Plate", "ID", "Type", "Ab.unit", "mean.OD", "Specie")
+# 3.2 FEED MEAN DATA.FRAME
+for (i in 1:n) {
+  wb_MEAN[i,5] <- mean(as.numeric(subset(wb_UNK, 
+                                           ID==levels(wb_UNK$ID)[i] &
+                                             Specie==levels(wb_UNK$Specie)[1])$OD))
+  wb_MEAN[n+i,5] <- mean(as.numeric(subset(wb_UNK, 
+                                             ID==levels(wb_UNK$ID)[i] &
+                                               Specie==levels(wb_UNK$Specie)[2])$OD))
+}
+#
+######
+###### [OFF] BACKGROUND SUBTRACTION
+######
+# 4 STD.DEV DATA.FRAME
+wb_SDCV <- cbind(wb_MEAN, 
+                   rep(NA,length(levels(wb_UNK$ID))),#mean.OD
+                   rep(NA,length(levels(wb_UNK$ID))))#sd.OD)
+colnames(wb_SDCV) <- c("Plate", "ID", "Type", "Ab.unit", "mean.OD", "Specie", "sd.OD", "cv.OD")
+# 4.1 FEED STD.DEV DATA.FRAME
+for (i in 1:n) {
+  wb_SDCV[i,7] <- sd(subset(wb_UNK, 
+                              ID==levels(wb_UNK$ID)[i] &
+                                Specie==levels(wb_UNK$Specie)[1])$OD)
+  wb_SDCV[n+i,7] <- sd(subset(wb_UNK, 
+                                ID==levels(wb_UNK$ID)[i] &
+                                  Specie==levels(wb_UNK$Specie)[2])$OD)
+}
+
+wb_SDCV[,8] <- 100*(wb_SDCV[,7] / wb_SDCV[,5])
+#
+# 5 PARAMETER ESTIMATION 4pLL model
+#
+wb.m1 <- drm(OD ~ Ab.unit, Specie, 
+               data= subset(wb_ALL, Type=="std"),
+               fct = LL.4(names = c("b", "c", "d", "e")))
+#
+wb.model <- wb.m1
+# 6 BOX-COX TRANSFORMATION against RESIDUAL heterogeneity
+wb.model.BX <- boxcox(wb.model, 
+                     main=expression("Optimal " ~ lambda ~ " with confidence intervals"), 
+                     plotit = FALSE)
+# 7 UNK AB.UNITS ESTIMATION by INVERSE REGRESSION
+wb_Resp.Pf <- ED(wb.model.BX, 
+                   wb_MEAN[1:n,5],
+                   type = "absolute",interval = "delta",
+                   clevel = "Pfal", display = FALSE)
+wb_Resp.Pv <- ED(wb.model.BX, 
+                   wb_MEAN[(n+1):(2*n),5],
+                   type = "absolute",interval = "delta",
+                   clevel = "Pviv", display = FALSE)
+# 7.1 FEED UNK AB.UNITS DATA.FRAME
+for (i in 1:n) {
+  wb_SDCV[i,4] <- wb_Resp.Pf[i]
+  wb_SDCV[n+i,4] <- wb_Resp.Pv[i]
+}
+#
+####
+#### END ANALYSIS
+#
+#### START PLOTTING
+####
+#
+par(mfrow=c(4,3))
+### 1 DISTRIBUTION PLOTING
+plot(OD ~ log(Ab.unit), 
+     data=subset(wb_ALL, Type=="std" & Specie=="Pfal"), 
+     ylim = c(0,1.5), col="red",
+     xlab = "log(Ab unit)", ylab = "OD 450nm",
+     main= paste0("ELISA plate"," ","N",b[j],"\n Standard samples distribution"))
+points(OD ~ log(Ab.unit), 
+       data=subset(wb_ALL, Type=="std" & Specie=="Pviv"), 
+       pch=2, col="blue")
+abline(h=c(ctrNeg.Pfal, ctrNeg.Pviv), lty=c(3, 3), col=c("red", "blue"))
+abline(h=c(ctrPos.Pfal, ctrPos.Pviv), lty=c(3, 3), col=c("red", "blue"))
+abline(h=c(blank.Pfal, blank.Pviv), lty=c(2, 2), col=c("red", "blue"))
+legend("bottomright", c("P.vivax","P.falcip", "C+/-", "blank"), 
+       col = c( "blue", "red", "black", "black"), 
+       pch = c(2, 1, NA, NA), #lwd= c(1,1),
+       lty = c(NA, NA, 3, 2),
+       cex = 0.8,
+       inset = .01#, merge = TRUE
+)
+#
+### 2 %CV CONDITIONAL PLOTING
+plot(cv.OD ~ mean.OD,wb_SDCV, 
+     ylim=c(0,100), xlim=c(0,1.5),
+     xlab="mean OD 450nm of duplicates",
+     ylab="%CV of duplicates",
+     main="Percentage Coefficient of Variation")
+abline(h=20, v=0.25, lty=2, col=2)
+#
+### 3 UNK AB.UNITS PLOTING
+plot(wb.model.BX,#broken = TRUE,
+     ylim = c(0,1.5), 
+     xlim = c(0,5e3),
+     main=paste0("ELISA plate"," ","N",b[j],"\n Unknown samples distribution"),
+     col="grey",
+     legendPos = c(2,1.5))
+points(y=wb_MEAN[(n+1):(2*n),5],x=wb_Resp.Pv[1:n],col="blue",pch=4)
+points(y=wb_MEAN[1:n,5],x=wb_Resp.Pf[1:n],col="red",pch=4)
+#abline(h=c(ctrNeg.Pfal, ctrNeg.Pviv), lty=c(3, 3), col=c("red", "blue"))
+#abline(h=c(ctrPos.Pfal, ctrPos.Pviv), lty=c(3, 3), col=c("red", "blue"))
+#abline(h=c(blank.Pfal, blank.Pviv), lty=c(2, 2), col=c("red", "blue"))
+legend("bottomright", c("P.vivax","P.falcip"), #, "C+/-", "blank"
+       col = c( "blue", "red"), #, "black", "black"
+       pch = c(4, 4), #, NA, NA #lwd= c(1,1),
+       #lty = c(NA, NA), #, 3, 2
+       cex = 0.8,
+       inset = .01#, merge = TRUE
+)
+#
+### 4 VARIANCE HETEROGENEITY
+plot(residuals(wb.model) ~ fitted(wb.model), 
+     main="4p Log-Logistic model \n Variance Hetereogeneity",
+     xlab="fitted",
+     ylab = "residuals")
+abline(h=0)
+#
+### 5 LAMBDA ESTIMATE ##------Box-Cox transformation-------##
+wb.model.BX <- boxcox(wb.model, 
+                     main=expression("Optimal " ~ lambda ~ " with confidence intervals"))
+#
+### 6 VARIANCE HOMOGENEITY
+plot(residuals(wb.model.BX) ~ fitted(wb.model.BX), 
+     main="Box-Cox transformed model \n Variance Homogeneity",
+     xlab="fitted",
+     ylab = "residuals")
+abline(h=0)
+#
+### 7 RESIDUAL SKWENESS
+qqnorm(residuals(wb.model), 
+       main = "4p Log-Logistic model \n Normal Q-Q Plot")
+qqline(residuals(wb.model))
+#
+### 8 DRC AND BOXCOX OVERLAPPED MODELS
+plot(wb.model, #broken = TRUE, 
+     xlab="Ab units", ylab="OD 450nm",
+     ylim = c(0,1.5), 
+     xlim = c(0,5e3),
+     main="in black: 4p Log-Logistic model \n in red: Box-Cox transformed model",
+     legendPos = c(2,1.5))
+plot(wb.model.BX, col = "red", add = TRUE, legend = FALSE,
+     ylim = c(0,1.5), 
+     xlim = c(0,5e5))
+#
+### 9 RESIDUAL NORMALITY
+qqnorm(residuals(wb.model.BX), 
+       main="Box-Cox transformed model \n Normal Q-Q Plot")
+qqline(residuals(wb.model.BX))
+#
+####
+####
+#
+### 10 OD REPLICATES DISTRIBUTION
+#par(mfrow=c(3,3))
+#my <- max(hist(wb_ALL$OD, plot = F)$counts, na.rm=TRUE)
+#hist(wb_ALL$OD, ylim = c(0,my), 
+#     main= paste0("ELISA plate"," ","N",b[j]),
+#     xlab = "OD")
+plot(density(na.omit(wb_ALL$OD)),
+     main = "OD Density plot",
+     xlab = "OD")#, ylim = c(0,my)  #, xlim = c(0,mx)
+#qqnorm(wb_ALL$OD); qqline(wb_ALL$OD)
+#
+### 11 OD MEAN DISTRIBUTION
+#hist(wb_MEAN$mean.OD, ylim = c(0,my),
+#     main = "mean.OD Histogram",
+#     xlab = "mean.OD")
+plot(density(na.omit(wb_MEAN$mean.OD)),
+     main = "mean.OD Density plot",
+     xlab = "mean.OD")#, ylim = c(0,my)
+#qqnorm(wb_MEAN$mean.OD); qqline(wb_MEAN$mean.OD)
+#
+### 12 AB.UNIT DISTRIBUTION
+#hist(wb_SDCV$Ab.unit, ylim = c(0,my),
+#     main = "Ab.units Histogram",
+#     xlab = "Ab.units")
+plot(density(na.omit(wb_SDCV$Ab.unit)),
+     main = "Ab.units Density plot",
+     xlab = "Ab.units")#, ylim = c(0,my)
+#qqnorm(wb_SDCV$Ab.unit); qqline(wb_SDCV$Ab.unit)
+#
+####
+#### END PLOTTING
+#### START ROW BINDING TO FINAL DATA.FRAME
+####
+std.raw <- rbind(std.raw,wb_SDCV)
+####
+std.par <- rbind(std.par, data_frame(Plate= paste0("N",b[j]),
+                                       c_Pfal= coefficients(wb.model.BX)[3],
+                                       c_Pviv= coefficients(wb.model.BX)[4],
+                                       d_Pfal= coefficients(wb.model.BX)[5],
+                                       d_Pviv= coefficients(wb.model.BX)[6]))
+####
+}
+
+```
+
+## Output
+```{r}
+saveRDS(tbl_df(std.raw), "data/01-standard-raw.rds")
+saveRDS(tbl_df(std.par), "data/01-parametr.rds")
+saveRDS(Pf.ID, "data/01-dilution.rds")
+```
+
+
+***
+
+## APPENDIX: Upper/Lower limits
+
+```{r}
+#std.par <- readRDS("data/01-parametr.rds")
+std.par
+```
+
+***
+
+<!--## References-->

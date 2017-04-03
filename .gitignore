@@ -10,3 +10,5 @@ notrack/*
 report/*
 *manuscript*
 *.pdf
+_*
+*.html

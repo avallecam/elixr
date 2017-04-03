@@ -1,13 +1,6 @@
----
-title: "ASTMH 2017 abstract"
-author: "Andree Valle Campos"
-date: "March 22, 2017"
-output: pdf_document
-bibliography: analysis/SeroMarker.bib
-csl: analysis/american-medical-association.csl
----
+# ASTMH 2017 abstract {#astmh}
 
-# Title:
+## Title:
 
 <!-- 
 Towards standardized malaria serological surveillance:
@@ -29,46 +22,50 @@ https://www.practicereproducibleresearch.org/
 **Towards reproducible malaria sero-surveillance:
 A workflow for high-throughput ELISA plate standardization using R**
 
-# Abstract:
+## Abstract:
 @WHOreport2016
 @elliott2014surveillance
 @Seplveda2015
 @CienciaReproducible2016
 
-## Introduction
+### Introduction
 
 intro sentence:
+
 - sero-surveillance or seroepidemiological studies
 - antibody data is an excellent indicator of malaria exposure, transmission and 
 immunity at population levels. 
 
 Known field achievement:
+
 - antigen selection
 - mathematical models to define seropositivity, and changes in transmission and exposure.
 
 Problem:
+
 - No common procedure to standardize ELISA plates among publications
 - Usage of privative softwares without workflow recording
 - Lack of reproducibility of studies
 
 Solution:
+
 - Reproducible workflow for ELISA plates standardization
 - Adds standard analysis tools to develop high-throughput assays
 - Optimize sero-surveillance development
 
-## Methods
+### Methods
 
 - Plate protocol by @Miura2008
 - Data input with `XLConnect` @XLConnect
 - 4 parameter log-logistic regression with `drc` @Ritz2015
 - Unbiased selection and Filtering of replicated reads across plates.
 
-## Results
+### Results
 
 - residual variance homogenization of regression models per plate.
 - Inter and Intra-plate Coefficients of variation for QC.
 
-## Discussion
+### Discussion
 
 This type of reports, relevant for malaria surveillance [@elliott2014surveillance], 
 would be highly improved with standardize open-acess lab/comp protocols
@@ -80,4 +77,4 @@ would be highly improved with standardize open-acess lab/comp protocols
 - Standardize data generation and analysis methods will improve data comparison 
 between populations and geographical regions
 
-# References:
+<!--## References-->
