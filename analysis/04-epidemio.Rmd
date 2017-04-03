@@ -286,9 +286,9 @@ TO DO:
 
 ```{r ageres, fig.width=12, fig.height=3, fig.align="center"}
 unap60ar <- std.uty.cov %>% 
-  select(id, age_1, age_4) %>% 
+  dplyr::select(id, age_1, age_4) %>% 
   left_join(unap6a %>% 
-              select(id, age_e=age, residence), by="id") %>% 
+              dplyr::select(id, age_e=age, residence), by="id") %>% 
   mutate(age_e1= age_1==age_e,
          age_e4= age_4==age_e,
          age_0= age_1==age_4) #%>% #filter(age_e1==F) #count("age_e1")
@@ -333,17 +333,17 @@ Rmisc::multiplot(a,b,c,cols = 3)
 
 ```{r}
 unap6a <- unap6a %>% 
-  mutate_at(vars(ah_radio:ah_auto), factor) %>% #select(1, contains("enf")) %>% glimpse()
+  mutate_at(vars(ah_radio:ah_auto), factor) %>% #dplyr::select(1, dplyr::contains("enf")) %>% glimpse()
   mutate(ah_radio=fct_recode(ah_radio,"si"="1","no"="0"), 
          ah_television=fct_recode(ah_television,"si"="1","no"="0"), 
          ah_estereo=fct_recode(ah_estereo,"si"="1","no"="0"), 
          ah_refrigerador=fct_recode(ah_refrigerador,"si"="1","no"="0"), 
          ah_motocicleta=fct_recode(ah_motocicleta,"si"="1","no"="0"), 
          ah_mototaxi=fct_recode(ah_mototaxi,"si"="1","no"="0"), 
-         ah_auto=fct_recode(ah_auto,"si"="1","no"="0")) #%>% select(enf_diabetes_si,enf_diabetes_no) %>% count()
+         ah_auto=fct_recode(ah_auto,"si"="1","no"="0")) #%>% dplyr::select(enf_diabetes_si,enf_diabetes_no) %>% count()
 
 unap6a %>% 
-  select(1, starts_with("ah_")) %>%
+  dplyr::select(1, starts_with("ah_")) %>%
   gather(key= ah, value = ah_m, -id, na.rm = T) %>% 
   filter(ah_m=="si") %>% dplyr::count(ah, sort = T)
   #group_by(ah, ah_m) %>% 
@@ -360,16 +360,16 @@ discovery:
 
 ```{r}
 unap6a %>% 
-  select(1, starts_with("otro_")) %>% #str() # 3/11 son significativas
+  dplyr::select(1, starts_with("otro_")) %>% #str() # 3/11 son significativas
   gather(key= otro, value = otro_m, -id, na.rm = T) %>% dplyr::count(otro, sort = T)
 
 unap6_otro <- unap6a %>% 
-  select(1, starts_with("otro_")) %>% #str() # 3/11 son significativas
-  select(1, 2,6,9) #%>% #str() # 3/11 son significativas
+  dplyr::select(1, starts_with("otro_")) %>% #str() # 3/11 son significativas
+  dplyr::select(1, 2,6,9) #%>% #str() # 3/11 son significativas
   
 unap6a <- unap6a %>% 
-  select(-starts_with("otro_")) %>% #str() # 3/11 son significativas
-  left_join(unap6_otro, by="id") #%>% select(1, starts_with("otro_")) %>% str() # 3/11 son significativas
+  dplyr::select(-starts_with("otro_")) %>% #str() # 3/11 son significativas
+  left_join(unap6_otro, by="id") #%>% dplyr::select(1, starts_with("otro_")) %>% str() # 3/11 son significativas
   #spread(key= otro, value = otro_m)
 ```
 
@@ -391,7 +391,7 @@ unap6a <- unap6a %>%
 #unap6a %>% glimpse()
 
 unap6a %>% 
-  select(1, contains("trabajo")) %>% 
+  dplyr::select(1, dplyr::contains("trabajo")) %>% 
   dplyr::count(trabajo, sort = T)
   #group_by(trabajo, trabajo_paga_ultima) %>% dplyr::count(trabajo_paga_ultima, sort = T)
 ```
@@ -402,7 +402,7 @@ unap6a %>%
 
 ```{r}
 unap6a <- unap6a %>% 
-  #select(1, contains("material")) %>% 
+  #dplyr::select(1, dplyr::contains("material")) %>% 
   mutate(material_piso= str_replace(material_piso,"\\d+\\.\\s", "")) %>% #dplyr::count(material_piso, sort = T)
   mutate(material_paredes= str_replace(material_paredes,"\\d+\\.\\s", "")) %>% #dplyr::count(material_paredes, sort = T)
   mutate(material_paredes= str_replace(material_paredes,"\\so\\s", "_")) %>% #dplyr::count(material_paredes, sort = T)
@@ -420,7 +420,7 @@ unap6a %>%
   #group_by(trabajo, trabajo_paga_ultima) %>% dplyr::count(trabajo_paga_ultima, sort = T)
   
 unap6a %>% 
-  select(1, contains("material")) %>% 
+  dplyr::select(1, dplyr::contains("material")) %>% 
   mutate(material_piso= str_replace(material_piso,"\\d+\\.\\s", "")) %>% dplyr::count(material_piso, sort = T)
 ```
 
@@ -430,7 +430,7 @@ unap6a %>%
 
 ```{r}
 unap6a <- unap6a %>% 
-  #select(1, contains("banio")) %>% #dplyr::count(banio_conectado, sort = T)
+  #dplyr::select(1, dplyr::contains("banio")) %>% #dplyr::count(banio_conectado, sort = T)
   mutate(banio_conectado= str_replace(banio_conectado,"\\d+\\.\\s", "")) %>% #dplyr::count(material_paredes, sort = T)
   mutate(banio_conectado= str_replace(banio_conectado,str_c("Otro","\\.\\s","\\(","especifique","\\)"), "NA"))%>%#dplyr::count(banio_conectado, sort = T)
   #group_by(material_paredes, otro_material_paredes) %>% dplyr::count()
@@ -441,7 +441,7 @@ unap6a <- unap6a %>%
 
 #unap6a %>% glimpse()
 
-#unap6a %>% select(1, contains("banio")) %>% glimpse()
+#unap6a %>% dplyr::select(1, dplyr::contains("banio")) %>% glimpse()
 
 unap6a %>% dplyr::count(banio_conexion, sort = T)
   #mutate(material_pared= fct_lump(material_pared, 3)) %>% dplyr::count(material_pared, sort = T)
@@ -454,7 +454,7 @@ unap6a %>% dplyr::count(banio_conexion, sort = T)
 
 ```{r, fig.width=8, fig.height=4,fig.align="center"}
 unap6a <- unap6a %>% #str()
-  #select(1, age, residence, contains("malaria")) %>% #str()
+  #dplyr::select(1, age, residence, dplyr::contains("malaria")) %>% #str()
   mutate(recibio_tratamiento_malaria= str_replace(recibio_tratamiento_malaria,"\\d+\\.\\s", "")) %>% 
   mutate(recibio_tratamiento_malaria= str_replace(recibio_tratamiento_malaria,str_c("\\s","\\(","especifique","\\)"), "")) %>%
   mutate(epi_especie_causo_malaria= str_replace(epi_especie_causo_malaria,"\\d+\\.\\s", "")) %>% 
@@ -466,7 +466,7 @@ unap6a <- unap6a %>% #str()
 #unap6a %>% glimpse()
 
 unap6a %>% 
-  select(1, age, residence, contains("malaria")) %>%
+  dplyr::select(1, age, residence, dplyr::contains("malaria")) %>%
   glimpse()
 
 unap6a %>% 
@@ -490,8 +490,8 @@ unap6a %>%
   group_by(drogas_tratamiento_03, ndias_drogas_tratamiento_03) %>% dplyr::count(sort = T)
 
 unap6a <- unap6a %>% 
-  #select(-contains("tratamiento_03")) %>% 
-  #select(1, contains("tratamiento")) %>% #str() #dplyr::count(busco_ayuda_tratamiento)
+  #dplyr::select(-dplyr::contains("tratamiento_03")) %>% 
+  #dplyr::select(1, dplyr::contains("tratamiento")) %>% #str() #dplyr::count(busco_ayuda_tratamiento)
   mutate(no_busco_ayuda_tratamiento= str_replace(no_busco_ayuda_tratamiento,
                                                  "\\d+\\.\\s", "")) %>% 
   #dplyr::count(no_busco_ayuda_tratamiento)
@@ -505,7 +505,7 @@ unap6a <- unap6a %>%
   #str()
 
 unap6a %>% 
-  select(1, contains("tratamiento")) %>% 
+  dplyr::select(1, dplyr::contains("tratamiento")) %>% 
   glimpse()
 
 #unap6a %>% dplyr::count(drogas_tratamiento_01, sort = T)
@@ -532,15 +532,15 @@ unap6a %>%
 
 ```{r}
 unap6a <- unap6a %>% #str()
-  select(-enf_especifique_neurologica,
+  dplyr::select(-enf_especifique_neurologica,
          -enf_especifique_pulmonar,
          -enf_especifique_cardiaca) %>% 
   mutate_at(vars(enf_diabetes_si:enf_renal_no), factor) %>% 
-  #select(1, contains("enf")) %>% glimpse()
+  #dplyr::select(1, dplyr::contains("enf")) %>% glimpse()
   
   mutate(enf_diabetes_si=fct_recode(enf_diabetes_si,"si"="1","no"="0"), 
          enf_diabetes_no=fct_recode(enf_diabetes_no,"no"="1","si"="0")) %>% 
-  #select(enf_diabetes_si,enf_diabetes_no) %>% count()
+  #dplyr::select(enf_diabetes_si,enf_diabetes_no) %>% count()
   unite(enf_diabetes, enf_diabetes_si, enf_diabetes_no, sep = "") %>% 
   #dplyr::count(enf_diabetes)
   mutate(enf_diabetes= str_replace_all(enf_diabetes, "nono","no")) %>% 
@@ -550,7 +550,7 @@ unap6a <- unap6a %>% #str()
 
   mutate(enf_neurologica_si=fct_recode(enf_neurologica_si,"si"="1","no"="0"),
          enf_neurologica_no=fct_recode(enf_neurologica_no,"no"="1","si"="0")) %>% 
-  #select(enf_neurologica_si,enf_neurologica_no) %>% count()
+  #dplyr::select(enf_neurologica_si,enf_neurologica_no) %>% count()
   unite(enf_neurologica, enf_neurologica_si, enf_neurologica_no, sep = "") %>% 
   #dplyr::count(enf_neurologica)
   mutate(enf_neurologica= str_replace_all(enf_neurologica, "nono","no")) %>% 
@@ -560,7 +560,7 @@ unap6a <- unap6a %>% #str()
     
   mutate(enf_pulmonar_si=fct_recode(enf_pulmonar_si,"si"="1","no"="0"), 
          enf_pulmonar_no=fct_recode(enf_pulmonar_no,"no"="1","si"="0")) %>% 
-  #select(enf_pulmonar_si,enf_pulmonar_no) %>% count()
+  #dplyr::select(enf_pulmonar_si,enf_pulmonar_no) %>% count()
   unite(enf_pulmonar, enf_pulmonar_si, enf_pulmonar_no, sep = "") %>% 
   #dplyr::count(enf_pulmonar)
   mutate(enf_pulmonar= str_replace_all(enf_pulmonar, "nono","no")) %>% 
@@ -570,7 +570,7 @@ unap6a <- unap6a %>% #str()
   
   mutate(enf_cardiaca_si=fct_recode(enf_cardiaca_si,"si"="1","no"="0"), 
          enf_cardiaca_no=fct_recode(enf_cardiaca_no,"no"="1","si"="0")) %>% 
-  #select(enf_cardiaca_si,enf_cardiaca_no) %>% count()
+  #dplyr::select(enf_cardiaca_si,enf_cardiaca_no) %>% count()
   unite(enf_cardiaca, enf_cardiaca_si, enf_cardiaca_no, sep = "") %>% 
   #dplyr::count(enf_cardiaca)
   mutate(enf_cardiaca= str_replace_all(enf_cardiaca, "nono|NAno|noNA","no")) %>% 
@@ -582,7 +582,7 @@ unap6a <- unap6a %>% #str()
 
   mutate(enf_renal_si=fct_recode(enf_renal_si,"si"="1","no"="0"), 
          enf_renal_no=fct_recode(enf_renal_no,"no"="1","si"="0")) %>% 
-  #select(enf_renal_si,enf_renal_no) %>% count()
+  #dplyr::select(enf_renal_si,enf_renal_no) %>% count()
   unite(enf_renal, enf_renal_si, enf_renal_no, sep = "") %>% 
   #dplyr::count(enf_renal)
   mutate(enf_renal= str_replace_all(enf_renal, "nono","no")) %>% 
@@ -596,10 +596,10 @@ unap6a %>% #dplyr::count(enf_renal)
   #dplyr::count(enf_tomo_medicinas_parasitos)
   #dplyr::count(enf_medicinas_parasitos)
   
-  select(1, contains("enf")) %>% glimpse()
+  dplyr::select(1, dplyr::contains("enf")) %>% glimpse()
 
 unap6a %>%
-  select(enfermedad_cronica, enf_diabetes, enf_neurologica, enf_pulmonar, enf_cardiaca, enf_renal) %>% 
+  dplyr::select(enfermedad_cronica, enf_diabetes, enf_neurologica, enf_pulmonar, enf_cardiaca, enf_renal) %>% 
   group_by(enfermedad_cronica, enf_diabetes, enf_neurologica, enf_pulmonar, enf_cardiaca, enf_renal) %>% count()
 ```
 
@@ -607,7 +607,7 @@ unap6a %>%
 
 ```{r}
 unap6a <- unap6a %>%
-  select(-epi_especifique_viajo_fuera_villa) %>% 
+  dplyr::select(-epi_especifique_viajo_fuera_villa) %>% 
   mutate(epi_tipo_fuente_agua= str_replace(epi_tipo_fuente_agua,"\\d+\\.\\s", "")) %>% 
   #dplyr::count(epi_tipo_fuente_agua)
   mutate(epi_distancia_fuente_agua= str_replace(epi_distancia_fuente_agua,"\\d+\\.\\s", "")) %>% 
@@ -654,15 +654,15 @@ unap6a %>%#dplyr::count(epi_redes_usadas_actualmente)
   #dplyr::count(epi_meses_ultima_malaria)
   #dplyr::count(epi_especie_causo_malaria)
   #dplyr::count(epi_cantidad_redes_usadas_actualmente)
-  select(1, contains("epi_")) %>% glimpse()
+  dplyr::select(1, dplyr::contains("epi_")) %>% glimpse()
 ```
 
 ### no patterns
 
 ```{r}
 unap6a <- unap6a %>%
-  select(-email) %>% 
-  select(-fecha_actualizacion) %>%  
+  dplyr::select(-email) %>% 
+  dplyr::select(-fecha_actualizacion) %>%  
   mutate(combustible_cocinar= str_replace(combustible_cocinar,"\\d+\\.\\s", "")) %>% 
   mutate(pertenencia_casa= str_replace(pertenencia_casa,"\\d+\\.\\s", "")) %>% 
   mutate(tipo_casa= str_replace(tipo_casa,"\\d+\\.\\s", "")) %>% 
@@ -670,19 +670,19 @@ unap6a <- unap6a %>%
   mutate(relacion_jefe_familia= str_replace(relacion_jefe_familia,"\\d+\\.\\s", "")) 
 
 unap6a %>%
-  select(1, 
-         -contains("ah_"),
-         -contains("otro_"),
-         -contains("trabajo"),
-         -contains("material"),
-         -contains("banio"),
-         -contains("malaria"),
-         -contains("tratamiento"),
-         -contains("enf"),
-         -contains("epi_")) %>% 
-  select(-starts_with("ah_")) %>%
-  #select(-email) %>% 
-  #select(-fecha_actualizacion) %>%
+  dplyr::select(1, 
+         -dplyr::contains("ah_"),
+         -dplyr::contains("otro_"),
+         -dplyr::contains("trabajo"),
+         -dplyr::contains("material"),
+         -dplyr::contains("banio"),
+         -dplyr::contains("malaria"),
+         -dplyr::contains("tratamiento"),
+         -dplyr::contains("enf"),
+         -dplyr::contains("epi_")) %>% 
+  dplyr::select(-starts_with("ah_")) %>%
+  #dplyr::select(-email) %>% 
+  #dplyr::select(-fecha_actualizacion) %>%
   #dplyr::count(estado_civil, sort = T)
   #dplyr::count(nivel_educacion, sort = T)
   #dplyr::count(estado, sort = T)
@@ -708,9 +708,9 @@ TO DO:
 - CHECK IF **intersections** outside the core **959 samples** have ID typos.
 
 ```{r, fig.align='center', fig.width=5, fig.height=5}
-unapid <- unap0 %>% select(id)      # 960
-seroid <- std.uty %>% select(id=ID) # 969
-epidid <- unap6a %>% select(id)     # 963
+unapid <- unap0 %>% dplyr::select(id)      # 960
+seroid <- std.uty %>% dplyr::select(id=ID) # 969
+epidid <- unap6a %>% dplyr::select(id)     # 963
 
 id_unap= unlist(as.list(unapid))
 id_sero= unlist(as.list(seroid))
@@ -748,9 +748,9 @@ dicoveries:
 
 ```{r}
 unap6b <- unap6a %>% 
-  select(-age, -sex, -community) %>% 
+  dplyr::select(-age, -sex, -community) %>% 
   full_join(std.uty.cov
-              %>% select(-sex_0, 
+              %>% dplyr::select(-sex_0, 
                          -micro_n1, 
                          #-sex_1, 
                          #-micro_1,
@@ -762,9 +762,9 @@ unap6b <- unap6a %>%
 unap6b %>% glimpse()
 
 unap6c <- unap6a %>% 
-  select(-age, -sex, -community) %>% 
+  dplyr::select(-age, -sex, -community) %>% 
   inner_join(std.uty.cov
-              %>% select(-sex_0, 
+              %>% dplyr::select(-sex_0, 
                          -micro_n1, 
                          #-sex_1, 
                          #-micro_1, 
@@ -781,6 +781,7 @@ unap6c <- unap6a %>%
 - a **`full`** dataset **(973x100)** was written as `data/04-epidemio-full.csv`.
 - a **`core`** dataset **(959x100)** was written as `data/04-epidemio-core.csv`.
 
+## write .csv .rds
 ```{r}
 readr::write_csv(unap6b, "data/04-epidemio-full.csv")
 saveRDS(unap6b, "data/04-epidemio-full.rds")
@@ -788,6 +789,63 @@ saveRDS(unap6b, "data/04-epidemio-full.rds")
 readr::write_csv(unap6c, "data/04-epidemio-core.csv")
 saveRDS(unap6c, "data/04-epidemio-core.rds")
 ```
+
+## Data dictionary
+```{r, message=FALSE, eval=TRUE}
+datadic <- readxl::read_excel("data/UNAP-6-EPI-08feb2017.xlsx", sheet = 2)#SPANISH
+#datadic <- readxl::read_excel("data/UNAP-6-EPI-08feb2017.xlsx", sheet = 3)#ENGLISH
+whatyouwant <- setNames(as.character(datadic$`EXPLICACIÓN DE VARIABLE`), datadic$VARIABLE)
+#http://stackoverflow.com/questions/19265172/converting-two-columns-of-a-data-frame-to-a-named-vector
+unap6x <- Hmisc::upData(unap6c, labels = whatyouwant, force.single = F)
+```
+```{r}
+unap6x <- Hmisc::upData(unap6x, 
+                        labels = c(Ab.unit_Pfal="standardize AU Pfal",
+                                   Ab.unit_Pviv="standardize AU Pviv",
+                                   mean.OD_Pfal="raw mean OD Pfal",
+                                   mean.OD_Pviv="raw mean OD Pviv",
+                                   sex_4="gender-UNAP_UPDATE",
+                                   age_1="age",
+                                   age_4="age-UNAP_UPDATE",
+                                   micro_1="microscopy UNAP",
+                                   micro_n="microscopy NAMRU",
+                                   micro_c="microscopy CONCENSUS",
+                                   pcr_1="pcr UNAP",
+                                   pcr_n="pcr NAMRU",
+                                   pcr_c="pcr CONCENSUS"), 
+                        force.single = F)
+```
+
+```{r}
+#Hmisc::contents(unap6x)
+html(Hmisc::contents(unap6x), maxlevels=10, levelType='table')
+```
+
+
+## write .dta
+
+- without labels due to errors in writing labelled variables
+
+**.dta restrictions:**
+
+- STATA requires labelled integers (not numeric variables)
+- do not allow dots in variable name
+- string length of variable names
+
+```{r}
+haven::write_dta(unap6c %>% 
+                   dplyr::rename(Ab_unit_Pfal=Ab.unit_Pfal,
+                                 Ab_unit_Pviv=Ab.unit_Pviv,
+                                 mean_OD_Pfal=mean.OD_Pfal,
+                                 mean_OD_Pviv=mean.OD_Pviv,
+                                 epi_n_redes_adquirio_dormir=epi_cantidad_redes_adquirio_dormir,
+                                 epi_n_redes_usadas_actualmente=epi_cantidad_redes_usadas_actualmente)
+                 , "data/04-epidemio-core.dta")
+
+#haven::read_dta("data/04-epidemio-core.dta")
+#haven::read_dta("data/04-epidemio-core.dta") %>% haven::as_factor() # WORKS PERFECT!
+```
+
 
 To check the data in R, use the following commands:
 
@@ -808,23 +866,22 @@ data %>% mutate_if(is.character, factor) %>% str()      # all variables and stru
 data %>% mutate_if(is.character, factor) %>% summary()  # all variables and descriptive stats
 ```
 
-
 ***
 
 # APPENDIX: age updates
 
 ```{r, fig.height=8, fig.width=6, fig.align='center'}
 x <- unap6a %>% 
-  select(1,contains("age")) %>% 
+  dplyr::select(1,dplyr::contains("age")) %>% 
   full_join(std.uty.cov %>% 
-              select(1,contains("age"), -age_0), 
+              dplyr::select(1,dplyr::contains("age"), -age_0), 
             by="id") %>% 
   mutate(age_0= age==age_1 & age_1==age_4) %>% 
   filter(age_0==FALSE) %>% 
-  select(-age_0)
+  dplyr::select(-age_0)
 
 y <- x$id
-z <- x %>% select(-id) %>% as.data.frame()
+z <- x %>% dplyr::select(-id) %>% as.data.frame()
 rownames(z) <- y
 
 slopegraph::ggslopegraph(z, 
@@ -898,7 +955,7 @@ unap6a %>%
 
 ```{r}
 unap6at <- unap6 %>% 
-  select(fecha_registro) %>% 
+  dplyr::select(fecha_registro) %>% 
   mutate(fecha_registro= str_replace_all(fecha_registro, "\\/","-")) %>% 
   rownames_to_column(var = "row")
 

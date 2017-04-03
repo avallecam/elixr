@@ -5,11 +5,16 @@ It follows K. Miura et al. 2008 experimental procedure.
 
 ## TO DO:
 
+* Use bookdown to knit all the Rmd reports!
+* Clean code in standard.Rmd -> make one function then loop
+
 1. Add an alternative initial path: `plater` instead of `XLConnect`.
 2. Generate inter-plate variability measurements: `inter-plate-CV`, `ctrl+`, `ctrl-`.
 3. Check if `ZG182-1` should be corrected to `ZG181-1`.
 4. Use `relational data` to conect `Serological dataset` and `Covariate+Epidemiological dataset`.
 5. Solve inconsistencies in the Epidemiological dataset.
+
+* Write an abstract!
 
 - Write methodology and limitations
     + Compare against drLumi statistical considerations

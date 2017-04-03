@@ -8,5 +8,5 @@ data-raw/*
 figure/*
 notrack/*
 report/*
-*.Rmd
+*manuscript*
 *.pdf
