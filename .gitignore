@@ -10,5 +10,6 @@ notrack/*
 report/*
 *manuscript*
 *.pdf
-_*
+_book/*
+_bookdown_files/*
 *.html

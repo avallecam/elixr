@@ -233,7 +233,9 @@ unap6a <- unap6 %>%
                                          "albendazol"="abenzadol",
                                          "albendazol"="albendazol",
                                          "antiparasitario"="antiparasitarias",
-                                         "antiparasitario"="antiparasitarios")
+                                         "antiparasitario"="antiparasitarios"),
+         combustible_cocinar=fct_recode(combustible_cocinar,
+                                        "5. Lenha"="5. Leña")
          ) #%>% mutate_each(funs(factor), 3) 
   #gather(key= variable, value = observation, -id, na.rm = T) %>% 
   #spread(variable, observation) 
@@ -840,7 +842,7 @@ haven::write_dta(unap6c %>%
                                  mean_OD_Pviv=mean.OD_Pviv,
                                  epi_n_redes_adquirio_dormir=epi_cantidad_redes_adquirio_dormir,
                                  epi_n_redes_usadas_actualmente=epi_cantidad_redes_usadas_actualmente)
-                 , "data/04-epidemio-core.dta")
+                 , "data/04-epidemio-core.dta", version=13)
 
 #haven::read_dta("data/04-epidemio-core.dta")
 #haven::read_dta("data/04-epidemio-core.dta") %>% haven::as_factor() # WORKS PERFECT!

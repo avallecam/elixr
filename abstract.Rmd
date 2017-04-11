@@ -1,4 +1,4 @@
-# ASTMH 2017 abstract {#astmh}
+# abstract {#astmh}
 
 ## Title:
 
