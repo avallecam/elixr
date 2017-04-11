@@ -1,27 +1,6 @@
 # INTRODUCTION {#intrap}
 
-## General Setup 
-
-All the reports are written in **R** [@R] within a `Rmarkdown` [@rmarkdown] notebook 
-using the `RStudio` [@rstudio] IDE software, and employing the `knitr` [@knitr] 
-and `Hmisc` [@Hmisc] packages for the `html` setup.
-
-This dynamic document format integrates **text**, **code** and **results** 
-[@CienciaReproducible2016].
-
-
-## Project Objectives
-
-* Principal: 
-    - Standardize the OD~450nm~ values across ELISA plates by the estimation of 
-    the Antibody Units of each unknown sample.
-
-* Secondary:
-    - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) 
-    for standardization of ELISA plates from a template matrix.
-
-
-## Notebook Objectives
+## Aim
 
 * Principal: 
     - Review the methods previously applied to the standarization across ELISA plates 
@@ -30,7 +9,6 @@ This dynamic document format integrates **text**, **code** and **results**
 * Secondary: 
     - Register project updates, current problems to solve, project organization 
     and benefits of using Git.
-    
 
 ## To Do
 
@@ -301,9 +279,9 @@ to avoid all this measurement.
 
 - For a comparison between resting NaN's mean.OD and Upper/Lower limits per ELISA plate:
     + Complete list of NaN's available in 
-    [02-dtfilter.html](report/02-dtfilter.html#appendix-residual-na)
+    [02-dtfilter.html](#filter)
     + Complete list of Upper/Lower limits per ELISA plate in 
-    [01-standard.html](report/01-standard.html#appendix-upperlower-limits)
+    [01-standard.html](#stdrad)
 
 - A complete list of previous updates available in [Appendix](#appendix-updates)
 
@@ -322,14 +300,14 @@ to avoid all this measurement.
 *20ene2017:*
 
 - After Katty indication, DB typos were corrected in the current script at 
-[02-dtfilter.html](report/02-dtfilter.html#db-typo-corrections):
+[02-dtfilter.html](#filter):
     + 2 samples were added: ZG009-3 and NN068-2.
 
 - Complete list of replicates before and after the unbiased selection available at 
-[02-dtfilter.html](report/02-dtfilter.html#appendix-replicates)
+[02-dtfilter.html](#filter)
 
 - Covariate DB was added to the analysis at 
-[03-covariat.html](report/03-covariat.html#covariates):
+[03-covariat.html](#covar):
     + Updated covariate DB was merged with the Ab.units per sample:
         + CSV file is available to re-analyse seropositivity in STATA.
     

@@ -28,7 +28,7 @@ options(width = 110) # expand limits of CONSOLE output  # CHANGE TO DEFAULT in P
 # FOR PDF add new page USE: \newpage
 ```
 
-```{r, results='hide', message=FALSE, eval=TRUE}
+```{r, results='hide', message=FALSE, eval=TRUE, include=FALSE}
 require(Hmisc) # to call markupSpecs
 mu <- markupSpecs$html # expand limits of HTML SCREEN output to use an entire wide screen
 # with the following hidden command (<code>r mu$widescreen()</code>).
@@ -36,19 +36,43 @@ mu <- markupSpecs$html # expand limits of HTML SCREEN output to use an entire wi
 ```
 `r mu$widescreen()`
 
+***
+
 # Project notebook {-}
 
-This is a project notebook using the bookdown package.
+This is a project notebook using `Rmarkdown` [@rmarkdown], `knitr` [@knitr], 
+`Hmisc` [@Hmisc] and `bookdown` [@bookdown] packages. 
+This *dynamic document* format integrates **text**, **code** and **results** 
+[@CienciaReproducible2016].
 
-## Last update
+***
 
-- **[Data Dictionary](#data-dictionary)** available
-- Data epidemiological covariates output as a `.dta` without data labels. [reasons](#write-dta)
+## Project Objectives {-}
 
-## Urgent To do's
+* __Main:__ 
+    - __Standardize__ the OD~450nm~ values across ELISA plates 
+    by the estimation of Antibody Units of each unknown sample.
+    - __Unificate__ and __Update__ the epidemiological dataset.
+    - Generate a __QC report__ of UNAP vs NAMRU measurements. [here](#qc-report)
+
+* __Secondary:__
+    - Implement a [reproducible workflow](https://www.ncbi.nlm.nih.gov/pubmed/26776185) 
+    for standardization of ELISA plates from a template matrix and subsequent analysis.
+
+***
+
+## Last update {-}
+
+- **[Data Dictionary](#data-dictionary)** available for __epidemiology+serology__ covariates.
+- Database of __epidemiology+serology__ covariates in `.dta` format __without labels__. [issue submited](#write-dta)
+- `slopegraph` showing the changes of `age` along [updates](#slope). 
+- All results at the beginning + __hiperlinks__ of sections __3, 4, 5__.
+
+## Urgent To do's {-}
 
 - CHECK IF **ZG182-1** should be corrected to **ZG181-1**.
     + Missing reads are complementary between ID's.
+    + details in [Appendix](#appendix-residual-na) **NOTE 2**
     
 - Assess the **inter-plate-CV** comparing STD variability across plates to generate a 
 **Limit of Quantification**
@@ -58,9 +82,4 @@ This is a project notebook using the bookdown package.
     + Include other inter-plate measurements:
         + blank, positive and negative controls
 
-## README file
-
-```{bash}
-less README.md
-```
-
+***

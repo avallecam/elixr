@@ -1,4 +1,5 @@
 rm(list = ls())
+devtools::session_info()
 
 ## TRIAL of CORRAN et al. eluted samples
 x <- seq(0,2.5,.25)
@@ -66,7 +67,7 @@ haven::read_dta("data.dta") %>% haven::as_factor() # WORKS PERFECT!
 data <- data.frame(age = seq(21,27,2), 
                    sex = factor(rep(1:2,2), 
                                 labels = c("Female", "Male")))
-var.labels <- c(age = "Age in Years", 
+var.labels <- c(age = "Age (Years)", 
                 sex = "Sex of the participant")
 Hmisc::label(data)
 dplyr::as.tbl(data) # as tibble
@@ -85,6 +86,10 @@ Hmisc::contents(data) # data dictionary
 #attr(data[["sex"]], "label")
 #class(data$age); class(data$sex)
 haven::write_dta(data, "data.dta") # ERROR: STATA requires labelled integers
+dplyr::as.tbl(data %>% 
+                mutate(age=as.integer(age))) # as tibble
+Hmisc::contents(data %>% 
+                  mutate(age=as.integer(age)))
 haven::write_dta(data %>% 
                    mutate(age=as.integer(age)), "data.dta") # ERROR: after coerce as.integer ---> REPORT AN ISSUE
 haven::write_dta(data %>% 
@@ -94,35 +99,76 @@ haven::write_dta(data %>%
 #haven::read_dta("data.dta") %>% haven::as_factor()
 
 #(3) USING Hmisc::upData ------------------------------------------
-data <- data.frame(age = c(21, 30, 25, 41, 29, 33), 
-                   sex = factor(c(1, 2, 1, 2, 1, 2), 
-                                labels = c("Female", "Male")))
-var.labels <- c(age = "Age in Years", 
+set.seed(22)
+data <- data.frame(age = floor(rnorm(6,25,10)), 
+                   sex = gl(2,1,6, labels = c("f","m")))
+var.labels <- c(age = "Age (Years)", 
                 sex = "Sex of the participant")
 Hmisc::label(data)
-dplyr::as.tbl(data) # as tibble
+#dplyr::as.tbl(data) # as tibble
 Hmisc::contents(data) # data dictionary
 class(data$age); class(data$sex) # data class
 haven::write_dta(data, "data.dta") # WORKS with NO LABELS
 haven::read_dta("data.dta")
 haven::read_dta("data.dta") %>% haven::as_factor() # WORKS PERFECT!
+
+# ISSUE REPORTED -----------------------------------------------------------------------------
+# ERROR after labelled integers! 
+rm(list = ls())
 # labels
-data <- Hmisc::upData(data,
-                      labels = var.labels)# generates INTEGERS (required for STATA)
-Hmisc::label(data)
-dplyr::as.tbl(data) # as tibble
-Hmisc::contents(data) # data dictionary
-#attr(data[["age"]], "label")
-#attr(data[["sex"]], "label")
+set.seed(22)
+data <- dplyr::data_frame(age = floor(rnorm(6,25,10)),
+                          sex = gl(2,1,6, labels = c("f","m")))
+var.labels <- c(age = "Age (Years)", 
+                sex = "Sex of the participant")
+#class(data$age); class(data$sex)
+data <- Hmisc::upData(data, labels = var.labels) # update data --------------
+data <- Hmisc::upData(data, moveUnits = TRUE) # update data --------------
+#Hmisc::label(data) # check new labels ---------------------------------------
+#Hmisc::contents(data) # data dictionary -------------------------------------
 class(data$age); class(data$sex)
-haven::write_dta(data, "data.dta") # ERROR after labels! -> DIFFERENT ERROR MESSAGES
+haven::write_dta(data, "data.dta") # write dta ------------------------------
 #haven::read_dta("data.dta")
 #haven::read_dta("data.dta") %>% haven::as_factor()
 
-devtools::session_info()
+# same problem --------------------------------
+# http://stackoverflow.com/questions/42381915/r-havenwrite-dta-error
+data(cars)
+haven::write_dta(cars, "data.dta") # write dta
+#library("rio")
+#export(cars, "cars.dta")
 
-#(2) USING the APPLY FUNCTION [not working] ------------------------------------------
-Hmisc::label(data)
-Hmisc::label(data) <- lapply(names(var.labels), 
-                             function(x) label(data[,x]) <- var.labels[x])
-Hmisc::label(data)
+# MAIN ------------------------------------------------------
+
+# ok
+data(cars)
+#cars <- dplyr::as.tbl(cars)
+#haven::write_dta(cars, "data.dta") # write dta
+
+# SUPMITTED ISSUE
+# problem
+var.labels <- c(speed = "speed (mph)", 
+                dist = "stopping distance (ft)")
+class(cars$speed); class(cars$dist)
+cars <- Hmisc::upData(cars, labels = var.labels) # update data labels -------
+class(cars$speed); class(cars$dist)
+
+# ISSUE: labelled integers
+#haven::write_dta(cars, "data.dta") # write dta
+
+# using foreign?
+# http://stackoverflow.com/questions/16613144/r-to-stata-exporting-dataframe-with-variable-labels
+foreign::write.dta(cars, "data.dta")
+
+a <- foreign::read.dta("data.dta")
+dplyr::as.tbl(a)
+Hmisc::contents(a) # data dictionary -------------------------------------
+#haven::read_dta("data.dta")
+
+a <- haven::read_dta("data.dta")
+dplyr::as.tbl(a)
+Hmisc::contents(a) # data dictionary -------------------------------------
+
+a <- haven::read_dta("data.dta") %>% haven::as_factor()
+dplyr::as.tbl(a)
+Hmisc::contents(a) # data dictionary -------------------------------------

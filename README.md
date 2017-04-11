@@ -4,8 +4,10 @@ This is a reproducible workflow in R for the standardization of ELISA reads acro
 It follows K. Miura et al. 2008 experimental procedure.
 
 ## TO DO:
-
+<!-- 
+DONE:
 * Use bookdown to knit all the Rmd reports!
+-->
 * Clean code in standard.Rmd -> make one function then loop
 
 1. Add an alternative initial path: `plater` instead of `XLConnect`.
@@ -17,7 +19,7 @@ It follows K. Miura et al. 2008 experimental procedure.
 * Write an abstract!
 
 - Write methodology and limitations
-    + Compare against drLumi statistical considerations
+    + Compare against `drLumi` statistical considerations
     + `medrc` package
 - Add table with expected Template distribution
     + `plater` package

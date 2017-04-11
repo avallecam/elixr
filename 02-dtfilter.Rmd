@@ -1,12 +1,23 @@
 # DATA FILTERING {#filter}
 
-## Notebook Objectives
+## Aim
 
 * Principal: 
     - Identify and filter the replicated reads across ELISA plates.
 
 * Secondary: 
     - Visualize OD and AU distributions post ELISA standardization.
+
+## Results
+
+- **02 typos** were corrected. [here](#db-typo-corrections).
+- This experiment made **1937** observations for **969** ID's. [here](#all)
+- Among the **73** NA observations, **04** had an OD higher than the upper limit 
+given by its STD. [here](#na)
+- **63** observations had duplicates, **16** had triplicates. [here](#replicates)
+- A __unbiased selection criteria__ was implemented in a function [here](#unbiased-selection) and later used to filter replicates. [here](#filtering)
+- __Log transformed Ab.units__ shows a __normal distribution__. [here](#distributions)
+- __Outputs__ were stored in both _tidy_ and __untidy__ formats. [here](#tidy-format)
 
 
 ## To Do
@@ -50,17 +61,6 @@ std.par <- readRDS("data/01-parametr.rds")
 ```
 
 ***
-
-## Results
-
-- **02 typos** were corrected
-- This experiment made **1937** observations for **969** ID's
-- Among the **73** NA observations, **04** had an OD higher than the upper limit 
-given by its STD.
-- **63** observations had duplicates, **16** had triplicates.
-- A unbiased selection criteria was used to filter replicates.
-- Log transformed Ab.units shows a normal distribution.
-- Outputs were stored in both tidy and untidy formats.
 
 ## Procedure
 

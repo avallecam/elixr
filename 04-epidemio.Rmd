@@ -1,12 +1,27 @@
 # EPIDEMIOLOGICAL COVARIATES {#epide}
 
-## Notebook Objectives
+## Aim
 
 * Principal: 
     - Clean and standardize the UNAP-6 Epidemiological and Census database.
 
 * Secondary: 
     - Check variable consistency across the database.
+
+## Results
+
+- The **109 variables** of the Epidemiological database were reduced to **88** 
+after cleaning.
+- typos were corrected:
+    + some variables were renamed, and some factors recoded. [here](#typo-correction)
+- previous datasets share **959 ID's** with the current Epidemiological dataset. [here](#merge-datasets)
+- Two unified dataset were generated:
+    + One with the **full 973** ID's
+    + One with only the **core 959** ID's
+- a plot `age` vs `residence` show some inconsistencies corrected throughout updates. [here](#age-vs-residence)
+- **inconsistencies** between other variables are shown as table summaries. [here](#problemasx)
+- `sheet2` included as **[Data Dictionary](#data-dictionary)**. [here](#data-dictionary)
+- file output as a `.dta`. [here](#write-dta)
 
 
 ## To Do
@@ -53,22 +68,6 @@ unap0 <- readRDS("data/03-covariat-uap.rds")
 std.nty.cov <- readRDS("data/03-covariat-nty.rds")
 std.uty.cov <- readRDS("data/03-covariat-uty.rds")
 ```
-
-
-## Results
-
-- The **109 variables** of the Epidemiological database were reduced to **88** 
-after cleaning.
-- typos were corrected:
-    + some variables were renamed, and some factors recoded.
-- previous datasets share **959 ID's** with the current Epidemiological dataset.
-- Two unified dataset were generated:
-    + One with the **full 973** ID's
-    + One with only the **core 959** ID's
-- a plot `age` vs `residence` show some inconsistencies corrected throughout updates.
-- **inconsistencies** between other variables are shown as table summaries.
-- `sheet2` included as **[Data Dictionary](#data-dictionary)**.
-- file output as a `.dta`
 
 
 ## Covariate datasets
@@ -291,7 +290,7 @@ c <- unap60ar %>%
 Rmisc::multiplot(a,b,c,cols = 3)
 ```
 
-### problems 2
+### problems 2 {#problemasx}
 
 - `unap6a` was updated on each step
 
@@ -715,31 +714,41 @@ dicoveries:
     previous merging
 
 ```{r}
+std.uty.cov.new <- std.uty.cov %>% 
+  dplyr::select(-sex_0, 
+                -micro_n1, 
+                #-sex_1, 
+                #-micro_1,
+                #-pcr_1, 
+                #-age_1, 
+                -pcr_n1,
+                -age_0) %>% 
+  mutate(
+    micro_1=fct_recode(micro_1,
+                       "NG"="0","PV"="1","PF"="2","PV/PF"="3"),
+    micro_n=fct_recode(micro_n,
+                       "NG"="0","PV"="1","PF"="2","PV/PF"="3"),
+    micro_c=fct_recode(micro_c,
+                       "NG"="0","PV"="1","PF"="2","PV/PF"="3"),
+    pcr_1=fct_recode(pcr_1,
+                       "NG"="0","PV"="1","PF"="2","PV/PF"="3"),
+    pcr_n=fct_recode(pcr_n,
+                       "NG"="0","PV"="1","PF"="2","PV/PF"="3"),
+    pcr_c=fct_recode(pcr_c,
+                       "NG"="0","PV"="1","PF"="2","PV/PF"="3")
+  )
+
 unap6b <- unap6a %>% 
   dplyr::select(-age, -sex, -community) %>% 
-  full_join(std.uty.cov
-              %>% dplyr::select(-sex_0, 
-                         -micro_n1, 
-                         #-sex_1, 
-                         #-micro_1,
-                         #-pcr_1, 
-                         #-age_1, 
-                         -pcr_n1,
-                         -age_0)
+  full_join(
+    std.uty.cov.new
             , by="id") # 973
 unap6b %>% glimpse()
 
 unap6c <- unap6a %>% 
   dplyr::select(-age, -sex, -community) %>% 
-  inner_join(std.uty.cov
-              %>% dplyr::select(-sex_0, 
-                         -micro_n1, 
-                         #-sex_1, 
-                         #-micro_1, 
-                         #-pcr_1, 
-                         #-age_1, 
-                         -pcr_n1,
-                         -age_0)
+  inner_join(
+    std.uty.cov.new
              , by="id")# 959
 #unap6c %>% glimpse()
 ```
@@ -806,8 +815,10 @@ haven::write_dta(unap6c %>%
                                  Ab_unit_Pviv=Ab.unit_Pviv,
                                  mean_OD_Pfal=mean.OD_Pfal,
                                  mean_OD_Pviv=mean.OD_Pviv,
-                                 epi_n_redes_adquirio_dormir=epi_cantidad_redes_adquirio_dormir,
-                                 epi_n_redes_usadas_actualmente=epi_cantidad_redes_usadas_actualmente)
+                                 epi_n_redes_adquirio_dormir=
+                                   epi_cantidad_redes_adquirio_dormir,
+                                 epi_n_redes_usadas_actualmente=
+                                   epi_cantidad_redes_usadas_actualmente)
                  , "data/04-epidemio-core.dta", version=13)
 
 #haven::read_dta("data/04-epidemio-core.dta")
@@ -836,7 +847,9 @@ data %>% mutate_if(is.character, factor) %>% summary()  # all variables and desc
 
 ***
 
-## APPENDIX: age updates
+## APPENDIX: age updates {#slope}
+
+Using `slopegraph` [@slopegraph]
 
 ```{r, fig.height=8, fig.width=6, fig.align='center'}
 x <- unap6a %>% 

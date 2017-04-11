@@ -1,6 +1,6 @@
-# ELISA STANDARDIZATION
+# ELISA STANDARDIZATION {#stdrad}
 
-## Notebook Objectives
+## Aim
 
 * Principal: 
     - Implement a reproducible standardization of OD values across ELISA plates following 
