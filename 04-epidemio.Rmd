@@ -87,7 +87,8 @@ readxl::excel_sheets("data/UNAP-6-EPI-08feb2017.xlsx")
 ```{r}
 #read xl
 #read xl
-unap6 <- readxl::read_excel("data/UNAP-6-EPI-08feb2017.xlsx", sheet = 1)
+unap6 <- readxl::read_excel("data/UNAP-6-EPI-08feb2017.xlsx", sheet = 1) %>% 
+  mutate(anios_residencia= as.numeric(anios_residencia))
 #filter NA
 unap6 <- unap6[1:sum(unap6$id_integrante != "", na.rm = T), 
            1:sum(colnames(unap6) != "", na.rm= T)]

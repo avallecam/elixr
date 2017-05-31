@@ -1,2 +1,2 @@
 book_filename: "01-complete"
-rmd_files: ["index.Rmd", "00-appendix.Rmd", "01-standard.Rmd", "02-dtfilter.Rmd", "03-covariat.Rmd", "04-epidemio.Rmd", "abstract.Rmd", "05-citation.Rmd"]
+rmd_files: ["index.Rmd", "00-appendix.Rmd", "01-standard.Rmd", "02-dtfilter.Rmd", "03-covariat.Rmd", "04-epidemio.Rmd", "abstract.Rmd", "cpenviro.Rmd", "05-citation.Rmd"]

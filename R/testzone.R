@@ -154,7 +154,7 @@ cars <- Hmisc::upData(cars, labels = var.labels) # update data labels -------
 class(cars$speed); class(cars$dist)
 
 # ISSUE: labelled integers
-#haven::write_dta(cars, "data.dta") # write dta
+haven::write_dta(cars, "data.dta") # write dta
 
 # using foreign?
 # http://stackoverflow.com/questions/16613144/r-to-stata-exporting-dataframe-with-variable-labels

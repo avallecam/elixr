@@ -67,8 +67,7 @@ for (i in 1:(length(t)-1)) {
 
 The method provided by Julio followed this procedure, making two main assumptions:
 
-1. An **endpoint titer** equal to the last dilution of the STD, in this case 
-`r format(x[length(x)], scientific=FALSE)`.
+1. An **endpoint titer** equal to the last dilution of the STD, in this case `r format(x[length(x)], scientific=FALSE)`.
 2. An equal **endpoint titer** among *P.falciparum* and *P.vivax* STD's.
 
 ```{r}
