@@ -195,7 +195,7 @@ discoveries:
 unap1 <- haven::read_dta("data/UNAP-1-DB-20sep2016.dta") %>%
   haven::as_factor()
 # previous removing
-unap1.out <- unap1 %>% select((micro2:age3), -pcrrubio)
+unap1.out <- unap1 %>% select(micro2:age3, -pcrrubio)
 unap1 <- unap1 %>% select(-(micro2:age3), pcrrubio)
 #unap1$id <- forcats::as_factor(unap1$id) # not required
 str(unap1)
@@ -249,7 +249,7 @@ unap3 <- haven::read_dta("data/UNAP-3-DB-02nov2016.dta") %>%
   haven::as_factor()
 #str(unap3)
 # previous removing
-unap3.out <- unap3 %>% select((micro2:ll_pvmsp1pos), -pcrrubio)
+unap3.out <- unap3 %>% select(micro2:ll_pvmsp1pos, -pcrrubio)
 unap3 <- unap3 %>% select(-(micro2:ll_pvmsp1pos), pcrrubio)
 #unap3$id <- forcats::as_factor(unap3$id) # not required
 str(unap3)
@@ -470,13 +470,13 @@ unap0 <- unap0 %>%
   tidyr::unite(micro_c, micro_1, micro_n,remove = F) %>% #count()
   mutate(micro_c=str_replace(micro_c,"(\\d)_\\1", "\\1")) %>%
   mutate(micro_c=str_replace(micro_c,"(.+)_NA", "\\1")) %>% 
-  mutate(micro_c=str_replace(micro_c,"(\\d)_(\\d)", "\\2")) %>%  #%>% count()
+  mutate(micro_c=str_replace(micro_c,"(\\d)_(\\d)", "\\2")) %>%  #count()
   mutate(micro_c=str_replace(micro_c,"NA", replacement = NA_character_)) %>%  #%>% count()
   #select(contains("pcr")) %>% #, -micro_n1
   tidyr::unite(pcr_c, pcr_1, pcr_n,remove = F) %>% #count()
   mutate(pcr_c=str_replace(pcr_c,"(\\d)_\\1", "\\1")) %>%
   mutate(pcr_c=str_replace(pcr_c,"(.+)_NA", "\\1")) %>%   #count()
-  mutate(pcr_c=str_replace(pcr_c,"(\\d)_(\\d)", "\\2")) %>% #summary()
+  mutate(pcr_c=str_replace(pcr_c,"(\\d)_(\\d)", "\\2")) %>% #count() #summary()
   mutate(pcr_c=str_replace(pcr_c,"NA", replacement = NA_character_)) %>% dplyr::mutate_each(funs(factor),8,12)
 
 #

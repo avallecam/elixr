@@ -38,7 +38,7 @@ library(drc)          # Dose-Response modeling
 library("DiagrammeR") # method Flowchart
 library("knitr")      # To display nice tables
 library("tidyverse")
-#ggplot2, tibble, tidyr, readr, purr, dplyyr
+#ggplot2, tibble, tidyr, readr, purr, dplyr
 ##extra
 library("Rmisc")      # multiplot ggplots
 library("haven")      # import STATA df

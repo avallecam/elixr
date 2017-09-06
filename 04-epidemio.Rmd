@@ -111,6 +111,7 @@ Bad idea:
 - affects class of numeric variables
 
 TO DO:
+
 - who to fix it?
 - function to identify numeric values inside characters: **`chr` -> `dbl`**
 

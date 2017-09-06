@@ -1,6 +1,7 @@
 # SeroSurveillance
 
-This is a reproducible workflow in R for the standardization of ELISA reads across plates.
+This is a reproducible workflow in R for the standardization 
+of ELISA reads across plates.
 It follows K. Miura et al. 2008 experimental procedure.
 
 ## TO DO:
@@ -11,9 +12,11 @@ DONE:
 * Clean code in standard.Rmd -> make one function then loop
 
 1. Add an alternative initial path: `plater` instead of `XLConnect`.
-2. Generate inter-plate variability measurements: `inter-plate-CV`, `ctrl+`, `ctrl-`.
+2. Generate inter-plate variability measurements: 
+`inter-plate-CV`, `ctrl+`, `ctrl-`.
 3. Check if `ZG182-1` should be corrected to `ZG181-1`.
-4. Use `relational data` to conect `Serological dataset` and `Covariate+Epidemiological dataset`.
+4. Use `relational data` to conect `Serological dataset` and 
+`Covariate+Epidemiological dataset`.
 5. Solve inconsistencies in the Epidemiological dataset.
 
 * Write an abstract!
@@ -53,3 +56,18 @@ DONE:
 - Some lab replicate patterns:
     + N21 -> N28 -> {N30, N31, N32}
     + {N21, N20, N22} -> N24 -> N28
+
+## Personal communication
+
+- Viviana (28ago2017)
+> anexo las bases de resultados y de datos demográficos 
+finales corregidos hasta ahora seria el final, 
+> en la base de resultados està corregido la edad y 
+sexo y datos de ELISA.
+> la base epidemiológica hay tres datos de edad, 
+correcta edad_dni y correcto sexo_consentimiento. 
+> Si tienes dudas me avisas, 
+> en breve te envio do file que me envio Christian 
+del análisis previo que el hizo, 
+> por favor vas enviándome los resultados en tabla y/o figuras 
+para poder escribir los resultados del articulo e iniciar la discusión.

@@ -1,0 +1,643 @@
+# NEW UPDATE {#upnuu}
+
+## Aim
+
+* Principal: 
+    - Contrastar últimas actualizaciones (UNAP-7 y UNAP-8) con base Epidemiologica Consenso (UNAP-6c).
+    - Generar __tablas resumen__ de:
+        - Baseline characteristics of study population
+        - Control de calidad (UNAP vs N6 microscopy and PCR results)
+
+* Secondary: 
+    - Check variable consistency across the database.
+
+## Results
+
+- Entre las dos últimas bases entregadas (UNAP-7 y UNAP-8)
+    + `edad` es igual.
+    + `sexo` difiere en __4__ individuos,
+    + se prioriza a `sexo_consentimiento` en __UNAP-8__ (origilamente, `BASE_BARRIDO_2015-I_LIMPIA.xlsx`).
+        - Cuenta con __"DATO VERIFICADO CON BARRIDO 2016"__
+
+- Entre la última actualización y base concenso (UNAP-6)
+    + `edad_DNI.7` corrige __61__ valores,
+        - Ver contraste con `tiempo de residencia` y variación con respecto a la edad de bases previas.
+    + `sexo_consentimiento` corrige __3__ valores,
+
+- Valores actualizados de lectura de OD de UNAP-7 __no son tomados en cuenta__.
+    + Aquellos valores fueron extraídos, estandarizados y filtrados directamente de los Templates (_data cruda_).
+    
+
+## Results II
+
+- Detalles de inconsistencias (residencia y eventos previos de malaria)
+
+- Adición de la información de georeferencia con mapeo descriptivo
+
+- __Tabla 01__ de Baseline characteristics
+
+- __Tabla 02__ de Malaria prevalence (by microscopy and PCR)
+
+## To Do
+
+<!--
+- __Confirmar__ variables seelccionadas previo a la ejecución de la estadística inferencial. 
+[Ver aquí](#selected-variables)
+    + Ver resumen descriptivo. [Ver aquí](#resumen-descriptivo)
+
+- Solve **inconsistencies**?
+    + __17__ individuos tienen tiempo de residencia mayor a la edad última edad actualizada.
+-->
+
+- Ejecutar análisis de __seropositividad__ para generar __tabla resumen__ de:
+    + Malaria seroprevalence by study site
+- Ejecutar análisis __univariado y multivariado__ para generar __tabla resumen__ de:
+    + Risk factors for species-specific malaria exposure
+- Ejecutar __modelos de seroconversión__ para generar __gráfico resumen__ de:
+    + Age-seroprevalence curves in each site
+    + Rosas-Aguirre et al. 2015 lo restringe a individuos menores de 30 años. ¿Aplica para Zungarococha?
+
+## Dependencies
+
+The required R packages for this analysis are:
+
++ `tidyverse` [@tidyverse]
++ `readxl` [@readxl]
++ `forcats` [@forcats]
++ `stringr` [@stringr]
+
+```{r, results='hide', message=FALSE}
+##essential
+#library(XLConnect)    # load EXCEL workbooks
+#library(drc)          # Dose-Response modeling
+##accesory
+library("DiagrammeR") # method Flowchart
+library("knitr")      # To display nice tables
+library("tidyverse")
+#ggplot2, tibble, tidyr, readr, purr, dplyyr
+##extra
+library("Rmisc")      # multiplot ggplots
+library("haven")      # import STATA df
+library("readxl")     # import EXCEL df
+library("forcats")    # factor vectors
+library("lubridate")  # for dates
+library("stringr")    # for strings
+library("viridis")    # color visualization
+```
+
+## Input
+
+```{r}
+# load data
+unap6c <- readRDS("data/04-epidemio-core.rds")
+
+# attach specialized package
+#library(tidyverse) 
+# if not installed, run the following:
+# install.packages("tidyverse")
+
+# repetitive strings are recognized as factors (as shown in APPENDIX: Plots and problems)
+# in order to ease summary output, coerce them to factors:
+
+#unap6c %>% mutate_if(is.character, factor) %>% glimpse()  # all variables and class
+#unap6c %>% mutate_if(is.character, factor) %>% str()      # all variables and structure
+#unap6c %>% mutate_if(is.character, factor) %>% summary()  # all variables and descriptive stats
+
+#unap6c
+```
+
+### Information of updates
+
+```{bash}
+#less README.md
+```
+
+### Standard file names
+
+```{bash}
+cp data-raw/RESULTADOS_BARRIDO_2015-I_FINAL_SETIEMBRE.xlsx \
+data/UNAP-7-DB-25ago2017.xlsx
+
+cp data-raw/BASE_BARRIDO_2015-I_LIMPIA.xlsx \
+data/UNAP-8-EPI-25ago2017.xlsx
+```
+
+```{bash}
+ls -sh data/UNAP-*
+```
+
+### Tidy UNAP-7
+
+```{r}
+readxl::excel_sheets("data/UNAP-7-DB-25ago2017.xlsx")
+```
+
+```{r}
+unap7 <- readxl::read_excel("data/UNAP-7-DB-25ago2017.xlsx", sheet = 1,na = ".") %>% 
+  dplyr::rename(id=`CÓDIGO`,
+                Pf_MSP1=`Pf_MSP1-QTSR`,
+                Pv_MSP1=`Pv200_MSP1`) %>% 
+  dplyr::mutate(id= str_replace_all(id, "_","-")) %>% #mejor cambialo a "_"
+  select(id,sexo_corregido,edad_DNI,Pv_MSP1,Pf_MSP1)
+```
+
+### Tidy UNAP-8
+
+```{r}
+readxl::excel_sheets("data/UNAP-8-EPI-25ago2017.xlsx")
+```
+
+```{r}
+unap8 <- readxl::read_excel("data/UNAP-8-EPI-25ago2017.xlsx", sheet = 1) %>% 
+  dplyr::rename(id=id_integrante) %>% 
+  dplyr::mutate(id= str_replace_all(id, "_","-")) %>% #mejor cambialo a "_"
+  #select(id, contains("edad"), -enfermedad_cronica)
+  #select(id, contains("sexo"))
+  select(id, edad_DNI, sexo_consentimiento) #%>% summary()
+```
+
+## Between updates
+
+### edad
+
+- en EDAD: no hay incopatibilidad
+
+```{r}
+unap7 %>% full_join(unap8, by="id", suffix=c(".7",".8")) %>% 
+  mutate(edad_test= edad_DNI.7==edad_DNI.8) %>% dplyr::count(edad_test)
+```
+
+### sexo
+
+- en SEXO: difiere en __4__ individuos
+    - ¿Cuál es el correcto?
+    - `sexo_corregido` en UNAP-7
+    - `sexo_consentimiento` en UNAP-8
+- posible error de digitación
+
+```{r}
+unap7 %>% full_join(unap8, by="id", suffix=c(".7",".8")) %>% 
+  group_by(sexo_corregido,sexo_consentimiento) %>% dplyr::count()
+```
+
+
+## Contrast with UNAP-6
+
+#### edad
+
+- `edad_DNI.7` corrige __61__ valores.
+
+```{r}
+unap6c %>% 
+  inner_join(unap7 %>% 
+              full_join(unap8, by="id", suffix=c(".7",".8")),
+            by="id") %>% 
+  #select(contains("age")) %>% summary()
+  #select(contains("edad"),-enfermedad_cronica) %>% summary()
+  dplyr::mutate(edad_test= edad_DNI.7==age_4) %>% dplyr::count(edad_test)
+  #select(id,contains("age"),contains("edad"),-enfermedad_cronica,residence) %>% 
+  ##filter(edad_test=="FALSE") %>% 
+  #dplyr::mutate(age_res_pre= age_4>=residence,
+  #              age_res_up= edad_DNI.7>=residence) %>% 
+  #group_by(age_res_pre,age_res_up) %>% dplyr::count()
+```
+
+- Contraste con `tiempo de residencia`.
+    + __17__ individuos tienen tiempo de residencia mayor a la edad última edad actualizada.
+
+```{r, fig.height=3, fig.width=8}
+a <- unap6c %>% 
+  group_by(age_4, residence) %>%
+  dplyr::summarise(n=n()) %>%
+  mutate(prop= n/sum(n)) %>%
+  ggplot(aes(age_4, residence, colour=n)) + 
+  geom_point() + 
+  scale_color_viridis() +
+  labs(title="unap6-CORE")
+
+b <- unap6c %>% 
+  inner_join(unap7 %>% 
+              full_join(unap8, by="id", suffix=c(".7",".8")),
+            by="id") %>% 
+  group_by(edad_DNI.7, residence) %>%
+  dplyr::summarise(n=n()) %>%
+  mutate(prop= n/sum(n)) %>%
+  ggplot(aes(edad_DNI.7, residence, colour=n)) + 
+  geom_point() + 
+  scale_color_viridis() +
+  labs(title="unap8-UP")
+
+Rmisc::multiplot(a,b,cols = 2)
+```
+
+- variación de la `edad` con respecto a la base de datos previa.
+
+```{r, fig.height=8, fig.width=6, fig.align='center'}
+x <- unap6c %>% 
+  inner_join(unap7 %>% 
+              full_join(unap8, by="id", suffix=c(".7",".8")),
+            by="id") %>% 
+  dplyr::rename(age_7=edad_DNI.7) %>% 
+  dplyr::select(1,dplyr::contains("age")) %>% 
+  #full_join(std.uty.cov %>% 
+  #            dplyr::select(1,dplyr::contains("age"), -age_0), 
+  #          by="id") %>% 
+  mutate(age_0= age_1==age_4 & age_1==age_7) %>% 
+  filter(age_0==FALSE) %>% 
+  dplyr::select(-age_0)
+
+y <- x$id
+z <- x %>% dplyr::select(-id) %>% as.data.frame()
+rownames(z) <- y
+
+slopegraph::ggslopegraph(z, 
+                         offset.x = 0.06,
+                         xlim = c(.5,3.5),
+                         xlabels = c("unap1", "unap4", "unap7")) + theme_minimal() +
+  labs(title="Age updates across datasets")
+```
+
+
+#### sexo
+
+- OJO: justificar el uso de `sexo_consentimiento`
+    - Cuenta con __"DATO VERIFICADO CON BARRIDO 2016"__
+    - Menor diferencia con los datos de `unap-4`
+
+```{r}
+unap6c %>% 
+  inner_join(unap7 %>% 
+              full_join(unap8, by="id", suffix=c(".7",".8")),
+            by="id") %>% 
+  dplyr::mutate(sexo_corregido= forcats::fct_recode(sexo_corregido,
+                                                    "Female"="1",
+                                                    "Female"="F",
+                                                    "Male"="2"),
+                sexo_consentimiento= forcats::fct_recode(sexo_consentimiento,
+                                                         "Female"="F",
+                                                         "Male"="M")
+                ) %>% 
+  #select(contains("sex")) %>% summary()
+  #group_by(sexo_corregido,sexo_consentimiento) %>% dplyr::count()
+  #mutate(sexo_test= sex_4==sexo_corregido) %>% dplyr::count(sexo_test)
+  mutate(sexo_test= sex_4==sexo_consentimiento) %>% dplyr::count(sexo_test)
+```
+
+### mean OD reads
+
+- NO USAR valores corregidos.
+- VALORES EN TABLA provienen de la data cruda.
+
+```{r}
+unap6c %>% 
+  inner_join(unap7 %>% 
+              full_join(unap8, by="id", suffix=c(".7",".8")),
+            by="id") %>% 
+  dplyr::mutate(pf_test= mean.OD_Pfal==Pf_MSP1,
+                pv_test= mean.OD_Pviv==Pv_MSP1) %>% dplyr::count(pf_test,pv_test)
+```
+
+
+## Consensus
+
+- __Seleccionar__ variables similares a la __tabla 1__ de Rosas-Aguirre et al. 2015
+- Ejecutar __estadística inferencial__ para las proporciones entre comunidades.
+- Ver __lista de todas las variables__ en la base de datos final:
+
+```{r}
+unap6c %>% 
+  inner_join(unap7 %>% 
+              full_join(unap8, by="id", suffix=c(".7",".8")),
+            by="id") %>% 
+  dplyr::mutate(sexo_corregido= forcats::fct_recode(sexo_corregido,
+                                                    "Female"="1",
+                                                    "Female"="F",
+                                                    "Male"="2"),
+                sexo_consentimiento= forcats::fct_recode(sexo_consentimiento,
+                                                         "Female"="F",
+                                                         "Male"="M")
+                ) %>% 
+  select(-age_1,-age_4,-edad_DNI.8,-sex_1,-sex_4,-sexo_corregido,-Pf_MSP1,-Pv_MSP1) %>% 
+  dplyr::rename(age_7=edad_DNI.7,
+                sex_8=sexo_consentimiento) %>% glimpse()
+```
+
+### Selected variables
+
+- __Confirmar__ su elección:
+    + Ver resumen descriptivo. [Ver aquí](#resumen-descriptivo)
+        - `edad` y `cuantas_tenido_malaria` serán categorizadas por cuartiles.
+        - ¿Hay variable relacionada al __`material del techo`__? solo hay material de piso y paredes
+        - ¿Hay variable relacionada __`tiempo desde la última exposición`__? 
+        e.g. malaria en los últimos 12 meses.
+
+```{r}
+unap9c <- unap6c %>% 
+  inner_join(unap7 %>% 
+              full_join(unap8, by="id", suffix=c(".7",".8")),
+            by="id") %>% 
+  dplyr::mutate(sexo_corregido= forcats::fct_recode(sexo_corregido,
+                                                    "Female"="1",
+                                                    "Female"="F",
+                                                    "Male"="2"),
+                sexo_consentimiento= forcats::fct_recode(sexo_consentimiento,
+                                                         "Female"="F",
+                                                         "Male"="M")
+                ) %>% 
+  select(-age_1,-age_4,-edad_DNI.8,-sex_1,-sex_4,-sexo_corregido,-Pf_MSP1,-Pv_MSP1) %>% 
+  dplyr::rename(age_7=edad_DNI.7,
+                sex_8=sexo_consentimiento) %>% #glimpse()
+  dplyr::select(id, sex_8, age_7, community_1,
+         nivel_educacion, trabajo, residence,
+         electricidad_red_publica,
+         material_pared, material_piso,
+         epi_uso_redes_cama, #epi_adquirio_redes_dormir, 
+         epi_uso_red_dormir, #epi_redes_usadas_actualmente,
+         tenido_malaria, cuantas_tenido_malaria,
+         Ab.unit_Pfal,Ab.unit_Pviv,
+         micro_c,pcr_c
+         )
+
+unap9c %>% glimpse()
+```
+
+##### Resumen descriptivo
+
+```{r}
+unap9c %>% mutate_if(is.character, factor) %>% summary()
+```
+
+#### Exploratorio
+
+```{r}
+unap9c
+```
+
+## Georeference data
+
+- Unir y actualizar `unap9c` con los datos de georeferencia.
+- __pendiente:__ visualizarlo mediante google maps.
+
+```{r}
+unapgr <- readxl::read_xlsx("data-raw/UNAP_georeference.xlsx",n_max=940) %>% 
+              dplyr::rename(id=`CÓDIGO`) %>% 
+              rename_all(funs(stringr::str_to_lower(.))) %>% 
+              dplyr::mutate(id= str_replace_all(id, "_","-"))
+
+unap9c <- unap9c %>% 
+  inner_join(unapgr,
+            by = "id")
+```
+
+```{r,fig.width=10,fig.height=6,message=FALSE}
+library(maps)
+library(mapdata)
+
+#unapgr %>% summary()
+
+par(mfrow=c(1,2))
+
+maps::map(regions=sov.expand(c("Peru","Ecuador","Brazil","Chile","Bolivia","Colombia")), 
+          xlim=c(-82,-68),ylim=c(-19,0),col="gray95", fill=TRUE)
+maps::map('rivers', add=TRUE, col = "blue")
+maps::map.axes()
+map.cities(country = "Peru", capitals = 1)
+points(-73.253801, -3.743316, pch=19, col="black", cex=.5)  #plot my sample sites: IQUITOS
+text(-73.253801, -3.743316,"Iquitos",pos = 2)
+points(unapgr$longitud, unapgr$latitud, 
+       pch=19, col="red", cex=0.5)  #plot my sample sites
+
+maps::map(regions=sov.expand("Peru"), 
+          xlim=c(-73.42,-73.34),ylim=c(-3.87,-3.815),
+          col="gray95", fill=TRUE)
+maps::map('rivers', add=TRUE, col = "blue")
+maps::map.axes()
+points(unapgr$longitud, unapgr$latitud, 
+       pch=19, col="red", cex=0.5)  #plot my sample sites
+```
+
+
+## Output
+
+```{r, fig.align='center', fig.width=5, fig.height=5}
+unap6i <- unap6c %>% dplyr::select(id)
+unap7i <- unap7 %>% dplyr::select(id)
+unap9i <- unap9c %>% dplyr::select(id)
+unapgi <- unapgr %>% dplyr::select(id)
+
+i9_unap= unlist(as.list(unap9i))
+i7_sero= unlist(as.list(unap7i))
+ig_epid= unlist(as.list(unapgi))
+i6_unap= unlist(as.list(unap6i))
+
+tmp <- gplots::venn(list(unap9c=i9_unap,unap_geo=ig_epid,unap7=i7_sero,unap6c=i6_unap))
+```
+
+- a **`core`** dataset **(936x100)** was written as `data/05-epidemio-core.csv`.
+    + __23__ samples from `unap6c` are lost.
+    + __01__ sample from `unap7` is lost due to absence in core DB `unap6c`.
+
+### write .csv .rds
+```{r}
+#readr::write_csv(unap6b, "data/04-epidemio-full.csv")
+#saveRDS(unap6b, "data/04-epidemio-full.rds")
+
+readr::write_csv(unap9c, "data/05-epidemio-core.csv")
+saveRDS(unap9c, "data/05-epidemio-core.rds")
+```
+
+## Inconsistencies
+
+### malaria events
+
+- __01__ individuo reporta 1 evento de malaria pero se registra sin `tenido_malaria`.
+- ¿Corrijo priorizando `cuantas_tenido_malaria`?
+
+```{r}
+unap9c %>% 
+  select(tenido_malaria,cuantas_tenido_malaria) %>% 
+  group_by(tenido_malaria,cuantas_tenido_malaria) %>% dplyr::count()
+```
+
+### On residence higher than age
+
+```{r}
+unap9c %>% 
+  select(id, age_7,residence,micro_c,pcr_c) %>% 
+  filter(residence>age_7) %>% 
+  group_by(micro_c,pcr_c) %>% dplyr::count()
+
+unap9c %>% 
+  select(id, age_7,residence,pcr_c,Ab.unit_Pviv) %>% 
+  filter(residence>age_7,Ab.unit_Pviv>quantile(Ab.unit_Pviv,0.75,na.rm=T))
+
+summary(unap9c$Ab.unit_Pviv)
+```
+
+### Microscopy and PCR reads
+
+- la 1era base con estos datos fue `unap5 (UNAP-5-QC-08feb2017.xlsx)`
+- `unap5` solo presenta __222__ muestras con datos para micros y pcr
+- la última base entregada `RESULTADOS_BARRIDO_2015-I_FINAL_SETIEMBRE.xlsx (UNAP-7-DB-25ago2017.xlsx)` 
+rellenó las casillas sin datos con valores `0`.
+- `micro_c` y `pcr_c` son las variables consenso obtenidas al __comparar__ UNAP vs N6 y __priorizar__ las lecturas _positivas_ obtenidas en N6.
+    + sufijo `_7` son datos de `unap7` (`_a` y `_b`, 1era y 2da lectura),
+    + sufijo `_1` son datos de UNAP en `unap5`, la 1era base con esta data.
+    + sufijo `_n` son datos de NAM6 en `unap5`.
+
+```{r}
+# load data
+readxl::read_xlsx("data/UNAP-5-QC-08feb2017.xlsx") %>% 
+  dplyr::rename(id=CODE) %>% dplyr::mutate(db="unap5") %>%  dplyr::count(db)
+
+unap_qc76 <- readxl::read_excel("data/UNAP-7-DB-25ago2017.xlsx", 
+                              sheet = 1,na = ".") %>% 
+  dplyr::rename(id=`CÓDIGO`,
+                Pf_MSP1=`Pf_MSP1-QTSR`,
+                Pv_MSP1=`Pv200_MSP1`,
+                micro_7a=`1er micros (nolberto_anibal)`,
+                micro_7b=`2da micros  (nolberto)`,
+                pcr_pv=`PCR_Pv (Rubio et al 1999)`,
+                pcr_pf=`PCR_Pf (Rubio et al 1999)`) %>% 
+  dplyr::mutate(id= str_replace_all(id, "_","-")) %>% 
+  select(id,micro_7a,micro_7b,pcr_pv,pcr_pf) %>% 
+  inner_join(unap6c %>% 
+              select(id,micro_c:pcr_n),
+            by="id")
+
+unap_qc76 %>% 
+  select(contains("micro")) %>% 
+  dplyr::mutate(micro_c=as.character(micro_c)) %>% 
+  replace_na(list(micro_c="na"))  %>% 
+  filter(micro_c=="na") %>% 
+  group_by(micro_7a,micro_7b,micro_c,micro_1,micro_n) %>%  dplyr::count()
+
+unap_qc76 %>% 
+  select(contains("pcr")) %>% 
+  dplyr::mutate(pcr_7=pcr_pv+pcr_pf) %>% 
+  dplyr::mutate(pcr_c=as.character(pcr_c)) %>% 
+  replace_na(list(pcr_c="na"))  %>% 
+  filter(pcr_c=="na") %>% 
+  group_by(pcr_7,pcr_c,pcr_1,pcr_n) %>%  dplyr::count()
+```
+
+- los valores negativos `NG` también fueron reemplazados por `0` en la última actualización:
+
+```{r}
+unap_qc76 %>% 
+  select(contains("micro")) %>% 
+  dplyr::mutate(micro_c=as.character(micro_c)) %>% 
+  replace_na(list(micro_c="na"))  %>% 
+  filter(micro_c=="NG") %>% 
+  group_by(micro_7a,micro_7b,micro_c,micro_1,micro_n) %>%  dplyr::count()
+
+unap_qc76  %>% 
+  select(contains("pcr")) %>% 
+  dplyr::mutate(pcr_7=pcr_pv+pcr_pf) %>% 
+  dplyr::mutate(pcr_c=as.character(pcr_c)) %>% 
+  replace_na(list(pcr_c="na"))  %>% 
+  filter(pcr_c=="NG") %>% 
+  group_by(pcr_7,pcr_c,pcr_1,pcr_n) %>%  dplyr::count()
+```
+
+- Todos los valores positivos
+- Los los resultados del __control de calidad (QC)__ fueron reportados anteriormente [aquí](#covar)
+
+```{r}
+unap_qc76 %>% 
+  select(contains("micro")) %>% 
+  dplyr::mutate(micro_c=as.character(micro_c)) %>% 
+  replace_na(list(micro_c="na"))  %>% 
+  filter(micro_c!="NG" & micro_c!="na") %>% 
+  group_by(micro_7a,micro_7b,micro_c,micro_1,micro_n) %>%  dplyr::count()
+
+unap_qc76  %>% 
+  select(contains("pcr")) %>% 
+  dplyr::mutate(pcr_7=pcr_pv+pcr_pf) %>% 
+  dplyr::mutate(pcr_c=as.character(pcr_c)) %>% 
+  replace_na(list(pcr_c="na"))  %>% 
+  filter(pcr_c!="NG" & pcr_c!="na") %>% 
+  group_by(pcr_7,pcr_c,pcr_1,pcr_n) %>%  dplyr::count()
+```
+
+## Result tables
+
+### Baseline characteristics of the study population
+
+```{r}
+unap9c_bc <- unap9c %>% 
+  select(-residence,-(Ab.unit_Pfal:longitud)) %>% 
+  dplyr::mutate(age_7=cut(age_7,c(0,
+                                  quantile(unap9c$age_7,0.25,na.rm = T),
+                                  quantile(unap9c$age_7,0.50,na.rm = T),
+                                  quantile(unap9c$age_7,0.75,na.rm = T),
+                                  Inf)),
+                cuantas_tenido_malaria=cut(cuantas_tenido_malaria,
+                                           c(-Inf,
+                                             0,
+                                             1,
+                                             quantile(unap9c$cuantas_tenido_malaria,0.75,na.rm = T),
+                                             Inf))
+                )
+```
+
+```{r}
+s1 <- Hmisc::summaryM(sex_8 + age_7 +
+                        #community_1 +
+                        nivel_educacion +
+                        trabajo +
+                        electricidad_red_publica +
+                        material_pared +
+                        material_piso +
+                        epi_uso_redes_cama +
+                        epi_uso_red_dormir + tenido_malaria +
+                        cuantas_tenido_malaria
+                      ~ community_1 #+ 
+                      #episodio_previo
+                      ,
+               data=unap9c_bc,
+               overall=FALSE, test=TRUE)
+
+Hmisc::latex(s1, caption='Epidemiological data',
+      exclude1=TRUE, npct='both', 
+      #digits=2, eps = 0.01,
+      #prmsd=TRUE, brmsd=TRUE, msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = TRUE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%", html = TRUE
+      ) #change here for LaTeX PDF
+```
+
+### Malaria prevalence by study site
+
+- prevalencia en base a microscopía y PCR.
+- __pendiente:__ seroprevalencia
+- ¿Se tomará en cuenta _Incidence rate_? (ver Rosas-Aguirre et al. 2015)
+
+```{r}
+unap9c_pr <- unap9c %>% 
+  select(id,community_1,Ab.unit_Pfal:pcr_c) %>% 
+  #filter(micro_c!="NG" | pcr_c!="NG")
+  dplyr::mutate(micro_c=stringr::str_replace(micro_c,"NG", 
+                                             replacement = NA_character_),
+                pcr_c=stringr::str_replace(pcr_c,"NG", 
+                                             replacement = NA_character_))
+```
+
+```{r}
+s1 <- Hmisc::summaryM(micro_c + pcr_c #+ Ab.unit_Pviv + Ab.unit_Pfal
+                      ~ community_1 #+ 
+                      #episodio_previo
+                      ,
+               data=unap9c_pr,
+               overall=FALSE, test=TRUE)
+
+Hmisc::latex(s1, caption='Epidemiological data',
+      exclude1=FALSE, npct='both', 
+      digits=2, #eps = 0.01,
+      #prmsd=TRUE, brmsd=TRUE, msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = TRUE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%", html = TRUE
+      ) #change here for LaTeX PDF
+```
