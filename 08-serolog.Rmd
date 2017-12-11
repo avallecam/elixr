@@ -494,6 +494,19 @@ dd <- rms::datadist(unap10a_ra); options(datadist='dd')
 #levels(unap10a_ra$age_7)
 ```
 
+```{r}
+### test cases per pheno
+unap10a_ra %>% 
+  dplyr::count(community_1,sero_c) %>%
+  group_by(community_1) %>% mutate(tot=sum(n),prop= (n*100)/(sum(n))) %>% 
+  filter(sero_c!="non" & sero_c!="mix") %>% 
+  arrange(desc(community_1)) #%>% 
+  #dplyr::select(2,3,1,everything()) 
+
+unap10a_ra %>% filter(!is.na(trabajo_rpl)) %>% dplyr::count(sero_c)
+unap10a_ra %>% filter(!is.na(trabajo_rpl)) %>% dplyr::count(pcr_c)
+```
+
 ### univariate test
 
 ```{r}
@@ -713,9 +726,9 @@ plot(my.calib, las=1)
 #options(prType = "plain")
 
 #print(modx_pen,long=F)
-#summary(modx_pen)
+summary(modx_pen)
 #print(lrm.finl,long=F)
-#summary(lrm.finl)
+summary(lrm.finl)
 
 stargazer::stargazer(modx_pen,lrm.finl,
                      type = "text", apply.coef=exp, #apply.ci=exp,
@@ -870,9 +883,9 @@ plot(my.calib, las=1)
 #options(prType = "plain")
 
 #print(modx_pen,long=F)
-#summary(modx_pen)
+summary(modx_pen)
 #print(lrm.finl,long=F)
-#summary(lrm.finl)
+summary(lrm.finl)
 
 stargazer::stargazer(modx_pen,lrm.finl,
                      type = "text", apply.coef=exp, #apply.ci=exp,
@@ -1032,9 +1045,9 @@ Hmisc::html(summary(mod1),file="",dec=2)
 #options(prType = "plain")
 
 #print(modx_pen,long=F)
-#summary(modx_pen)
+summary(modx_pen)
 #print(lrm.finl,long=F)
-#summary(lrm.finl)
+summary(lrm.finl)
 
 stargazer::stargazer(modx_pen,lrm.finl,
                      type = "text", apply.coef=exp, #apply.ci=exp,
@@ -1194,9 +1207,9 @@ plot(my.calib, las=1)
 #options(prType = "plain")
 
 #print(modx_pen,long=F)
-#summary(modx_pen)
+summary(modx_pen)
 #print(lrm.finl,long=F)
-#summary(lrm.finl)
+summary(lrm.finl)
 
 stargazer::stargazer(modx_pen,lrm.finl,
                      type = "text", apply.coef=exp, #apply.ci=exp,
@@ -1433,8 +1446,19 @@ unap10a_rc_a %>%
 
 ## Acquisition models
 
-```{r}
-#unap10a#age vs log(Ab.units)
+- just distribution + loess regression line
+
+```{r,fig.height=3,fig.width=6}
+unap10a %>% #age vs log(Ab.units)
+  dplyr::select(id,age_7,community_1,Ab.unit_Pfal,Ab.unit_Pviv) %>% 
+  gather(Specie,Ab.units,-id,-age_7,-community_1) %>% 
+  filter(Ab.units>=0) %>% 
+  ggplot(aes(age_7,Ab.units)) +
+  geom_point(alpha=.5)+
+  geom_smooth() +
+  scale_y_log10() +
+  facet_grid(~Specie) +
+  scale_y_continuous(breaks = c(1,10,100,1000),trans="log10")
 ```
 
 
