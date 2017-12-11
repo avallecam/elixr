@@ -1,0 +1,1699 @@
+---
+title: "Serology: Zungarococha"
+author: "Andree Valle Campos"
+date: '`r Sys.Date()`'
+output:
+  html_notebook:
+  #html_document:
+    fig_caption: yes
+    toc: yes
+    toc_depth: 5
+    toc_float:
+      collapsed: yes
+    code_folding: "hide"
+    #df_print: paged
+#bibliography: malaria.bib
+biblio-style: apalike
+link-citations: yes
+#csl: american-medical-association.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, #fig.path = "01-",
+                      warning = FALSE)
+#knitr::opts_knit$set(root.dir = '../.')
+
+options(width = 90) # expand limits of CONSOLE output
+
+#require(Hmisc)
+#mu <- markupSpecs$html   # markupSpecs is in Hmisc
+# hidden command (<code>r mu$widescreen()</code>) to use an entire wide screen. # mu$widescreen()
+#`r mu$widescreen()`
+```
+
+# SEROMAP {#seromap}
+
+## Aim
+
+- Classify samples by seropositivity.
+- Map samples by sero+, PCR+, micro+.
+
+## Results
+
+## To Do
+
+## Dependencies
+
+```{r, results='hide', message=FALSE}
+library(tidyverse)
+
+library(mixtools)
+
+library(maps)
+library(mapdata)
+
+library(ggmap)
+```
+
+```{r}
+theme_set(theme_bw())
+```
+
+
+## Input
+```{r}
+std.nty <- readRDS("data/02-dtfilter-nty.rds")
+std.uty <- readRDS("data/02-dtfilter-uty.rds")
+
+unap0 <- readRDS("data/03-covariat-uap.rds")
+std.nty.cov <- readRDS("data/03-covariat-nty.rds")
+std.uty.cov <- readRDS("data/03-covariat-uty.rds")
+
+unap9d <- readRDS("data/05-epidemio-core.rds")
+```
+
+## Serology
+
+### Descriptive
+
+```{r,fig.align='center', fig.width=6, fig.height=5}
+std.wrg <- std.nty %>% 
+  mutate(community=stringr::str_replace(ID, "(..)(.+)","\\1")) %>% 
+  select(ID,community,Specie,Ab.unit,mean.OD) %>% #dplyr::count(Specie)
+  gather(measure,linear,-ID,-Specie,-community) %>% #dplyr::count(measure)
+  mutate(log=log(linear)) %>% 
+  gather(transform,data,-ID,-Specie,-community,-measure) %>% #dplyr::count(Specie,measure,transform)
+  mutate(measure=forcats::fct_relevel(measure, "mean.OD")) 
+
+std.wrg %>% 
+  ggplot(aes(x=data,fill=Specie)) + theme_bw() +
+  geom_histogram(alpha=.5,position = "identity") +
+  facet_wrap(transform~measure,scales = "free")
+```
+
+```{r,fig.align='center', fig.width=10, fig.height=2.5}
+#std.wrg %>% 
+ # filter(transform=="log") %>% 
+  #ggplot(aes(x=data,fill=Specie)) + theme_bw() +
+  #geom_histogram(alpha=.5,position = "identity") +
+  #facet_grid(.~community)
+std.nty %>% 
+  mutate(community=stringr::str_replace(ID, "(..)(.+)","\\1")) %>% 
+  ggplot(aes(x=Ab.unit,fill=Specie)) + theme_bw() +
+  geom_histogram(alpha=.5,position = "identity") +
+  facet_grid(.~community) +
+  scale_x_log10()
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+```
+
+##### compare OD AU
+
+```{r,fig.height=2,fig.width=6}
+std.nty %>% dplyr::rename(id="ID") %>% 
+  mutate(id=as.character(id)) %>% 
+  inner_join(unap9d %>% dplyr::select(id,densidad,pcr_c),by="id") %>% 
+  #mutate(community=stringr::str_replace(ID, "(..)(.+)","\\1")) %>% 
+  ggplot(aes(Ab.unit, mean.OD)) +
+  geom_point(aes(colour=pcr_c),size=1#,alpha=.5
+             ) +
+  facet_grid(~Specie) #+scale_x_log10()
+```
+
+```{r,fig.height=2,fig.width=6}
+std.nty %>% dplyr::rename(id="ID") %>% 
+  mutate(id=as.character(id)) %>% 
+  inner_join(unap9d %>% dplyr::select(id,densidad,pcr_c),by="id") %>% 
+  filter(!densidad==is.na(densidad)) %>% 
+  #mutate(community=stringr::str_replace(ID, "(..)(.+)","\\1")) %>% 
+  ggplot(aes(Ab.unit, mean.OD)) +
+  geom_point(aes(colour=densidad)#,alpha=.5
+             ) +
+  facet_grid(~Specie) +
+  viridis::scale_color_viridis(trans="log10",
+                               breaks = c(100,1000,10000,20000,60000)
+                               #,option="plasma"#,discrete = TRUE
+                               ) #+scale_x_log10()
+##breakes=c(20000,40000,60000)#labels=c(20000,40000,60000)
+```
+
+### Classification
+
+```{r}
+#std.wrg %>% dplyr::count(measure)
+#std.nty
+mco <- std.nty %>% dplyr::rename(Ab.units=Ab.unit) %>% .[!is.na(.$Ab.units),]
+#sum(is.na(mco))
+```
+
+#### check distributions
+
+```{r,fig.width=7,fig.height=2.5}
+a <- mco %>% #filter(igg=="igg3") %>% 
+  ggplot(aes(x=Ab.units
+             #,fill=pheno
+             #,fill=igg
+             )) + #theme_bw() +
+  #scale_x_log10() +
+  geom_density(alpha=.5,position = "identity") +
+  geom_histogram(aes(x=Ab.units,..density..),
+                 alpha=.5,position = "identity") +
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title="AU linear distribution")
+
+b <- mco %>% #filter(igg=="igg3") %>% 
+  ggplot(aes(sample=Ab.units
+             #,fill=pheno
+             #,fill=igg
+             )) +
+  geom_qq(alpha=.2) +
+  geom_qq_line(line.p = c(0.25, 0.75)) +
+  labs(title="Gaussian quantile-quantile plot") +
+  coord_cartesian(ylim = c(0,2000))
+
+Rmisc::multiplot(a,b,cols = 2)
+```
+
+```{r,fig.width=5,fig.height=2.2}
+mco %>% 
+  ggplot(aes(x=Ab.units
+             #,fill=pheno
+             )) + theme_bw() +
+  #scale_x_log10() +
+  geom_density(alpha=.5,position = "identity",adjust= 1/2
+               ) + 
+  geom_histogram(aes(x=Ab.units,..density..),
+                 alpha=.5,position = "identity") + 
+  facet_wrap(~Specie, scales = "free",ncol = 5) +
+  labs(title="AU linear distribution per IgG subtype")
+```
+
+#### apply mixtools
+
+```{r}
+# source: http://tinyheero.github.io/2015/10/13/mixture-model.html
+f <- mco %>% mutate(Specie=as.factor(Specie)) %>% 
+  mutate(Specie=forcats::fct_relevel(Specie,"Pviv")) %>% .$Specie
+
+library("mixtools")
+
+#' Plot a Mixture Component
+#' 
+#' @param x Input data
+#' @param mu Mean of component
+#' @param sigma Standard deviation of component
+#' @param lam Mixture weight of component
+plot_mix_comps <- function(x, mu, sigma, lam) {
+  lam * dnorm(x, mu, sigma)
+}
+
+set.seed(1)
+#length(levels(f))
+#wait <- mco %>% filter(igg=="igg2") %>% 
+#  .$Ab.units %>% log()
+
+llmix <- data_frame(Specie=as.character(),
+                    kpr=as.numeric(),
+                    lik=as.numeric())
+for (j in 2:3) {#j=2
+    
+    mixmdl_p <- normalmixEM(mco %>% 
+                              #filter(igg==levels(f)[i]) %>% 
+                              .$Ab.units #%>% log10()
+                            , 
+                            k = j)
+    llmix <- llmix %>% 
+      dplyr::union(data_frame(Specie="all",#levels(f)[i],
+                       kpr=j,
+                       lik=mixmdl_p$loglik))
+    
+  }
+llmix %>% arrange(Specie,desc(lik)) %>% mutate(aic=2*kpr-2*lik)
+
+#
+llmix <- data_frame(Specie=as.character(),
+                    kpr=as.numeric(),
+                    lik=as.numeric())
+for (i in 1:length(levels(f))) {
+  
+  for (j in 2:3) {
+    
+    mixmdl_p <- normalmixEM(mco %>% 
+                              filter(Specie==levels(f)[i]) %>% 
+                              .$Ab.units #%>% log10()
+                            , 
+                            k = j)
+    llmix <- llmix %>% 
+      dplyr::union(data_frame(Specie=levels(f)[i],
+                       kpr=j,
+                       lik=mixmdl_p$loglik))
+    
+  }
+  
+}
+llmix %>% arrange(Specie,desc(lik)) %>% mutate(aic=2*kpr-2*lik) #%>% 
+  #group_by(igg) %>% filter(lik==max(lik))
+
+#mixmdl <- normalmixEM(wait, k = 3)
+#mixmdl$loglik
+```
+
+```{r,fig.height=3,fig.width=12}
+### FOR ALL AB.UNITS (NO IGG SUBTYPES)
+set.seed(1)
+
+#for (i in 1:length(levels(f))) {
+  
+wait <- mco %>% #filter(igg==levels(f)[i]) %>% 
+  .$Ab.units #%>% log10()
+mixmdl <- normalmixEM(wait, k = 3)
+###
+r <- data.frame(x = mixmdl$x) %>%
+  ggplot() +
+  geom_histogram(aes(x, ..density..), 
+                 #binwidth = 1, 
+                 #colour = "black", 
+                 #fill = "gray",
+                 alpha=.5,position = "identity"
+                 ) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[1], 
+                            mixmdl$sigma[1], 
+                            lam = mixmdl$lambda[1]),
+                colour = "green", lwd = 1.5) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[2], 
+                            mixmdl$sigma[2], 
+                            lam = mixmdl$lambda[2]),
+                colour = "blue", lwd = 1.5) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[3], 
+                            mixmdl$sigma[3], 
+                            lam = mixmdl$lambda[3]),
+                colour = "red", lwd = 1.5) +
+  ylab("Density") +
+  xlab("Ab.units") +
+  labs(title= paste0("Ab.units: ",
+                     #ifelse(levels(f)[i]=="igg","IgG ",
+                      #      ifelse(levels(f)[i]=="igg1","IgG1 ",
+                        #           ifelse(levels(f)[i]=="igg2","IgG2 ",
+                         #                 ifelse(levels(f)[i]=="igg3","IgG3 ","IgG4 ")
+                          #                )
+                          #         )
+                          #  ),
+                     "3-component distribution"
+                     #,": LogLik=",
+                     #mixmdl$loglik %>% format(digits=3)
+                     )) 
+  #+ scale_x_log10()
+
+####
+u <- 0.90 # 90% classification probability
+
+post.df <- as.data.frame(cbind(x = mixmdl$x, mixmdl$posterior)) %>% 
+  #mutate(comp.12=comp.1+comp.2,
+  #       comp.23=comp.2+comp.3) %>% 
+  mutate(comp.sp=if_else(rep(mixmdl$mu[2]>40,length(mixmdl$x)), # UMBRAL ARBITRARIO!!
+                        comp.2+comp.3, # sero+ equals to the sum of comp 2+3
+                        comp.3)) %>% # sero+ equals to the sum of comp 3
+  mutate(comp.sn=if_else(rep(mixmdl$mu[2]>40,length(mixmdl$x)),
+                        comp.1, # sero- equals to the sum of comp 1
+                        comp.1+comp.2)) %>% # sero+ equals to the sum of comp 1+2
+  mutate(label = if_else(comp.sn > u, "s-", 
+                        ifelse(comp.sp > u, "s+", "s0"
+                        #ifelse(comp.2 > u, "s+", #"s0"
+                               #ifelse(comp.1 > u,"s++","s0")
+                               ))) %>% 
+  mutate(comp = if_else(comp.1 > u, "comp.1", 
+                        if_else(comp.2 > u, "comp.2", "comp.3"))) %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s0","s+"#,"s++"
+                                    )) 
+
+s <- post.df %>% 
+  ggplot(aes(x = factor(label))) +
+  geom_bar() +
+  xlab("Component") +
+  ylab("Number of Data Points") +
+  labs(title="Classification")
+
+###
+t <- post.df %>% 
+  ggplot() +
+  #geom_line(aes(x,comp.1), colour="green", lwd = 1.5) +
+  #geom_line(aes(x,comp.2), colour="blue", lwd = 1.5) +
+  geom_line(aes(x,comp.12), colour="blue", lwd = 1.5) +
+  geom_line(aes(x,comp.3), colour="red", lwd = 1.5) +
+  geom_hline(yintercept = u, col = "black") +
+  geom_rect(aes(xmin=post.df %>% filter(label=="s0") %>% 
+                  summarise(min=min(x)) %>% .$min,
+                xmax=post.df %>% filter(label=="s0") %>% 
+                  summarise(max=max(x)) %>% .$max,
+                ymin=-Inf,ymax=Inf
+                ),alpha=0.8
+            ) +
+  #geom_vline(xintercept = cutoffs[2], col = "black", lty=3) +
+  #geom_vline(xintercept = cutoffs[1], col = "black", lty=3) +
+  xlab("Ab.units") +
+  ylab("classification probability") +
+  labs(title="Cutoff")
+
+#Rmisc::multiplot(r,t,s,cols = 3)
+  
+#}
+
+#sum(mco$Ab.units_log == mixmdl$x)
+#length(mixmdl$x)
+#sum(!post.df$x==mco$Ab.units_log)
+
+msr <- inner_join(mco %>% rownames_to_column(),
+           post.df %>%
+             #dplyr::rename(Ab.units_log=x) %>% 
+             dplyr::select(#Ab.units_log,
+                           label,comp) %>% 
+             rownames_to_column(),
+           by="rowname") #%>% 
+  #mutate(test= Ab.units_log.x==Ab.units_log.y) %>% dplyr::count(test)
+
+msr <- msr[FALSE,] #%>% glimpse()
+```
+
+#### two-component
+
+- higher s0 (indetermined) for all antigens
+
+```{r}
+msr <- msr[FALSE,] #%>% glimpse()
+```
+
+```{r,fig.height=3,fig.width=12}
+
+
+###
+set.seed(1)
+
+for (i in 1:length(levels(f))) {#i=2 # SOLO FALSTATIN
+#i <- 2
+  
+wait <- mco %>% filter(Specie==levels(f)[i]) %>% 
+  .$Ab.units #%>% log10()
+mixmdl <- normalmixEM(wait, k = 2)
+###
+r <- data.frame(x = mixmdl$x) %>%
+  ggplot() +
+  geom_histogram(aes(x, ..density..), 
+                 #binwidth = 1, 
+                 #colour = "black", 
+                 #fill = "gray",
+                 alpha=.5,position = "identity"
+                 ) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[1], 
+                            mixmdl$sigma[1], 
+                            lam = mixmdl$lambda[1]),
+                colour = "red", lwd = 1.5) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[2], 
+                            mixmdl$sigma[2], 
+                            lam = mixmdl$lambda[2]),
+                colour = "blue", lwd = 1.5) +
+  #stat_function(geom = "line", 
+  #              fun = plot_mix_comps,
+  #              args = list(mixmdl$mu[3], 
+  #                          mixmdl$sigma[3], 
+  #                          lam = mixmdl$lambda[3]),
+  #              colour = "green", lwd = 1.5) +
+  ylab("Density") +
+  xlab("Ab.units") +
+  labs(title= paste0(ifelse(levels(f)[i]=="Pfal","P. falciparum: ",
+                                   "P. vivax: "),
+                     "2-component distribution"
+                     #,": LogLik=",
+                     #mixmdl$loglik %>% format(digits=3)
+                     )) 
+  #+ scale_x_log10()
+
+####
+u <- 0.90 # 90% classification probability
+
+post.df <- as.data.frame(cbind(x = mixmdl$x, mixmdl$posterior)) %>% 
+  #mutate(comp.12=comp.1+comp.2,
+  #       comp.23=comp.2+comp.3) %>% 
+  mutate(comp.sp=comp.2) %>% # sero+ equals to the sum of comp 3
+  mutate(comp.sn=comp.1) %>% # sero+ equals to the sum of comp 1+2
+  mutate(label = if_else(comp.sn > u, "s-", 
+                        ifelse(comp.sp > u, "s+", "s0"
+                        #ifelse(comp.2 > u, "s+", #"s0"
+                               #ifelse(comp.1 > u,"s++","s0")
+                               ))) %>% 
+  mutate(comp = if_else(comp.1 > u, "comp.1", 
+                        if_else(comp.2 > u, "comp.2", "comp.3"))) %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s0","s+"#,"s++"
+                                    )) 
+
+s <- post.df %>% 
+  ggplot(aes(x = factor(label))) +
+  geom_bar() +
+  xlab("Component") +
+  ylab("Number of Data Points") +
+  labs(title="Classification")
+
+###
+t <- post.df %>% 
+  ggplot() +
+  #geom_line(aes(x,comp.1), colour="green", lwd = 1.5) +
+  #geom_line(aes(x,comp.2), colour="blue", lwd = 1.5) +
+  #geom_point(aes(x,comp.sp), colour="blue", lwd = 1.5) +
+  geom_line(aes(x,comp.sp), colour="blue", lwd = 1.5) +
+  #geom_point(aes(x,comp.sn), colour="red", lwd = 1.5) +
+  geom_line(aes(x,comp.sn), colour="red", lwd = 1.5) +
+  geom_hline(yintercept = u, col = "black") +
+  geom_rect(aes(xmin=post.df %>% filter(label=="s0") %>% 
+                  summarise(min=min(x)) %>% .$min,
+                xmax=post.df %>% filter(label=="s0") %>% 
+                  summarise(max=max(x)) %>% .$max,
+                ymin=-Inf,ymax=Inf
+                ),alpha=0.8
+            ) +
+  #geom_vline(xintercept = 63.6, col = "black", lty=3) +
+  #geom_vline(xintercept = 69.7, col = "black", lty=3) +
+  xlab("Ab.units") +
+  ylab("classification probability") +
+  labs(title="Cutoff")
+
+
+
+###
+msr_p <- inner_join(mco %>%
+                    filter(Specie==levels(f)[i]) %>% 
+                    rownames_to_column(),
+           post.df %>%
+             #dplyr::rename(Ab.units_log=x) %>% 
+             dplyr::select(#Ab.units_log,
+                           label,comp) %>% 
+             rownames_to_column(),
+           by="rowname") #%>% 
+  #mutate(test= Ab.units_log.x==Ab.units_log.y) %>% dplyr::count(test)
+
+
+msr <- dplyr::union(msr, msr_p)
+
+
+Rmisc::multiplot(r,t,s,cols = 3)
+  
+}
+
+mixmdl$mu
+mixmdl$sigma
+mixmdl$lambda
+
+msr_two <- msr
+#msr_two %>% dplyr::count(Specie)
+msr_two %>% dplyr::count(Specie,label) %>% group_by(Specie) %>% mutate(prop=100*n/sum(n))
+```
+
+#### three-component distribution: s-=1 s+=2+3
+
+```{r}
+msr <- msr[FALSE,] #%>% glimpse()
+```
+
+```{r,fig.height=3,fig.width=12}
+set.seed(1)
+#
+#levels(f) <- levels(f)[c(1,3,NA)]
+#
+for (i in 1:length(levels(f))) {#i=3 # SOLO GEST + PV200
+  
+wait <- mco %>% filter(Specie==levels(f)[i]) %>% 
+  .$Ab.units #%>% log10()
+mixmdl <- normalmixEM(wait, k = 3)
+###
+r <- data.frame(x = mixmdl$x) %>%
+  ggplot() +
+  geom_histogram(aes(x, ..density..), 
+                 #binwidth = 1, 
+                 #colour = "black", 
+                 #fill = "gray",
+                 alpha=.5,position = "identity"
+                 ) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[1], 
+                            mixmdl$sigma[1], 
+                            lam = mixmdl$lambda[1]),
+                colour = "red", lwd = 1.5) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[2], 
+                            mixmdl$sigma[2], 
+                            lam = mixmdl$lambda[2]),
+                colour = "blue", lwd = 1.5) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[3], 
+                            mixmdl$sigma[3], 
+                            lam = mixmdl$lambda[3]),
+                colour = "green", lwd = 1.5) +
+  ylab("Density") +
+  xlab("Ab.units") +
+  labs(title= paste0(ifelse(levels(f)[i]=="Pfal","P. falciparum: ",
+                                   "P. vivax: "),
+                     "3-component distribution"
+                     #,": LogLik=",
+                     #mixmdl$loglik %>% format(digits=3)
+                     )) 
+  #+ scale_x_log10()
+
+####
+u <- 0.90 # 90% classification probability
+
+post.df <- as.data.frame(cbind(x = mixmdl$x, mixmdl$posterior)) %>% 
+  #mutate(comp.12=comp.1+comp.2,
+  #       comp.23=comp.2+comp.3) %>% 
+  mutate(comp.sp=#if_else(rep(mixmdl$mu[2]>600,length(mixmdl$x)), # UMBRAL ARBITRARIO!!
+                        comp.2+comp.3 # sero+ equals to the sum of comp 2+3
+                  #      ,comp.3)
+         ) %>% # sero+ equals to the sum of comp 3
+  mutate(comp.sn=#if_else(rep(mixmdl$mu[2]>600,length(mixmdl$x)),
+                        comp.1 # sero- equals to the sum of comp 1
+                  #      ,comp.1+comp.2)
+         ) %>% # sero+ equals to the sum of comp 1+2
+  mutate(label = if_else(comp.sn > u, "s-", 
+                        ifelse(comp.sp > u, "s+", "s0"
+                        #ifelse(comp.2 > u, "s+", #"s0"
+                               #ifelse(comp.1 > u,"s++","s0")
+                               ))) %>% 
+  mutate(comp = if_else(comp.1 > u, "comp.1", 
+                        if_else(comp.2 > u, "comp.2", "comp.3"))) %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s0","s+"#,"s++"
+                                    )) 
+
+s <- post.df %>% 
+  ggplot(aes(x = factor(label))) +
+  geom_bar() +
+  xlab("Component") +
+  ylab("Number of Data Points") +
+  labs(title="Classification")
+
+###
+t <- post.df %>% 
+  ggplot() +
+  #geom_line(aes(x,comp.1), colour="green", lwd = 1.5) +
+  #geom_line(aes(x,comp.2), colour="blue", lwd = 1.5) +
+  #geom_point(aes(x,comp.sp), colour="blue", lwd = 1.5) +
+  geom_line(aes(x,comp.sp), colour="blue", lwd = 1.5) +
+  #geom_point(aes(x,comp.sn), colour="red", lwd = 1.5) +
+  geom_line(aes(x,comp.sn), colour="red", lwd = 1.5) +
+  geom_hline(yintercept = u, col = "black") +
+  geom_rect(aes(xmin=post.df %>% filter(label=="s0") %>% 
+                  summarise(min=min(x)) %>% .$min,
+                xmax=post.df %>% filter(label=="s0") %>% 
+                  summarise(max=max(x)) %>% .$max,
+                ymin=-Inf,ymax=Inf
+                ),alpha=0.8
+            ) +
+  #geom_vline(xintercept = 63.6, col = "black", lty=3) +
+  #geom_vline(xintercept = 69.7, col = "black", lty=3) +
+  xlab("Ab.units") +
+  ylab("classification probability") +
+  labs(title="Cutoff")
+
+
+###
+msr_p <- inner_join(mco %>%
+                    filter(Specie==levels(f)[i]) %>% 
+                    rownames_to_column(),
+           post.df %>%
+             #dplyr::rename(Ab.units_log=x) %>% 
+             dplyr::select(#Ab.units_log,
+                           label,comp) %>% 
+             rownames_to_column(),
+           by="rowname") #%>% 
+  #mutate(test= Ab.units_log.x==Ab.units_log.y) %>% dplyr::count(test)
+
+
+msr <- dplyr::union(msr, msr_p)
+
+
+Rmisc::multiplot(r,t,s,cols = 3)
+  
+}
+
+mixmdl$mu
+mixmdl$sigma
+mixmdl$lambda
+
+msr_three_a <- msr
+#msr_three %>% dplyr::count(Specie)
+msr_three_a %>% dplyr::count(Specie,label) %>% group_by(Specie) %>% mutate(prop=100*n/sum(n))
+```
+
+#### three-component distribution: s-=1+2 s+=3
+
+```{r}
+msr <- msr[FALSE,] #%>% glimpse()
+```
+
+```{r,fig.height=3,fig.width=12}
+set.seed(1)
+#
+#levels(f) <- levels(f)[c(1,3,NA)]
+#
+for (i in 1:length(levels(f))) {#i=3 # SOLO GEST + PV200
+  
+wait <- mco %>% filter(Specie==levels(f)[i]) %>% 
+  .$Ab.units #%>% log10()
+mixmdl <- normalmixEM(wait, k = 3)
+###
+r <- data.frame(x = mixmdl$x) %>%
+  ggplot() +
+  geom_histogram(aes(x, ..density..), 
+                 #binwidth = 1, 
+                 #colour = "black", 
+                 #fill = "gray",
+                 alpha=.5,position = "identity"
+                 ) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[1], 
+                            mixmdl$sigma[1], 
+                            lam = mixmdl$lambda[1]),
+                colour = "red", lwd = 1.5) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[2], 
+                            mixmdl$sigma[2], 
+                            lam = mixmdl$lambda[2]),
+                colour = "blue", lwd = 1.5) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[3], 
+                            mixmdl$sigma[3], 
+                            lam = mixmdl$lambda[3]),
+                colour = "green", lwd = 1.5) +
+  ylab("Density") +
+  xlab("Ab.units") +
+  labs(title= paste0(ifelse(levels(f)[i]=="Pfal","P. falciparum: ",
+                                   "P. vivax: "),
+                     "3-component distribution"
+                     #,": LogLik=",
+                     #mixmdl$loglik %>% format(digits=3)
+                     )) 
+  #+ scale_x_log10()
+
+####
+u <- 0.90 # 90% classification probability
+
+post.df <- as.data.frame(cbind(x = mixmdl$x, mixmdl$posterior)) %>% 
+  #mutate(comp.12=comp.1+comp.2,
+  #       comp.23=comp.2+comp.3) %>% 
+  mutate(comp.sp=#if_else(rep(mixmdl$mu[2]>600,length(mixmdl$x)), # UMBRAL ARBITRARIO!!
+                  #      comp.2+comp.3, # sero+ equals to the sum of comp 2+3
+                        comp.3#)
+         ) %>% # sero+ equals to the sum of comp 3
+  mutate(comp.sn=#if_else(rep(mixmdl$mu[2]>600,length(mixmdl$x)),
+                  #      comp.1, # sero- equals to the sum of comp 1
+                        comp.1+comp.2#)
+         ) %>% # sero+ equals to the sum of comp 1+2
+  mutate(label = if_else(comp.sn > u, "s-", 
+                        ifelse(comp.sp > u, "s+", "s0"
+                        #ifelse(comp.2 > u, "s+", #"s0"
+                               #ifelse(comp.1 > u,"s++","s0")
+                               ))) %>% 
+  mutate(comp = if_else(comp.1 > u, "comp.1", 
+                        if_else(comp.2 > u, "comp.2", "comp.3"))) %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s0","s+"#,"s++"
+                                    )) 
+
+s <- post.df %>% 
+  ggplot(aes(x = factor(label))) +
+  geom_bar() +
+  xlab("Component") +
+  ylab("Number of Data Points") +
+  labs(title="Classification")
+
+###
+t <- post.df %>% 
+  ggplot() +
+  #geom_line(aes(x,comp.1), colour="green", lwd = 1.5) +
+  #geom_line(aes(x,comp.2), colour="blue", lwd = 1.5) +
+  #geom_point(aes(x,comp.sp), colour="blue", lwd = 1.5) +
+  geom_line(aes(x,comp.sp), colour="blue", lwd = 1.5) +
+  #geom_point(aes(x,comp.sn), colour="red", lwd = 1.5) +
+  geom_line(aes(x,comp.sn), colour="red", lwd = 1.5) +
+  geom_hline(yintercept = u, col = "black") +
+  geom_rect(aes(xmin=post.df %>% filter(label=="s0") %>% 
+                  summarise(min=min(x)) %>% .$min,
+                xmax=post.df %>% filter(label=="s0") %>% 
+                  summarise(max=max(x)) %>% .$max,
+                ymin=-Inf,ymax=Inf
+                ),alpha=0.8
+            ) +
+  #geom_vline(xintercept = post.df %>% filter(label=="s0") %>% 
+   #            summarise(min=min(x)) %>% .$min
+    #           , col = "black", lty=3) +
+  #geom_vline(xintercept = post.df %>% filter(label=="s0") %>% 
+   #            summarise(max=max(x)) %>% .$max
+    #           , col = "black", lty=3) +
+  xlab("Ab.units") +
+  ylab("classification probability") +
+  labs(title="Cutoff")
+
+
+###
+msr_p <- inner_join(mco %>%
+                    filter(Specie==levels(f)[i]) %>% 
+                    rownames_to_column(),
+           post.df %>%
+             #dplyr::rename(Ab.units_log=x) %>% 
+             dplyr::select(#Ab.units_log,
+                           label,comp) %>% 
+             rownames_to_column(),
+           by="rowname") #%>% 
+  #mutate(test= Ab.units_log.x==Ab.units_log.y) %>% dplyr::count(test)
+
+
+msr <- dplyr::union(msr, msr_p)
+
+
+Rmisc::multiplot(r,t,s,cols = 3)
+  
+}
+
+mixmdl$mu
+mixmdl$sigma
+mixmdl$lambda
+
+msr_three_b <- msr
+#msr_three %>% dplyr::count(Specie)
+msr_three_b %>% dplyr::count(Specie,label) %>% group_by(Specie) %>% mutate(prop=100*n/sum(n))
+```
+
+#### select model
+
+```{r}
+l <- llmix %>% arrange(Specie,lik) %>% mutate(aic=2*kpr-2*lik) %>% dplyr::select(-lik) %>% 
+  dplyr::rename(comp_num="kpr")
+```
+
+```{r}
+
+sum.tbl <- function(msr,m,define){
+
+  #msr <- msr %>% mutate(label=comp) # TO DO
+  
+a <- msr %>% 
+  filter(!label=="s0") %>% 
+  group_by(Specie,label) %>% summarise(comp_num=m,
+                                       q50=quantile(Ab.units) %>% .[3],
+                                       mean=mean(Ab.units),
+                                       sd=sd(Ab.units)) %>% 
+  ungroup()
+b <- msr %>% 
+  filter(label=="s0") %>% group_by(Specie,label) %>% #mutate(comp_num=2) %>% 
+  summarise(comp_num=m,cut_inf=min(Ab.units),cut_sup=max(Ab.units)) %>%
+  ungroup() %>% 
+  dplyr::select(comp_num,everything(),-label)
+c <- msr %>% 
+  dplyr::count(Specie,label) %>% group_by(Specie) %>% 
+  mutate(prop=100*n/sum(n),
+         comp_num=m) %>% dplyr::select(comp_num,Specie,label,prop) %>% 
+  ungroup() %>% 
+  spread(label,prop) %>% rownames_to_column() %>% dplyr::select(-rowname)
+
+d <- full_join(a,b,by=c("Specie","comp_num")) %>% 
+  full_join(c,by=c("Specie","comp_num")) %>% 
+  mutate(define=define,
+         `size_s0`=cut_sup-cut_inf) %>% 
+  dplyr::rename(`prop_s-`=`s-`,`prop_s0`=`s0`,`prop_s+`=`s+`) %>% 
+  left_join(l,by=c("Specie","comp_num")) %>% 
+  dplyr::select(3,1,label:sd,aic,define,cut_inf,cut_sup,`size_s0`,everything()) %>% 
+  #mutate(cut_inf==as.numeric(cut_inf)) %>% 
+  mutate_at(vars(aic,cut_inf:`prop_s+`),funs(
+    if_else(.==lag(.),NA_real_,.,.)
+  ))
+  
+return(d)
+
+}
+
+#msr <- msr_two; m=2; define="s-=1, s+=2"
+#msr <- msr_three_a; m=3; define="s-=1, s+=2+3"
+#msr <- msr_three_b; m=3; define="s-=1+2, s+=3"
+
+e <- sum.tbl(msr_two,2,"s-=1, s+=2") %>% 
+  rbind(sum.tbl(msr_three_a,3,"s-=1, s+=2+3")) %>% 
+  rbind(sum.tbl(msr_three_b,3,"s-=1+2, s+=3"))
+
+e %>% filter(Specie=="Pfal") %>% 
+  mutate(define=if_else(define==lag(define),NA_character_,define,define))
+e %>% filter(Specie=="Pviv") %>% 
+  mutate(define=if_else(define==lag(define),NA_character_,define,define))
+```
+
+- __SELECTION__:
+    - __3 component__ Mixture Model
+    - population definition: __s-=1, s+=2+3__
+        - for both species: 
+            + lowest size of indetermined region
+            + highest proportion of indetermined individuals
+            + seropositives proportions more similar to Sepúlveda's previous analysis.
+    - __ISSUE__:
+        - controvertial clasification of the intermediate population
+    - __ALTERNATIVE__:
+        - __2-component__
+        - __characteristics__:
+            + higher size of indetermined region,
+            + lower proportion of indetermined individuals.
+        - __advantage__:
+            + more conservative option.
+            + no further assumption needs to be made.
+
+```{r}
+msr <- #union(
+  #msr_three_a#,
+  #msr_three_b#,
+  msr_two
+#)
+```
+
+```{r}
+readr::write_rds(msr,"data/06-standard-sero.rds")
+```
+
+### Descriptive
+
+#### Proportion sero+
+
+```{r}
+msr %>% dplyr::count(Specie,label) %>% 
+  group_by(Specie) %>% mutate(tot=sum(n),prop= (n*100)/(sum(n))) %>% 
+  filter(label=="s+")
+```
+
+```{r,fig.width=3.5,fig.height=2.5}
+msr %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=Specie,fill=label)) +
+  geom_bar(position = "fill") +
+  #facet_grid(~igg) +
+  labs(title="Proportion of seropositives")
+```
+
+```{r}
+msr %>% 
+  left_join(unap9d %>% dplyr::select(ID=id,community=community_1),by="ID") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  .[!is.na(.$community),] %>% 
+  dplyr::count(Specie,community,label) %>% 
+  group_by(Specie,community) %>% mutate(tot=sum(n),prop= (n*100)/(sum(n))) %>% 
+  filter(label=="s+") %>% 
+  arrange(community) %>% 
+  dplyr::select(2,3,1,everything()) 
+```
+
+```{r,fig.width=6.25,fig.height=2.5}
+msr %>% 
+  left_join(unap9d %>% dplyr::select(ID=id,community=community_1),by="ID") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  .[!is.na(.$community),] %>% 
+  ggplot(aes(x=Specie,fill=label)) +
+  geom_bar(position = "fill") +
+  facet_grid(~community) +
+  labs(title="Proportion of seropositives") #+
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+msr %>% 
+  dplyr::select(Specie,label) %>% 
+  #filter(igg==levels(f)[i]) %>% 
+  #dplyr::select(-igg) %>% 
+  group_by(Specie,label) %>% summarise(n=n()) %>% ungroup() %>% 
+  spread(label,n)
+```
+
+```{r}
+fst <- msr %>% 
+  dplyr::select(Specie,label) %>% 
+  #filter(igg==levels(f)[i]) %>% 
+  #dplyr::select(-igg) %>% 
+  group_by(Specie,label) %>% summarise(n=n()) %>% ungroup() %>% 
+  #spread(label,n) %>% as.matrix() %>% 
+  reshape2::acast(Specie ~ label,
+                  value.var = "n") #%>% #class()
+
+fst[is.na(fst)] <- 0
+
+fisher.test(fst) %>% broom::tidy()
+```
+
+
+#### Distribution
+
+```{r,fig.width=8,fig.height=2.5}
+msr %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=Ab.units,fill=label)) +
+  #geom_bar(position = "fill") +
+  geom_histogram(position = "stack") +
+  facet_grid(~Specie,scales = "free") +
+  labs(title="Proportion of seropositives")
+```
+
+```{r}
+msr %>% 
+  filter(label=="s0") %>% 
+  group_by(Specie,label) %>% summarise(min=min(Ab.units),
+                                          #q25=quantile(Ab.units) %>% .[2],
+                                          #mean=mean(Ab.units),
+                                          #q50=quantile(Ab.units) %>% .[3],
+                                          #q75=quantile(Ab.units) %>% .[4],
+                                          max=max(Ab.units)) %>% 
+  arrange(Specie,label)
+```
+
+```{r}
+msr %>% 
+  filter(!label=="s0") %>% 
+  group_by(Specie,label) %>% summarise(#min=min(Ab.units),
+                                          #q25=quantile(Ab.units) %>% .[2],
+                                          q50=quantile(Ab.units) %>% .[3],
+                                          mean=mean(Ab.units),
+                                          sd=sd(Ab.units)#,
+                                          #q75=quantile(Ab.units) %>% .[4],
+                                          #max=max(Ab.units)
+                                          ) %>% 
+  arrange(Specie,label)
+```
+
+### join all
+
+```{r, message=FALSE}
+sero <- msr %>% select(1,ID,Specie,label) %>% 
+  mutate(sero_c=if_else(label=="s+" & Specie=="Pfal","fal",
+                        if_else(label=="s+" & Specie=="Pviv","viv","non"))) %>% 
+  dplyr::select(-label,-rowname) %>% 
+  replace_na(replace=list(sero_c="non")) %>% 
+  spread(Specie,sero_c) %>% 
+  replace_na(replace=list(Pfal="non",Pviv="non")) %>% 
+  mutate(sero_c=if_else(Pfal==Pviv,Pviv,
+                        if_else(Pfal=="fal" & Pviv=="viv","mix",
+                                if_else(Pfal=="non" & is.na(Pviv),"non",
+                                        if_else(Pviv=="non" & is.na(Pfal),"non",
+                                                if_else(Pfal=="fal","fal",
+                                                        if_else(Pviv=="viv","viv",
+                                                                NA_character_))))))) %>% 
+  dplyr::select(-Pfal,-Pviv,id=ID)
+unap10 <- unap9d %>% 
+  left_join(sero,by="id") %>% 
+  replace_na(replace=list(sero_c="non")) %>% 
+  mutate(sero_c=as.factor(sero_c))
+```
+
+#### hierarchical classification
+
+```{r}
+unap10 %>% dplyr::count(sero_c,pcr_c,micro_c) %>% arrange(desc(n))
+```
+
+#### prevalencies
+
+```{r}
+unap10 %>%
+  select(id,community_1,micro_c:sero_c) %>% 
+  group_by(community_1) %>% 
+  dplyr::count(sero_c,pcr_c,micro_c) %>% mutate(percent=n*100/sum(n)) %>%
+  arrange(community_1,desc(percent))
+  #filter(!(sero_c=="non" & pcr_c=="non" & micro_c=="non")) #%>% #ungroup()
+```
+
+#### save
+
+```{r}
+readr::write_rds(unap10,"data/06-epidemio-sero.rds")
+```
+
+```{r}
+#test post save
+unap10 %>% 
+  select(id,community_1,sero_c) %>% 
+  dplyr::count(community_1,sero_c) %>% 
+  group_by(community_1) %>% mutate(tot=sum(n),prop= (n*100)/(sum(n))) %>% 
+  filter(sero_c!="non" & sero_c!="mix") %>% 
+  arrange(community_1) #%>% 
+  #dplyr::select(2,3,1,everything()) 
+```
+
+```{r,fig.height=4,fig.width=5,eval=FALSE,echo=FALSE}
+#### compare AU and OD
+
+#std.wrg
+x <- std.nty %>% dplyr::rename(id="ID") %>% 
+  mutate(id=as.character(id)) %>% 
+  inner_join(unap10 %>% dplyr::select(id,densidad,pcr_c,sero_c),by="id") #%>% 
+  #filter(!densidad==is.na(densidad))
+
+#summary(x$Ab.unit)
+#summary(x$densidad)
+#max(x$Ab.unit,na.rm = T)
+#x %>% filter(Ab.unit==max(Ab.unit,na.rm = T))
+
+a <- x %>% 
+  ggplot(aes(mean.OD,densidad)) +
+  geom_point(aes(color=sero_c)) +
+  facet_grid(~Specie) #+scale_x_log10() +scale_y_log10()
+
+b <- x %>% 
+  ggplot(aes(Ab.unit,densidad)) +
+  geom_point(aes(color=sero_c)) +
+  facet_grid(~Specie) #+scale_x_log10() +scale_y_log10()
+
+Rmisc::multiplot(a,b,cols = 1)
+
+#x
+cor.test(x$mean.OD,x$densidad) %>% broom::tidy()
+cor.test(x$Ab.unit,x$densidad) %>% broom::tidy()
+```
+
+```{r,eval=FALSE,echo=FALSE}
+x %>% 
+  filter(sero_c=="non" & !is.na(densidad)) %>% 
+  dplyr::select(Ab.unit,sero_c,densidad) %>% 
+  summary()
+```
+
+
+## Geolocalization
+
+### Descriptive
+
+```{r}
+unapgr <- readxl::read_xlsx("data-raw/UNAP_georeference.xlsx",
+                            n_max=940) %>% 
+              dplyr::rename(id=`CÓDIGO`) %>% 
+              rename_all(funs(stringr::str_to_lower(.))) %>% 
+              dplyr::mutate(id= stringr::str_replace_all(id,
+                                                         "_",
+                                                         "-"))
+
+#unap9dgr <- unap9d %>% 
+#  inner_join(unapgr,
+#            by = "id")
+#unap9dgr
+```
+
+#### classic
+
+```{r,fig.width=10,fig.height=6,message=FALSE}
+#unapgr %>% summary()
+
+par(mfrow=c(1,2))
+
+#plot1
+maps::map(regions=sov.expand(c("Peru","Ecuador","Brazil","Chile","Bolivia","Colombia")), 
+          xlim=c(-82,-68),ylim=c(-19,0),col="gray95", fill=TRUE)
+maps::map('rivers', add=TRUE, col = "blue")
+maps::map.axes()
+map.cities(country = "Peru", capitals = 1)
+points(-73.253801, -3.743316, pch=19, col="black", cex=.5)  #plot my sample sites: IQUITOS
+text(-73.253801, -3.743316,"Iquitos",pos = 2)
+points(unapgr$longitud, unapgr$latitud, 
+       pch=19, col="red", cex=0.5)  #plot my sample sites
+
+#plot2
+maps::map(regions=sov.expand("Peru"), 
+          xlim=c(-73.42,-73.34),ylim=c(-3.87,-3.815),
+          col="white", 
+          fill=TRUE)
+maps::map('rivers', add=TRUE, col = "blue")
+maps::map.axes()
+points(unapgr$longitud, unapgr$latitud, 
+       pch=19, col="red", cex=0.5)  #plot my sample sites
+```
+
+#### ggmap
+
+```{r}
+#geocode("iquitos, zungarococha")
+
+##
+
+centered_unap <- unap9d %>% 
+  #summarise(lon=mean(longitud),
+  #          lat=mean(latitud))
+  summarise(max.lat= max(latitud),
+            min.lat= min(latitud),
+            max.lon= max(longitud),
+            min.lon= min(longitud)) %>% 
+  #ungroup() %>% 
+  mutate(lat=min.lat+((max.lat-min.lat)/2),
+         lon=min.lon+((max.lon-min.lon)/2))
+
+zunga_map <- get_map(location=c(lon=centered_unap$lon,#zunga_cen$lon,zunga_cen$lat
+                                lat=centered_unap$lat),
+                     #source = "osm", #only google works
+                     #maptype = "toner-lite", #only with stamen
+                     #color = "bw",
+                     zoom = 13)
+```
+
+- __CORREGIR:__ GPS de individuos pertenecientes a __Ninarrumi__
+
+```{r,fig.height=4.5,fig.width=7.5}
+zunga_map %>% 
+  ggmap(extent = "panel") +
+  geom_point(aes(x = longitud, y = latitud, 
+                 colour = community_1), 
+             data = unap9d, alpha = .5) +
+  #facet_wrap(~community_1)
+  theme(legend.position=c(0.17,0.84),#"bottom"
+        legend.margin = margin(0,0,0,0),
+        axis.title.y=element_blank()) + scale_colour_discrete(name="Community")
+```
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE}
+qmplot(longitud, latitud, 
+       data = unap9d, 
+       maptype = "toner-lite", #only with stamen
+       source="google", 
+       zoom = 13,
+       #check the effect of I() function
+       color = community_1,
+       #facets = "~community_1",
+       #alpha = .5,
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(legend.position=c(0.17,0.84),#"bottom"
+        legend.margin = margin(0,0,0,0),
+        axis.title.y=element_blank()) + scale_colour_discrete(name="Community")
+```
+
+##### GPS problem?
+
+```{r}
+cardinals_unap_community <- unap9d %>% 
+  group_by(community_1) %>% 
+  summarise(lat=mean(latitud),
+            lon=mean(longitud),
+            max.lat= max(latitud),
+            min.lat= min(latitud),
+            max.lon= max(longitud),
+            min.lon= min(longitud)) %>% 
+  ungroup() 
+
+centered_unap_community <- cardinals_unap_community %>% 
+  select(community_1,lat,lon)
+
+nn_cen <- centered_unap_community %>% 
+  filter(community_1==centered_unap_community$community_1[2])
+
+ll_cen <- centered_unap_community %>% 
+  #[1] Zungarococha
+  filter(community_1==centered_unap_community$community_1[1])
+
+pa_cen <- centered_unap_community %>% 
+  #[1] Zungarococha
+  filter(community_1==centered_unap_community$community_1[3])
+
+nongps <- unap9d %>% 
+  select(id,community_1,latitud,longitud) %>% 
+  filter(community_1=="Llanchama") %>% 
+  mutate(nn_distance=sqrt(((nn_cen$lon-.$longitud)^2)+((nn_cen$lat-.$latitud)^2))) %>% 
+  arrange(nn_distance) %>% filter(nn_distance<0.01) %>% 
+  arrange(id) %>% 
+  full_join(
+    unap9d %>% 
+      select(id,community_1,latitud,longitud) %>% 
+      filter(community_1=="Puerto Almendra") %>% 
+      mutate(nn_distance=sqrt(((nn_cen$lon-.$longitud)^2)+((nn_cen$lat-.$latitud)^2))) %>% 
+      arrange(nn_distance) %>% filter(nn_distance<0.01)
+  )
+
+nongps
+
+readr::write_rds(nongps,"data/06-spatial-nongps.rds")
+
+#unap9d %>% filter(stringr::str_detect(id, "LL075-|LL076-|LL077-"))
+#unap9d %>% filter(stringr::str_detect(id, "PA070-"))
+```
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE}
+qmplot(longitud, latitud, 
+       data = unap9d %>% 
+         select(id,community_1,latitud,longitud) %>% 
+         filter(community_1=="Ninarrumi") %>% 
+         full_join(nongps)
+       , maptype = "toner-lite", #only with stamen
+       source="google", 
+       zoom = 13,
+       #check the effect of I() function
+       color = community_1,
+       #facets = "~community_1",
+       #alpha = .5,
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(legend.position=c(0.17,0.84),#"bottom"
+        legend.margin = margin(0,0,0,0),
+        axis.title.y=element_blank()) + scale_colour_discrete(name="Community") +
+  ggrepel::geom_text_repel(data = nongps
+                           ,aes(label=id),
+                           size=3.5#,
+                           #box.padding = unit(.65, "lines"),segment.size =.2,
+                           #direction = "x",#nudge_x = 45,
+                           #point.padding = unit(.5, "lines")#,
+                           #segment.color = "black"
+                           )
+```
+
+###### distance
+
+```{r}
+#cardinals_unap_community
+#nongps
+
+corr_card_unap_community <- unap9d %>% 
+  select(id, community_1, latitud, longitud) %>% 
+  # OJO: aquí retiro a los individuos problematicos!!!
+  anti_join(nongps) %>% 
+  group_by(community_1) %>% 
+  summarise(lat=mean(latitud),
+            lon=mean(longitud),
+            max.lat= max(latitud),
+            min.lat= min(latitud),
+            max.lon= max(longitud),
+            min.lon= min(longitud)) %>% 
+  ungroup() 
+##
+corr_dis2nn <- corr_card_unap_community %>% 
+  filter(community_1=="Ninarrumi") %>% 
+  select(community_1,lon,lat) %>% 
+  rename(longitude=lon, latitude=lat) %>% 
+  gather(community,measure,-community_1) %>% 
+  mutate(community=as.factor(community)) %>% 
+  mutate(community=forcats::fct_relevel(community,"longitude")) %>% 
+  reshape2::acast(community_1 ~ community,
+                  value.var = "measure") #%>% class()
+
+corr_dis2ll <- corr_card_unap_community %>% 
+  filter(community_1=="Llanchama") %>% 
+  select(community_1,lon,lat) %>% 
+  rename(longitude=lon, latitude=lat) %>% 
+  gather(community,measure,-community_1) %>% 
+  mutate(community=as.factor(community)) %>% 
+  mutate(community=forcats::fct_relevel(community,"longitude")) %>% 
+  reshape2::acast(community_1 ~ community,
+                  value.var = "measure") #%>% class()
+
+corr_dis2pa <- corr_card_unap_community %>% 
+  filter(community_1=="Puerto Almendra") %>% 
+  select(community_1,lon,lat) %>% 
+  rename(longitude=lon, latitude=lat) %>% 
+  gather(community,measure,-community_1) %>% 
+  mutate(community=as.factor(community)) %>% 
+  mutate(community=forcats::fct_relevel(community,"longitude")) %>% 
+  reshape2::acast(community_1 ~ community,
+                  value.var = "measure") #%>% class()
+##
+card_dis2nn <- corr_card_unap_community %>% 
+  filter(community_1=="Ninarrumi") %>% 
+  select(community_1,min.lon,max.lat) %>% 
+  #rename(longitude=lon, latitude=lat) %>% 
+  gather(community,measure,-community_1) %>% 
+  mutate(community=as.factor(community)) %>% 
+  #mutate(community=forcats::fct_relevel(community,"longitude")) %>% 
+  reshape2::acast(community_1 ~ community,
+                  value.var = "measure") #%>% class()
+
+card_dis2ll <- corr_card_unap_community %>% 
+  filter(community_1=="Llanchama") %>% 
+  select(community_1,max.lon) %>% 
+  #rename(longitude=lon, latitude=lat) %>% 
+  gather(community,measure,-community_1) %>% 
+  mutate(community=as.factor(community)) %>% 
+  #mutate(community=forcats::fct_relevel(community,"longitude")) %>% 
+  reshape2::acast(community_1 ~ community,
+                  value.var = "measure") #%>% class()
+
+card_dis2pa <- corr_card_unap_community %>% 
+  filter(community_1=="Puerto Almendra") %>% 
+  select(community_1,min.lat) %>% 
+  #rename(longitude=lon, latitude=lat) %>% 
+  gather(community,measure,-community_1) %>% 
+  mutate(community=as.factor(community)) %>% 
+  #mutate(community=forcats::fct_relevel(community,"longitude")) %>% 
+  reshape2::acast(community_1 ~ community,
+                  value.var = "measure") #%>% class()
+```
+
+```{r}
+###
+extra_nn <- cardinals_unap_community %>% 
+  filter(community_1=="Ninarrumi") %>% 
+  select(community_1,min.lon,max.lat)
+
+nn_min.lon <- unap9d %>% 
+  select(id,community_1,latitud,longitud) %>% 
+  filter(community_1=="Ninarrumi") %>% 
+  filter(longitud==extra_nn$min.lon) %>% 
+  select(id,longitud,latitud) %>% 
+  rename(longitude=longitud, latitude=latitud) %>% 
+  gather(sample,measure,-id) %>% 
+  mutate(sample=as.factor(sample)) %>% 
+  mutate(sample=forcats::fct_relevel(sample,"longitude")) %>% 
+  reshape2::acast(id ~ sample,
+                  value.var = "measure") #%>% class()
+
+nn_max.lat <- unap9d %>% 
+  select(id,community_1,latitud,longitud) %>% 
+  filter(community_1=="Ninarrumi") %>% 
+  filter(latitud==extra_nn$max.lat) %>%
+  slice(1) %>% 
+  select(id,longitud,latitud) %>% 
+  rename(longitude=longitud, latitude=latitud) %>% 
+  gather(sample,measure,-id) %>% 
+  mutate(sample=as.factor(sample)) %>% 
+  mutate(sample=forcats::fct_relevel(sample,"longitude")) %>% 
+  reshape2::acast(id ~ sample,
+                  value.var = "measure") #%>% class()
+###
+extra_ll <- corr_card_unap_community %>% 
+  filter(community_1=="Llanchama") %>% 
+  select(community_1,max.lon)
+
+ll_max.lon <- unap9d %>% 
+  select(id,community_1,latitud,longitud) %>% 
+  filter(community_1=="Llanchama") %>% 
+  filter(longitud==extra_ll$max.lon) %>% 
+  select(id,longitud,latitud) %>% 
+  rename(longitude=longitud, latitude=latitud) %>% 
+  gather(sample,measure,-id) %>% 
+  mutate(sample=as.factor(sample)) %>% 
+  mutate(sample=forcats::fct_relevel(sample,"longitude")) %>% 
+  reshape2::acast(id ~ sample,
+                  value.var = "measure") #%>% class()
+###
+extra_pa <- corr_card_unap_community %>% 
+  filter(community_1=="Puerto Almendra") %>% 
+  select(community_1,min.lat)
+
+pa_min.lat <- unap9d %>% 
+  select(id,community_1,latitud,longitud) %>% 
+  filter(community_1=="Puerto Almendra") %>% 
+  filter(latitud==extra_pa$min.lat) %>% 
+  slice(1) %>% 
+  select(id,longitud,latitud) %>% 
+  rename(longitude=longitud, latitude=latitud) %>% 
+  gather(sample,measure,-id) %>% 
+  mutate(sample=as.factor(sample)) %>% 
+  mutate(sample=forcats::fct_relevel(sample,"longitude")) %>% 
+  reshape2::acast(id ~ sample,
+                  value.var = "measure") #%>% class()
+###
+```
+
+
+```{r}
+dis2ll <- nongps %>% 
+  filter(community_1=="Llanchama") %>% 
+  dplyr::mutate(household= stringr::str_replace(id, "(.....)-(.+)","\\1")) %>% 
+  group_by(household) %>% 
+  summarise(latitud=mean(latitud),
+            longitud=mean(longitud)) %>% 
+  select(household,longitud,latitud) %>% 
+  rename(longitude=longitud, latitude=latitud) %>% 
+  gather(sample,measure,-household) %>% 
+  mutate(sample=as.factor(sample)) %>% 
+  mutate(sample=forcats::fct_relevel(sample,"longitude")) %>% 
+  reshape2::acast(household ~ sample,
+                  value.var = "measure") #%>% class()
+
+dis2pa <- nongps %>% 
+  filter(community_1=="Puerto Almendra") %>% 
+  dplyr::mutate(household= stringr::str_replace(id, "(.....)-(.+)","\\1")) %>% 
+  group_by(household) %>% 
+  summarise(latitud=mean(latitud),
+            longitud=mean(longitud)) %>% 
+  select(household,longitud,latitud) %>% 
+  rename(longitude=longitud, latitude=latitud) %>% 
+  gather(sample,measure,-household) %>% 
+  mutate(sample=as.factor(sample)) %>% 
+  mutate(sample=forcats::fct_relevel(sample,"longitude")) %>% 
+  reshape2::acast(household ~ sample,
+                  value.var = "measure") #%>% class()
+```
+
+```{r}
+library(geosphere)
+ll_max.lon_out.ll <- geosphere::distm(ll_max.lon,dis2ll,fun = distVincentyEllipsoid)
+colnames(ll_max.lon_out.ll) <- rownames(dis2ll)
+rownames(ll_max.lon_out.ll) <- "Llanchama far.east"
+
+nn_min.lon_out.ll <- geosphere::distm(nn_min.lon,dis2ll,fun = distVincentyEllipsoid)
+colnames(nn_min.lon_out.ll) <- rownames(dis2ll)
+rownames(nn_min.lon_out.ll) <- "Ninarrumi far.west"
+
+nn_max.lat_out.pa <- geosphere::distm(nn_max.lat,dis2pa,fun = distVincentyEllipsoid)
+colnames(nn_max.lat_out.pa) <- rownames(dis2pa)
+rownames(nn_max.lat_out.pa) <- "Ninarrumi far.north"
+
+pa_min.lat_out.pa <- geosphere::distm(pa_min.lat,dis2pa,fun = distVincentyEllipsoid)
+colnames(pa_min.lat_out.pa) <- rownames(dis2pa)
+rownames(pa_min.lat_out.pa) <- "Puerto Almendra far.south"
+
+rbind(ll_max.lon_out.ll,nn_min.lon_out.ll)
+rbind(nn_max.lat_out.pa,pa_min.lat_out.pa)
+```
+
+***
+
+```{r}
+dis2xx <- nongps %>% 
+  dplyr::mutate(household= stringr::str_replace(id, "(.....)-(.+)","\\1")) %>% 
+  group_by(household) %>% 
+  summarise(latitud=mean(latitud),
+            longitud=mean(longitud)) %>% 
+  select(household,longitud,latitud) %>% 
+  #select(id,longitud,latitud) %>% 
+  rename(longitude=longitud, latitude=latitud) %>% 
+  gather(sample,measure,-household) %>% 
+  mutate(sample=as.factor(sample)) %>% 
+  mutate(sample=forcats::fct_relevel(sample,"longitude")) %>% 
+  reshape2::acast(household ~ sample,
+                  value.var = "measure") #%>% class()
+#corr_dis2nn; corr_dis2ll; corr_dis2pa
+```
+
+```{r}
+library(geosphere)
+#distm(dis2xx, rbind(dis2nn,dis2ll,dis2pa), 
+#      fun = distHaversine)
+dist <- distm(dis2xx, rbind(corr_dis2nn,corr_dis2ll,corr_dis2pa), 
+              fun = distVincentyEllipsoid)
+
+colnames(dist) <- rownames(rbind(corr_dis2nn,corr_dis2ll,corr_dis2pa))
+rownames(dist) <- rownames(dis2xx)
+
+dist
+```
+
+
+***
+
+```{r,fig.height=4.5,fig.width=7.5,eval=FALSE}
+# SAME OUTPUT WITHOUT DECLARING `zunga_map`
+get_googlemap(center = c(lon=zunga_lon,
+                         lat=zunga_lat), 
+              #color = "bw",
+              zoom = 13) %>% 
+  ggmap() +
+  geom_point(aes(x = longitud, y = latitud, 
+                 colour = community_1), 
+             data = unap9d, alpha = .5) +
+  #facet_wrap(~community_1)
+  theme(legend.position=c(0.17,0.84),#"bottom"
+        legend.margin = margin(0,0,0,0),
+        axis.title.y=element_blank())
+
+# DOES NOT WORK!
+get_stamenmap(center = c(lon=zunga_lon,
+                         lat=zunga_lat), 
+              zoom = 13) %>% 
+  ggmap() +
+  geom_point(aes(x = longitud, y = latitud, 
+                 colour = community_1), 
+             data = unap9d, alpha = .5)
+```
+
+### MAPS
+
+#### densities
+
+```{r,fig.height=4,fig.width=7,eval=FALSE,echo=FALSE}
+unap9d_a <- unap10 %>% #colnames()
+  select(id,community_1,micro_c:sero_c) %>% 
+  tidyr::unite(pcr_mic_sero, pcr_c, micro_c, sero_c,remove = FALSE) %>% 
+  mutate(pcr_mic=stringr::str_replace(pcr_mic,"(.+)_\\1","\\1_micro")) %>% 
+  mutate(pcr_mic=stringr::str_replace(pcr_mic,"non_(.+)","non")) %>% 
+  mutate(pcr_mic=stringr::str_replace(pcr_mic,"(.+)_fal","\\1_submicro")) %>% 
+  mutate(pcr_mic=stringr::str_replace(pcr_mic,"(.+)_viv","\\1_submicro")) %>% 
+  mutate(pcr_mic=stringr::str_replace(pcr_mic,"(.+)_non","\\1_submicro")) %>% #dplyr::count(pcr_mic)
+  #filter(pcr_mic!="non") %>%
+  mutate(pcr_mic= ifelse(pcr_mic=="non",NA,pcr_mic)) %>% 
+  mutate(pcr_mic=as.factor(pcr_mic)) %>% 
+  #filter(community_1==levels(unap9d$community_1)[1]) %>% 
+  #filter(pcr_mic=="viv") %>% 
+  #filter(community_1!="Llanchama" | pcr_mic!="fal") %>% 
+  anti_join(nongps) %>% #dplyr::count(pcr_mic)
+  mutate(pcr_mic=forcats::fct_relevel(pcr_mic,
+                                      "viv_micro","viv_submicro",
+                                      "fal_micro","fal_submicro",
+                                      "mix_submicro","non"
+                                      ))
+
+unap9d_a %>% 
+  ggplot(aes(longitud, latitud)) + theme_bw() + #labs(title = print(levels(unap9d$community_1)[1])) +
+  geom_point(aes(colour=pcr_mic),alpha=.5#,#size=1,#
+             ) +
+  scale_colour_discrete(na.value = "grey80") +
+  geom_density_2d(aes(colour=pcr_mic),alpha=.7,
+                  data = unap9d_a %>% filter(pcr_mic!="non")
+                  ) +
+  facet_wrap(~community_1, scales = "free")
+```
+
+```{r,fig.height=6,fig.width=9,eval=FALSE,echo=FALSE}
+unap9d_a %>% 
+  ggplot(aes(longitud, latitud)) + theme_bw() + #labs(title = print(levels(unap9d$community_1)[1])) +
+  geom_point(aes(colour=pcr_mic),alpha=.5#,size=1
+             ) +
+  scale_colour_discrete(na.value = "grey80") +
+  geom_density_2d(aes(colour=pcr_mic),alpha=.5,
+                  data = unap9d_a %>% filter(pcr_mic!="non")
+                  ) +
+  facet_wrap(~community_1+pcr_mic, scales = "free")
+```
+
+
+```{r, fig.height=3,fig.width=9,eval=FALSE,echo=FALSE}
+p <- unap10 %>% #colnames()
+  select(id,community_1,micro_c:longitud) %>% 
+  tidyr::unite(pcr_mic, pcr_c, micro_c,remove = FALSE) %>% 
+  mutate(pcr_mic=stringr::str_replace(pcr_mic,"(.+)_\\1","\\1")) %>% 
+  mutate(pcr_mic=stringr::str_replace(pcr_mic,"non_(.+)","non")) %>% 
+  mutate(pcr_mic=stringr::str_replace(pcr_mic,"(.+)_fal","\\1")) %>% 
+  mutate(pcr_mic=stringr::str_replace(pcr_mic,"(.+)_viv","\\1")) %>% 
+  mutate(pcr_mic=stringr::str_replace(pcr_mic,"(.+)_non","\\1_submicro")) %>% #dplyr::count(pcr_mic)
+  mutate(pcr_mic=as.factor(pcr_mic)) %>% 
+  #filter(community_1==levels(unap9d$community_1)[1]) %>% 
+  #filter(pcr_mic=="viv") %>% 
+  filter(pcr_mic!="non") %>% #str()
+  filter(community_1!="Llanchama" | pcr_mic!="fal") %>% 
+  filter(community_1==levels(unap10$community_1)[1]) %>% 
+  anti_join(nongps)
+
+p %>% 
+  ggplot(aes(longitud, latitud)) + theme_bw() + #labs(title = print(levels(unap9d$community_1)[1])) +
+  geom_point(#aes(colour=community_1),
+             alpha=.5) +
+  geom_density2d(aes(colour=pcr_mic)) +facet_wrap(~community_1+pcr_mic,ncol = 4)
+```
+
+***
+
+```{r, eval=FALSE}
+qmplot(longitud, latitud, 
+       data = unap10 %>% filter(community_1=="Zungarococha"), 
+       maptype = "toner-lite", #only with stamen
+       source="google", 
+       zoom = 15,
+       #check the effect of I() function
+       color = community_1,
+       facets = "micro_c~pcr_c",
+       #facets = "~micro_c",
+       #facets = "~pcr_c",
+       geom = "density2d",
+       extent = "panel")
+```
+
+
+```{r,message=FALSE, eval=FALSE}
+#library(dplyr)
+
+violent_crimes <- crime %>% 
+  # only violent crimes
+  filter(offense != "auto theft", 
+         offense != "theft", 
+         offense != "burglary") %>% 
+  # rank violent crimes
+  mutate(offense=as.factor(offense),
+         offense=forcats::fct_drop(offense)) %>% #summary()
+  # restrict to downtown
+  filter(-95.39681 <= lon & lon <= -95.34188,
+         29.73631 <= lat & lat <=  29.78400)
+  
+
+qmplot(lon, lat, 
+       data = violent_crimes, 
+       maptype = "toner-lite", 
+       #check the effect of I() function
+       color = I("red"),
+       extent = "panel")
+
+qmplot(lon, lat, 
+       data = violent_crimes, 
+       maptype = "toner-lite", 
+       #check the effect of I() function
+       color = I("red"),
+       extent = "panel",
+       geom = "density2d")
+
+qmplot(lon, lat, 
+       data = violent_crimes, 
+       maptype = "toner-lite", 
+       #check the effect of I() function
+       color = offense,
+       extent = "panel"#,
+       #geom = "density2d"
+       ) +
+  facet_wrap(~offense)
+
+qmplot(lon, lat, 
+       data = violent_crimes, 
+       maptype = "toner-lite", 
+       #check the effect of I() function
+       color = offense,
+       extent = "panel",
+       darken = .4
+       #geom = "density2d"
+       ) +
+  facet_wrap(~month)
+```
+
+### Heatmap
+
+```{r, eval=FALSE}
+robberies <- violent_crimes %>% 
+  filter(offense == "robbery")
+
+qmplot(lon, lat, 
+       data = violent_crimes, 
+       geom = "blank", zoom = 15, 
+       maptype = "toner-background", darken = .7, 
+       legend = "topleft") +
+  stat_density_2d(aes(fill = ..level..), 
+                  geom = "polygon", alpha = .3, color = NA) +
+  scale_fill_gradient2("Robbery\nPropensity", 
+                       low = "white", 
+                       mid = "yellow", 
+                       high = "red", 
+                       midpoint = 650)
+```
+
+### Clustering

@@ -1,0 +1,1895 @@
+---
+title: "Serology: Zungarococha"
+author: "Andree Valle Campos"
+date: '`r Sys.Date()`'
+output:
+  html_notebook:
+  #html_document:
+    fig_caption: yes
+    toc: yes
+    toc_depth: 5
+    toc_float:
+      collapsed: yes
+    code_folding: "hide"
+    #df_print: paged
+#bibliography: malaria.bib
+biblio-style: apalike
+link-citations: yes
+#csl: american-medical-association.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, #fig.path = "01-",
+                      warning = FALSE)
+#knitr::opts_knit$set(root.dir = '../.')
+
+options(width = 90) # expand limits of CONSOLE output
+
+#require(Hmisc)
+#mu <- markupSpecs$html   # markupSpecs is in Hmisc
+# hidden command (<code>r mu$widescreen()</code>) to use an entire wide screen. # mu$widescreen()
+#`r mu$widescreen()`
+```
+
+# SEROLOG {#serolog}
+
+## To Do
+
+- point spatial regression
+
+## Dependencies
+
+```{r,message=FALSE}
+library(tidyverse)
+library(Hmisc)
+library(rms)
+library(ggmap)
+library(stargazer)
+```
+
+```{r}
+theme_set(theme_bw())
+```
+
+
+## Input
+
+```{r}
+unap10s <- readr::read_rds("data/06-standard-sero.rds")
+unap10a <- readr::read_rds("data/06-epidemio-sero.rds") %>% 
+  mutate(community_1=forcats::fct_recode(community_1,Ninarumi="Ninarrumi")) #%>% 
+  #dplyr::count(community_1,material_pared)
+nongps <- readr::read_rds("data/06-spatial-nongps.rds") %>% 
+  mutate(community_1=forcats::fct_recode(community_1,Ninarumi="Ninarrumi"))
+```
+
+## Baseline characteristics of the study population
+
+```{r}
+unap10a_bc <- unap10a %>% 
+  select(-residence,-(Ab.unit_Pfal:longitud),micro_c,pcr_c,sero_c) %>% 
+  dplyr::mutate(age_d=cut(age_7,c(0,
+                                  quantile(unap10a$age_7,0.25,na.rm = T),
+                                  quantile(unap10a$age_7,0.50,na.rm = T),
+                                  quantile(unap10a$age_7,0.75,na.rm = T),
+                                  Inf)),
+                cuantas_tenido_malaria=cut(cuantas_tenido_malaria,
+                                           c(-Inf,
+                                             0,
+                                             1,
+                                             quantile(unap10a$cuantas_tenido_malaria,
+                                                      0.75,na.rm = T),
+                                             Inf))
+                ) %>% 
+  mutate(trabajo=as.character(trabajo),
+         trabajo_tdy=as.character(trabajo_tdy),
+         trabajo_rpl=as.character(trabajo_rpl),
+         #material_pared=as.character(material_pared),
+         epi_uso_red_dormir=as.character(epi_uso_red_dormir),
+         nivel_educacion=as.character(nivel_educacion),
+         tenido_malaria=as.character(tenido_malaria)
+         ) %>% 
+  mutate(trabajo_tdy=if_else(trabajo_tdy=="no aplica" | 
+                           trabajo_tdy=="desempleado" |
+                           trabajo_tdy=="independiente"
+                           ,NA_character_,trabajo_tdy),
+         epi_uso_red_dormir=if_else(epi_uso_red_dormir=="no sabe" | 
+                                      epi_uso_red_dormir=="recientemente",
+                                    NA_character_,epi_uso_red_dormir),
+         #material_pared=if_else(material_pared=="tripley",
+          #                      NA_character_,material_pared),
+         nivel_educacion=if_else(nivel_educacion=="inicial",
+                                NA_character_,nivel_educacion),
+         tenido_malaria=if_else(tenido_malaria=="no sabe"
+                           ,"no",tenido_malaria)
+         ) %>% #dplyr::count(tenido_malaria)
+  mutate(trabajo=if_else(age_7<15,NA_character_,trabajo),
+         trabajo_tdy=if_else(age_7<15,NA_character_,trabajo_tdy),
+         trabajo_rpl=if_else(age_7<15,NA_character_,trabajo_rpl),
+         nivel_educacion=if_else(age_7<18,NA_character_,nivel_educacion)) %>% 
+  mutate(trabajo=as.factor(trabajo),
+         trabajo_tdy=as.factor(trabajo_tdy),
+         trabajo_rpl=as.factor(trabajo_rpl),
+         #material_pared=as.factor(material_pared),
+         epi_uso_red_dormir=as.factor(epi_uso_red_dormir),
+         nivel_educacion=as.factor(nivel_educacion),
+         tenido_malaria=as.factor(tenido_malaria)
+         ) %>% #dplyr::count(tenido_malaria)
+  mutate(sex_8=forcats::fct_relevel(sex_8,"female"),
+         electricidad_red_publica=forcats::fct_relevel(electricidad_red_publica,
+                                                       "si","no"),
+         tenido_malaria=forcats::fct_relevel(tenido_malaria,"si","no"),
+         epi_uso_red_dormir=forcats::fct_relevel(epi_uso_red_dormir,"siempre","nunca")
+         ) #%>% dplyr::count(community_1,material_pared)
+#unap10a_bc
+```
+
+```{r}
+###### TEST Hmisc::upData
+unap10a_bcx <- Hmisc::upData(unap10a_bc,
+                         labels = c(sex_8="Sex", 
+                                    age_7="Age (years)", 
+                                    age_d="Age groups (years)",
+                                    community_1="Community",
+                                    nivel_educacion="Education (>=18 years)",
+                                    trabajo_tdy="Occupation (>=15 years)",
+                                    electricidad_red_publica="Electricity availability",
+                                    material_pared="Predominant material in wall",
+                                    material_piso="Predominant material in floor",
+                                    #epi_uso_redes_cama="Sleeping under bednet",
+                                    epi_uso_red_dormir="Sleeping under bednet", 
+                                    tenido_malaria="Self-report of confirmed previous episode of malaria",
+                                    cuantas_tenido_malaria="Self-report of confirmed malaria episodes"
+                         ),
+                         levels = list(
+                           electricidad_red_publica=list("Yes"="si",
+                                                    "No"="no"),
+                           tenido_malaria=list("No"="no",
+                                                            "Yes"="si"),
+                           epi_uso_red_dormir=list("Always"="desde siempre",
+                                                   "Never"="nunca"),
+                                       sex_8=list("Male"="male",
+                                                 "Female"="female"),
+                           nivel_educacion=list("Primary"="primaria",
+                                                "Incomplete secondary"="secundaria incompleta",
+                                                "Complete seconday/+"="secundaria completa / +",
+                                                "None"="sin educacion"
+                                                ),
+                           material_pared=list("Wood"="madera",
+                                               "Concrete"="cemento",
+                                               "Triplay"="tripley"),
+                        material_piso=list("Wood"="madera",
+                                               "Concrete"="cemento",
+                                           "Soil or sand"="tierra o arena")
+                                       )
+                         )
+```
+
+
+```{r}
+s1 <- Hmisc::summaryM(sex_8 + #age_7 + 
+                        age_d +
+                        #community_1 +
+                        nivel_educacion +
+                        trabajo_tdy + #trabajo_rpl +
+                        electricidad_red_publica +
+                        material_pared +
+                        material_piso +
+                        #epi_uso_redes_cama +
+                        epi_uso_red_dormir + #tenido_malaria +
+                        cuantas_tenido_malaria
+                      ~ community_1 #+ 
+                      #episodio_previo
+                      ,
+               data=unap10a_bcx,
+               overall=FALSE, test=TRUE)
+#s1
+#print(s1)
+Hmisc::latex(s1, caption='Baseline characteristics of the study population',
+      exclude1=TRUE, npct='both', file="",
+      #digits=2, eps = 0.01,
+      #prmsd=TRUE, brmsd=TRUE, msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = TRUE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%", html = TRUE
+      ) #change here for LaTeX PDF
+```
+
+### wall | floor
+
+```{r}
+unap10a_bc %>% 
+  dplyr::select(material_pared,material_piso) %>% #dplyr::count(material_pared)
+  #filter(material_pared!="tripley" & material_piso!="tierra o arena") %>% 
+  #dplyr::count(material_pared,material_piso)
+  group_by(material_pared,material_piso) %>% 
+  summarise(n= n()) %>%
+  ungroup() %>% 
+  xtabs(n ~ #material_pared + 
+          material_piso + material_pared
+        , data=.)
+```
+
+```{r,eval=FALSE,echo=FALSE}
+a <- unap10a_ra %>% 
+  dplyr::select(material_pared,material_piso,exposure_viv) %>%
+  group_by(material_pared,
+           #material_piso,
+           exposure_viv
+           ) %>% 
+  summarise(n= n()) %>%
+  ungroup() %>% 
+  xtabs(n ~ material_pared + 
+          #material_piso #+ material_pared
+          exposure_viv
+        , data=.) 
+
+a %>% #.[1:2,1:2] 
+  summary()
+
+#a %>% 
+ # rcompanion::pairwiseNominalIndependence(fisher = TRUE,gtest  = FALSE,
+  #                                        chisq  = FALSE,digits = 3)
+
+b <- unap10a_ra %>% 
+  dplyr::select(material_pared,material_piso,exposure_viv) %>%
+  group_by(#material_pared,
+           material_piso,
+           exposure_viv
+           ) %>% 
+  summarise(n= n()) %>%
+  ungroup() %>% 
+  xtabs(n ~ #material_pared + 
+          material_piso + #material_pared
+          exposure_viv
+        , data=.)
+
+b %>% #.[1:2,1:2] 
+  summary()
+
+#b %>% 
+ # rcompanion::pairwiseNominalIndependence(fisher = TRUE,gtest  = FALSE,
+  #                                        chisq  = FALSE,digits = 3)
+
+```
+
+```{r,eval=FALSE,echo=FALSE}
+wall_floor <- unap10a_bc %>% 
+  dplyr::select(material_pared,material_piso) %>% #dplyr::count(material_pared)
+  #filter(material_pared!="tripley" & material_piso!="tierra o arena") %>% 
+  #dplyr::count(material_pared,material_piso)
+  group_by(material_pared,material_piso) %>% 
+  summarise(n= n()) %>%
+  ungroup() 
+
+a <- wall_floor %>% 
+  xtabs(n ~ #material_pared + 
+          material_piso + material_pared
+        , data=.) #%>% .[1:2,1:2]
+
+b <- wall_floor %>% 
+  xtabs(n ~ material_pared + 
+          material_piso #+ material_pared
+        , data=.) #%>% .[1:2,1:2]
+
+c <- wall_floor %>% 
+  xtabs(n ~ #material_pared + 
+          material_piso + material_pared
+        , data=.) %>% .[1:2,1:2]
+
+a
+summary(a)
+
+b
+summary(b)
+
+c
+summary(c)
+
+#fisher.test(wall_floor,
+ #            alternative="two.sided"#,simulate.p.value=TRUE,B=1e7
+  #        )
+
+rcompanion::pairwiseNominalIndependence(a,fisher = TRUE,gtest  = FALSE,
+                                        chisq  = FALSE,digits = 3)
+
+rcompanion::pairwiseNominalIndependence(b,fisher = TRUE,gtest  = FALSE,
+                                        chisq  = FALSE,digits = 3)
+```
+
+## Malaria prevalence by study site
+
+- ¿Se tomará en cuenta _Incidence rate_? (ver Rosas-Aguirre et al. 2015)
+
+```{r}
+#test post save
+unap10a %>% 
+  select(id,community_1,sero_c) %>% 
+  dplyr::count(community_1,sero_c) %>% 
+  group_by(community_1) %>% mutate(tot=sum(n),prop= (n*100)/(sum(n))) %>% 
+  filter(sero_c!="non" & sero_c!="mix") %>% 
+  arrange(community_1) #%>% 
+  #dplyr::select(2,3,1,everything()) 
+```
+
+```{r}
+unap10a_pr <- unap10a %>% #dplyr::count(pcr_c)
+  select(id,community_1,micro_c:pcr_c,sero_c) 
+
+#unap10a_pr %>% dplyr::select(-community_1) %>% 
+#  gather(attribute,quality,-id) %>% 
+#  mutate(quality=if_else(quality!="non","par",quality)) %>% 
+#  filter(quality!="non") %>% 
+#  group_by(id,attribute,quality) %>% 
+#  summarise(n= n()) %>%
+#  ungroup() %>%
+#  spread(attribute, n#, fill=0
+#         ) %>% 
+#  mutate(prev_t=sum(micro_c,pcr_c,sero_c,na.rm = T))
+  #filter(micro_c!="non" | pcr_c!="non" | sero_c!="non")
+  #dplyr::mutate(micro_c=stringr::str_replace(micro_c,"non", 
+   #                                          replacement = NA_character_),
+    #            pcr_c=stringr::str_replace(pcr_c,"non", 
+     #                                        replacement = NA_character_),
+      #          sero_c=stringr::str_replace(sero_c,"non", 
+       #                                      replacement = NA_character_)
+        #        )
+```
+
+```{r}
+###### TEST Hmisc::upData
+unap10a_prx <- Hmisc::upData(unap10a_pr,
+                         labels = c(community_1="Community",
+                                    micro_c="Microscopy",
+                                    pcr_c="PCR",
+                                    sero_c="Seropositivity"#,
+                         ),
+                         levels = list(
+                           micro_c=list("P.falciparum"="fal",
+                                        "P.vivax"="viv",
+                                        "non"="non"
+                                        #"Mixed"="mix"
+                                        ),
+                           pcr_c=list("P.falciparum"="fal",
+                                        "P.vivax"="viv",
+                                      "non"="non",
+                                        "Mixed"="mix"
+                                        ),
+                           sero_c=list("Pf MSP1-19kDa"="fal",
+                                        "Pv MSP1-19kDa"="viv",
+                                       "non"="non",
+                                        "Mixed"="mix"
+                                        )
+                                       )
+                         )
+```
+
+```{r}
+s1 <- Hmisc::summaryM(micro_c + pcr_c + sero_c #+ Ab.unit_Pviv + Ab.unit_Pfal
+                      ~ community_1 #+ 
+                      #episodio_previo
+                      ,
+               data=unap10a_prx,
+               overall=FALSE, test=TRUE)
+
+Hmisc::latex(s1, caption='Malaria prevalence (microscopy and PCR) and seroprevalence by study site',
+      exclude1=FALSE, npct='both', file="", 
+      digits=2, #eps = 0.01,
+      #prmsd=TRUE, brmsd=TRUE, msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = TRUE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%", html = TRUE
+      ) #change here for LaTeX PDF
+```
+
+```{r,eval=FALSE,echo=FALSE}
+###### TEST Hmisc::upData
+unap10a_prx <- Hmisc::upData(unap10a_pr,
+                         labels = c(community_1="Community",
+                                    micro_c="Microscopy",
+                                    pcr_c="PCR",
+                                    sero_c="Seropositivity"#,
+                         ),
+                         levels = list(
+                           micro_c=list("non"="fal",
+                                        "non"="viv",
+                                        "non"="non"
+                                        #"Mixed"="mix"
+                                        ),
+                           pcr_c=list("non"="fal",
+                                        "non"="viv",
+                                      "non"="non",
+                                        "Mixed"="mix"
+                                        ),
+                           sero_c=list("non"="fal",
+                                        "viv"="viv",
+                                       "non"="non",
+                                        "non"="mix"
+                                        )
+                                       )
+                         )
+```
+
+```{r,eval=FALSE,echo=FALSE}
+s1 <- Hmisc::summaryM(micro_c + pcr_c + sero_c #+ Ab.unit_Pviv + Ab.unit_Pfal
+                      ~ community_1 #+ 
+                      #episodio_previo
+                      ,
+               data=unap10a_prx,
+               overall=FALSE, test=TRUE)
+
+Hmisc::latex(s1, caption='Malaria prevalence (microscopy and PCR) and seroprevalence by study site',
+      exclude1=FALSE, npct='both', file="", 
+      digits=2, #eps = 0.01,
+      #prmsd=TRUE, brmsd=TRUE, msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = TRUE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%"#, html = TRUE
+      ) #change here for LaTeX PDF
+```
+
+### household summary
+
+```{r}
+unap10a_pr_hh <- unap10a_pr %>% 
+  mutate(hh=stringr::str_replace(id,"(.+)-(.+)","\\1")) %>% 
+  dplyr::select(id,hh,everything()) #%>% 
+
+unap10a_pr_hh_ind <- unap10a_pr_hh %>% 
+  select(1,2) %>% 
+  group_by(hh) %>% summarise(ind_hh=n()) %>% 
+  ungroup() #%>% dplyr::count(hh)
+
+unap10a_pr_hh %>% 
+  dplyr::select(hh,micro_c:sero_c) %>% 
+  gather(attribute,quality,-hh) %>% 
+  filter(quality!="non") %>% 
+  group_by(hh,attribute,quality) %>% 
+  summarise(n= n()) %>%
+  ungroup() %>%
+  spread(quality, n#, fill=0
+         ) %>% #dplyr::count(hh)
+  left_join(unap10a_pr_hh_ind,by="hh") #%>% dplyr::count(hh)
+  #arrange(hh,attribute) %>% 
+  #mutate(value=1) #%>% spread(quality,value)
+  #group_by(hh) %>% summarise()
+```
+
+
+## Risk analysis on survey data
+
+### age distribution
+
+```{r}
+summary(unap10a_bc$age_7)
+```
+
+```{r,fig.height=3,fig.width=10}
+unap10a_bc %>% 
+  ggplot(aes(age_7)) +
+  geom_histogram() +
+  #scale_x_log10() +
+  facet_grid(~community_1)
+```
+
+
+```{r}
+unap10a_ra <- unap10a_bcx %>% 
+  mutate(exposure_viv=if_else(sero_c=="viv" | sero_c=="mix",1,0),
+         exposure_fal=if_else(sero_c=="fal" | sero_c=="mix",1,0),
+         infection_viv=if_else(pcr_c=="viv" | pcr_c=="mix",1,0),
+         infection_fal=if_else(pcr_c=="fal" | pcr_c=="mix",1,0)
+         ) %>% #dplyr::count(pcr_c,infection_fal)
+  mutate(exposure_viv=as.factor(exposure_viv),
+         exposure_fal=as.factor(exposure_fal),
+         infection_viv=as.factor(infection_viv),
+         infection_fal=as.factor(infection_fal)
+         ) %>% 
+  mutate(community_1=forcats::fct_relevel(community_1,"Zungarococha")
+         ) #%>%
+  #dplyr::count(epi_uso_red_dormir)
+  #dplyr::count(trabajo)
+dd <- rms::datadist(unap10a_ra); options(datadist='dd')
+#unap10a_ra %>% dplyr::count(age_7)
+#levels(unap10a_ra$age_7)
+```
+
+### univariate test
+
+```{r}
+#unap10a_ra #plot like baseline but wrt species-specific exposure+infection
+```
+
+
+- unadjusted
+
+```{r,eval=FALSE,echo=FALSE}
+modx <- lrm(infection_viv ~ 
+                  #sex_8 #+ 
+                  ##age_d +
+                  #age_7 +
+                  ##rms::rcs(age_7,3) + 
+                  ##rms::rcs(age_7,5) + 
+                  #community_1 + 
+                  #trabajo_rpl + 
+                  #electricidad_red_publica + 
+                  #material_pared + 
+                  #material_piso + 
+                  ##epi_uso_redes_cama + 
+                  #epi_uso_red_dormir
+                , data=unap10a_ra, 
+                x=TRUE, y=TRUE)
+modx
+```
+
+```{r,eval=FALSE,echo=FALSE}
+model.null = glm(infection_viv ~ 1
+            ,data= unap10a_ra,
+            family = binomial(link="logit")#,na.action = na.omit
+            )
+
+model.full = glm(infection_viv ~ sex_8 + 
+                  #age_d +
+                  age_7 +
+                  #rms::rcs(age_7,3) + 
+                  #rms::rcs(age_7,5) + 
+                  community_1 + trabajo_rpl + 
+                  electricidad_red_publica + 
+                  material_pared + 
+                  material_piso + 
+                  #epi_uso_redes_cama + 
+                  epi_uso_red_dormir
+            ,data= unap10a_ra,
+            family = binomial(link="logit")#,na.action = na.omit
+            )
+
+step(model.null,
+     scope = list(upper=model.full),
+             direction="both",
+             test="Chisq",
+             data=unap10a_ra)
+```
+
+```{r,eval=FALSE,echo=FALSE}
+modx <- lrm(infection_viv ~ sex_8 + 
+                  #age_d +
+                  age_7 +
+                  #rms::rcs(age_7,3) + 
+                  #rms::rcs(age_7,5) + 
+                  community_1 + trabajo_rpl + 
+                  electricidad_red_publica + 
+                  material_pared + 
+                  material_piso + 
+                  #epi_uso_redes_cama + 
+                  epi_uso_red_dormir
+                , data=unap10a_ra, 
+                x=TRUE, y=TRUE)
+```
+
+```{r}
+#options(prType='latex')
+```
+
+### Pv infection
+
+#### rms::lrm
+
+- covariate adjusted model
+
+```{r}
+modx <- lrm(infection_viv ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+#modx <- lrm(as.factor(pheno.num) ~ igg + igg1 + igg2 + igg3 + rms::rcs(igg4,3) + rms::rcs(par,3) + edad + sexo, data=mmo_x_rms, x=TRUE, y=TRUE)
+modx
+paste("AIC=",AIC(modx))
+```
+
+```{r}
+mod1 <- modx
+```
+
+##### predictive potential
+
+```{r,fig.height=3,fig.width=6}
+#anova(mod1)
+plot(anova(mod1), what='proportion chisq') # relative importance
+```
+
+```{r}
+#summary(mod1)
+#Hmisc::html(summary(mod1),file="",dec=2)
+```
+
+```{r}
+#ggplot2::ggplot(rms::Predict(mod1))
+#ggplot2::ggplot(rms::Predict(mod1,fun=plogis))
+```
+
+```{r}
+#plot(summary(mod1), log=TRUE,main = "log Odds Ratio",cex.main = 0)
+```
+
+
+##### validity
+
+```{r}
+my.valid <- rms::validate(modx, method="boot", B=1000)
+my.valid
+```
+
+##### calibration
+
+```{r,fig.height=3,fig.width=6}
+my.calib <- rms::calibrate(modx, method="boot", B=1000)
+par(bg="white", las=1)
+plot(my.calib, las=1)
+```
+
+#### penalization 
+
+```{r}
+penalty <- rms::pentrace(modx, penalty=seq(-50,50,by=.25), maxit=25)
+#penalty
+modx_pen <- update(modx, penalty=penalty$penalty)
+paste("AIC=",AIC(modx_pen))
+modx_pen
+#rms::effective.df(mod1_pen)
+#mod1_pen
+```
+
+```{r}
+#options(prType='latex')
+#summary(modx_pen)
+Hmisc::html(summary(modx_pen),file="",dec=2)
+```
+
+```{r}
+#ggplot2::ggplot(rms::Predict(modx_pen))
+ggplot2::ggplot(rms::Predict(modx_pen,fun=plogis))
+```
+
+```{r}
+plot(summary(modx_pen), log=TRUE,main = "log Odds Ratio",cex.main = 0)
+```
+
+##### validity
+
+```{r}
+my.valid <- rms::validate(modx_pen, method="boot", B=1000)
+my.valid
+```
+
+##### calibration
+
+```{r,fig.height=3,fig.width=6}
+my.calib <- rms::calibrate(modx_pen, method="boot", B=1000)
+par(bg="white", las=1)
+plot(my.calib, las=1)
+```
+
+#### backward selection
+
+```{r}
+lrm.full <- lrm(infection_viv ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra,x=TRUE, y=TRUE)
+#stargazer::stargazer(lrm.full)
+paste("AIC=",AIC(lrm.full))
+#lrm.full
+rms::fastbw(lrm.full, rule = "p", sls = 0.5)
+```
+
+##### selected model
+
+```{r}
+lrm.finl <- lrm(infection_viv ~ sex_8 + community_1, data=unap10a_ra, x=TRUE, y=TRUE)
+paste("AIC=",AIC(lrm.finl))
+lrm.finl
+#rms::fastbw(lrm.finl, rule = "p", sls = 0.5)
+```
+
+```{r}
+mod1 <- lrm.finl
+#summary(mod1)
+Hmisc::html(summary(mod1),file="",dec=2)
+```
+
+##### validity
+
+```{r}
+my.valid <- rms::validate(mod1, method="boot", B=1000)
+my.valid
+```
+
+##### calibration
+
+```{r,fig.height=3,fig.width=6}
+my.calib <- rms::calibrate(mod1, method="boot", B=1000)
+par(bg="white", las=1)
+plot(my.calib, las=1)
+```
+
+#### stargazer
+
+```{r}
+#stargazer::stargazer(modx_pen,lrm.finl,type = "text")
+#options(prType = "plain")
+
+#print(modx_pen,long=F)
+#summary(modx_pen)
+#print(lrm.finl,long=F)
+#summary(lrm.finl)
+
+stargazer::stargazer(modx_pen,lrm.finl,
+                     type = "text", apply.coef=exp, #apply.ci=exp,
+                     t.auto=F, p.auto=F, report = "vcs*",ci = T,
+                     #no.space = F,
+                     single.row = T
+                     )
+
+lrm.full_iv <- modx_pen
+lrm.finl_iv <- lrm.finl
+```
+
+### Pv exposure
+
+#### rms::lrm
+
+- covariate adjusted model
+
+```{r}
+modx <- lrm(exposure_viv ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+#modx <- lrm(as.factor(pheno.num) ~ igg + igg1 + igg2 + igg3 + rms::rcs(igg4,3) + rms::rcs(par,3) + edad + sexo, data=mmo_x_rms, x=TRUE, y=TRUE)
+modx
+paste("AIC=",AIC(modx))
+```
+
+```{r}
+mod1 <- modx
+```
+
+##### predictive potential
+
+```{r,fig.height=3,fig.width=6}
+plot(anova(mod1), what='proportion chisq') # relative importance
+#plot(rms::Predict(mod1, fun=plogis)) # predicted values
+```
+
+```{r}
+#summary(mod1)
+#Hmisc::html(summary(mod1),file="",dec=2)
+```
+
+```{r}
+#ggplot2::ggplot(rms::Predict(mod1))
+#ggplot2::ggplot(rms::Predict(mod1,fun=plogis))
+```
+
+```{r}
+#plot(summary(mod1), log=TRUE,main = "log Odds Ratio",cex.main = 0)
+```
+
+
+##### validity
+
+```{r}
+my.valid <- rms::validate(modx, method="boot", B=1000)
+my.valid
+```
+
+##### calibration
+
+```{r,fig.height=3,fig.width=6}
+my.calib <- rms::calibrate(modx, method="boot", B=1000)
+par(bg="white", las=1)
+plot(my.calib, las=1)
+```
+
+#### penalization 
+
+```{r}
+penalty <- rms::pentrace(modx, penalty=seq(-50,50,by=.25), maxit=25)
+#penalty
+modx_pen <- update(modx, penalty=penalty$penalty)
+paste("AIC=",AIC(modx_pen))
+modx_pen
+#rms::effective.df(mod1_pen)
+#mod1_pen
+```
+
+```{r}
+#summary(modx_pen)
+Hmisc::html(summary(modx_pen),file="",dec=2)
+```
+
+```{r}
+#ggplot2::ggplot(rms::Predict(modx_pen))
+ggplot2::ggplot(rms::Predict(modx_pen,fun=plogis))
+```
+
+```{r}
+plot(summary(modx_pen), log=TRUE,main = "log Odds Ratio",cex.main = 0)
+```
+
+##### validity
+
+```{r}
+my.valid <- rms::validate(modx_pen, method="boot", B=1000)
+my.valid
+```
+
+##### calibration
+
+```{r,fig.height=3,fig.width=6}
+my.calib <- rms::calibrate(modx_pen, method="boot", B=1000)
+par(bg="white", las=1)
+plot(my.calib, las=1)
+```
+
+
+#### backward selection
+
+```{r}
+lrm.full <- lrm(exposure_viv ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+paste("AIC=",AIC(lrm.full))
+#lrm.full
+rms::fastbw(lrm.full, rule = "p", sls = 0.5)
+```
+
+##### selected model
+
+```{r}
+lrm.finl <- lrm(exposure_viv ~ age_7 + community_1 + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+paste("AIC=",AIC(lrm.finl))
+lrm.finl
+#rms::fastbw(lrm.finl, rule = "p", sls = 0.5)
+```
+
+```{r}
+mod1 <- lrm.finl
+#summary(mod1)
+Hmisc::html(summary(mod1),file="",dec=2)
+```
+
+##### validity
+
+```{r}
+my.valid <- rms::validate(mod1, method="boot", B=1000)
+my.valid
+```
+
+##### calibration
+
+```{r,fig.height=3,fig.width=6}
+my.calib <- rms::calibrate(mod1, method="boot", B=1000)
+par(bg="white", las=1)
+plot(my.calib, las=1)
+```
+
+#### stargazer
+
+```{r}
+#stargazer::stargazer(modx_pen,lrm.finl,type = "text")
+#options(prType = "plain")
+
+#print(modx_pen,long=F)
+#summary(modx_pen)
+#print(lrm.finl,long=F)
+#summary(lrm.finl)
+
+stargazer::stargazer(modx_pen,lrm.finl,
+                     type = "text", apply.coef=exp, #apply.ci=exp,
+                     t.auto=F, p.auto=F, report = "vcs*",ci = T,
+                     #no.space = F,
+                     single.row = T
+                     )
+
+lrm.full_ev <- modx_pen
+lrm.finl_ev <- lrm.finl
+```
+
+### Pf infection
+
+- 12 casos de 824 observaciones.
+    - _overfitting_: 
+        + Dxy 0.6 (model performance) 
+        + c-index 0.8 (discrimination power) 
+        - R2 0.17 (fit)
+
+#### rms::lrm
+
+- covariate adjusted model
+
+```{r}
+modx <- lrm(infection_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared +  material_piso + epi_uso_red_dormir, data=unap10a_ra %>% filter(community_1!="Puerto Almendra"), x=TRUE, y=TRUE)
+#modx <- lrm(as.factor(pheno.num) ~ igg + igg1 + igg2 + igg3 + rms::rcs(igg4,3) + rms::rcs(par,3) + edad + sexo, data=mmo_x_rms, x=TRUE, y=TRUE)
+modx
+paste("AIC=",AIC(modx))
+```
+```{r}
+mod1 <- modx
+```
+
+##### predictive potential
+
+```{r,fig.height=3,fig.width=6}
+plot(anova(mod1), what='proportion chisq') # relative importance
+#plot(rms::Predict(mod1, fun=plogis)) # predicted values
+```
+
+```{r}
+#summary(mod1)
+#Hmisc::html(summary(mod1),file="",dec=2)
+```
+
+```{r}
+#ggplot2::ggplot(rms::Predict(mod1))
+#ggplot2::ggplot(rms::Predict(mod1,fun=plogis))
+```
+
+```{r}
+#plot(summary(mod1), log=TRUE,main = "log Odds Ratio",cex.main = 0)
+```
+
+
+##### validity
+
+```{r}
+my.valid <- rms::validate(modx, method="boot", B=1000)
+my.valid
+```
+
+##### calibration
+
+```{r,fig.height=3,fig.width=6}
+my.calib <- rms::calibrate(modx, method="boot", B=1000)
+par(bg="white", las=1)
+plot(my.calib, las=1)
+```
+
+#### penalization 
+
+```{r}
+penalty <- rms::pentrace(modx, penalty=seq(-50,50,by=.25), maxit=25)
+#penalty
+modx_pen <- update(modx, penalty=penalty$penalty)
+paste("AIC=",AIC(modx_pen))
+modx_pen
+#rms::effective.df(mod1_pen)
+#mod1_pen
+```
+
+```{r}
+summary(modx_pen)
+Hmisc::html(summary(modx_pen),file="",dec=2)
+```
+
+```{r}
+#ggplot2::ggplot(rms::Predict(modx_pen))
+ggplot2::ggplot(rms::Predict(modx_pen,fun=plogis))
+```
+
+```{r}
+plot(summary(modx_pen), log=TRUE,main = "log Odds Ratio",cex.main = 0)
+```
+
+##### validity
+
+```{r}
+my.valid <- rms::validate(modx_pen, method="boot", B=1000)
+my.valid
+```
+
+##### calibration
+
+```{r,fig.height=3,fig.width=6}
+my.calib <- rms::calibrate(modx_pen, method="boot", B=1000)
+par(bg="white", las=1)
+plot(my.calib, las=1)
+```
+
+
+#### backward selection
+
+```{r}
+lrm.full <- lrm(infection_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+paste("AIC=",AIC(lrm.full))
+#lrm.full
+rms::fastbw(lrm.full, rule = "p", sls = 0.5)
+```
+
+##### selected model
+
+```{r}
+lrm.finl <- lrm(infection_fal ~ electricidad_red_publica, data=unap10a_ra, x=TRUE, y=TRUE)
+paste("AIC=",AIC(lrm.finl))
+lrm.finl
+#rms::fastbw(lrm.finl, rule = "p", sls = 0.5)
+```
+
+```{r}
+mod1 <- lrm.finl
+#summary(mod1)
+Hmisc::html(summary(mod1),file="",dec=2)
+```
+
+##### validity
+
+```{r}
+#my.valid <- rms::validate(mod1, method="boot", B=1000)
+#my.valid
+```
+
+##### calibration
+
+```{r,fig.height=3,fig.width=6}
+#my.calib <- rms::calibrate(mod1, method="boot", B=1000)
+#par(bg="white", las=1)
+#plot(my.calib, las=1)
+```
+
+#### stargazer
+
+```{r}
+#stargazer::stargazer(modx_pen,lrm.finl,type = "text")
+#options(prType = "plain")
+
+#print(modx_pen,long=F)
+#summary(modx_pen)
+#print(lrm.finl,long=F)
+#summary(lrm.finl)
+
+stargazer::stargazer(modx_pen,lrm.finl,
+                     type = "text", apply.coef=exp, #apply.ci=exp,
+                     t.auto=F, p.auto=F, report = "vcs*",ci = T,
+                     #no.space = F,
+                     single.row = T
+                     )
+
+lrm.full_if <- modx_pen
+lrm.finl_if <- lrm.finl
+```
+
+### Pf exposure
+
+- 44 casos de 824 observaciones.
+    - _overfitting_: 
+        + Dxy 0.6 (model performance) 
+        + c-index 0.8 (discrimination power) 
+        - R2 0.211 (fit)
+
+#### rms::lrm
+
+- covariate adjusted model
+
+```{r}
+modx <- lrm(exposure_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+#modx <- lrm(as.factor(pheno.num) ~ igg + igg1 + igg2 + igg3 + rms::rcs(igg4,3) + rms::rcs(par,3) + edad + sexo, data=mmo_x_rms, x=TRUE, y=TRUE)
+modx
+paste("AIC=",AIC(modx))
+```
+```{r}
+mod1 <- modx
+```
+
+##### predictive potential
+
+```{r,fig.height=3,fig.width=6}
+plot(anova(mod1), what='proportion chisq') # relative importance
+#plot(rms::Predict(mod1, fun=plogis)) # predicted values
+```
+
+```{r}
+#summary(mod1)
+#Hmisc::html(summary(mod1),file="",dec=2)
+```
+
+```{r}
+#ggplot2::ggplot(rms::Predict(mod1))
+#ggplot2::ggplot(rms::Predict(mod1,fun=plogis))
+```
+
+```{r}
+#plot(summary(mod1), log=TRUE,main = "log Odds Ratio",cex.main = 0)
+```
+
+
+##### validity
+
+```{r}
+my.valid <- rms::validate(modx, method="boot", B=1000)
+my.valid
+```
+
+##### calibration
+
+```{r,fig.height=3,fig.width=6}
+my.calib <- rms::calibrate(modx, method="boot", B=1000)
+par(bg="white", las=1)
+plot(my.calib, las=1)
+```
+
+#### penalization 
+
+```{r}
+penalty <- rms::pentrace(modx, penalty=seq(-50,50,by=.25), maxit=25)
+#penalty
+modx_pen <- update(modx, penalty=penalty$penalty)
+paste("AIC=",AIC(modx_pen))
+modx_pen
+#rms::effective.df(mod1_pen)
+#mod1_pen
+```
+
+```{r}
+#summary(modx_pen)
+Hmisc::html(summary(modx_pen),file="",dec=2)
+```
+
+```{r}
+#ggplot2::ggplot(rms::Predict(modx_pen))
+ggplot2::ggplot(rms::Predict(modx_pen,fun=plogis))
+```
+
+```{r}
+plot(summary(modx_pen), log=TRUE,main = "log Odds Ratio",cex.main = 0)
+```
+
+##### validity
+
+```{r}
+my.valid <- rms::validate(modx_pen, method="boot", B=1000)
+my.valid
+```
+
+##### calibration
+
+```{r,fig.height=3,fig.width=6}
+my.calib <- rms::calibrate(modx_pen, method="boot", B=1000)
+par(bg="white", las=1)
+plot(my.calib, las=1)
+```
+
+
+#### backward selection
+
+```{r}
+lrm.full <- lrm(exposure_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+paste("AIC=",AIC(lrm.full))
+#lrm.full
+rms::fastbw(lrm.full, rule = "p", sls = 0.1)#changed default
+```
+
+##### selected model
+
+```{r}
+lrm.finl <- lrm(exposure_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+paste("AIC=",AIC(lrm.finl))
+lrm.finl
+#rms::fastbw(lrm.finl, rule = "p", sls = 0.5)
+```
+
+```{r}
+mod1 <- lrm.finl
+#summary(mod1)
+Hmisc::html(summary(mod1),file="",dec=2)
+```
+
+##### validity
+
+```{r}
+my.valid <- rms::validate(mod1, method="boot", B=1000)
+my.valid
+```
+
+##### calibration
+
+```{r,fig.height=3,fig.width=6}
+my.calib <- rms::calibrate(mod1, method="boot", B=1000)
+par(bg="white", las=1)
+plot(my.calib, las=1)
+```
+
+#### stargazer
+
+```{r}
+#stargazer::stargazer(modx_pen,lrm.finl,type = "text")
+#options(prType = "plain")
+
+#print(modx_pen,long=F)
+#summary(modx_pen)
+#print(lrm.finl,long=F)
+#summary(lrm.finl)
+
+stargazer::stargazer(modx_pen,lrm.finl,
+                     type = "text", apply.coef=exp, #apply.ci=exp,
+                     t.auto=F, p.auto=F, report = "vcs*",ci = T,
+                     #no.space = F,
+                     single.row = T
+                     )
+
+lrm.full_ef <- modx_pen
+lrm.finl_ef <- lrm.finl
+```
+
+### Stargazer presentation
+
+```{r}
+#lrm.full_iv <- lrm(infection_viv ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+#lrm.full_ev <- lrm(exposure_viv ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+#lrm.finl_iv <- lrm(infection_viv ~ sex_8 + community_1, data=unap10a_ra, x=TRUE, y=TRUE)
+#lrm.finl_ev <- lrm(exposure_viv ~ age_7 + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+
+#lrm.full_if <- lrm(infection_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+#lrm.full_ef <- lrm(exposure_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+#lrm.finl_if <- lrm(infection_fal ~ electricidad_red_publica, data=unap10a_ra, x=TRUE, y=TRUE)
+#lrm.finl_ef <- lrm(exposure_fal ~ age_7 + community_1 + material_pared, data=unap10a_ra, x=TRUE, y=TRUE)
+
+#stargazer::stargazer(lrm.full_ev,lrm.finl_ev,
+ #                    lrm.full_iv,lrm.finl_iv,
+  #                   type = "latex", apply.coef=exp, #apply.ci=exp,
+   #                  t.auto=F, p.auto=F, report = "vcs*",ci = T,
+    #                 #no.space = F,
+     #                single.row = T,
+      #               title="Multivariate and backward selected model for P.vivax exposure and infection")
+
+#stargazer::stargazer(lrm.full_ef,lrm.finl_ef,
+ #                    lrm.full_if,lrm.finl_if,
+  #                   type = "latex", apply.coef=exp, #apply.ci=exp,
+   #                  t.auto=F, p.auto=F, report = "vcs*",ci = T,
+    #                 #no.space = F,
+     #                single.row = T,
+      #               title="Multivariate and backward selected model for P.falciparum exposure and infection")
+
+stargazer::stargazer(lrm.full_iv,lrm.finl_iv,
+                     lrm.full_if,lrm.finl_if,
+                     type = "latex", apply.coef=exp, #apply.ci=exp,
+                     t.auto=F, p.auto=F, report = "vcs*",ci = T,
+                     #no.space = F,
+                     single.row = T,
+                     title="Multivariate and backward selected model for species-specific malaria infection")
+
+stargazer::stargazer(lrm.full_ev,lrm.finl_ev,
+                     lrm.full_ef,lrm.finl_ef,
+                     type = "latex", apply.coef=exp, #apply.ci=exp,
+                     t.auto=F, p.auto=F, report = "vcs*",ci = T,
+                     #no.space = F,
+                     single.row = T,
+                     title="Multivariate and backward selected model for species-specific malaria exposure")
+
+
+```
+
+```{r}
+options(prType = "plain") #latex #html
+```
+
+## Transmission intensity curves
+
+```{r}
+Lccm1 <- function(theta,data) {
+# theta : vector of length two, including h, r (parameters to be maximized)
+# h = seroconversion rate, r = seroreversion rate
+# (to maximize over a single parameter, e.g. h, replace theta with
+# separate args for h and r and pass an r value to the function)
+# data : data frame with columns = age / n / k
+h <- rep(theta[1],nrow(data))
+r <- rep(theta[2],nrow(data))
+t <- data[,1]
+n <- data[,2]
+k <- data[,3]
+p <- h/(r+h)*(1-exp(-(r+h)*t))
+# negative log likelihood function
+sum( - (k)*log(p) - (n-k)*log(1-p) )
+}
+```
+
+```{r}
+unap10a_rc <- 
+  unap10a %>% 
+  mutate(exposure_viv=if_else(sero_c=="viv" | sero_c=="mix",1,0),
+         exposure_fal=if_else(sero_c=="fal" | sero_c=="mix",1,0),
+         infection_viv=if_else(pcr_c=="viv" | pcr_c=="mix",1,0),
+         infection_fal=if_else(pcr_c=="fal" | pcr_c=="mix",1,0)
+         ) %>% #dplyr::count(pcr_c,infection_fal)
+  #mutate(exposure_viv=as.factor(exposure_viv),
+   #      exposure_fal=as.factor(exposure_fal),
+    #     infection_viv=as.factor(infection_viv),
+     #    infection_fal=as.factor(infection_fal)
+      #   ) %>% 
+  dplyr::select(id,age_7,community_1,
+                exposure_viv:infection_fal) %>% 
+  group_by(community_1,age_7) %>% summarise(tot.sero.viv=n(),
+                                sum.sero.viv=sum(exposure_viv),
+                                sero.viv.p=sum(exposure_viv)/n(),
+                                tot.sero.fal=n(),
+                                sum.sero.fal=sum(exposure_fal),
+                                sero.fal.p=sum(exposure_fal)/n()
+                                ) %>% 
+  ungroup()
+```
+
+```{r,fig.height=5,fig.width=4}
+unap10a_rc %>% 
+  dplyr::select(community_1,age_7,#sum.sero.viv,
+                tot.sero.viv,
+                #sum.sero.fal,
+                tot.sero.fal#,5,8
+                ) %>% 
+  gather(Specie,sero.t,-community_1,-age_7#,-sero.viv.p,-sero.fal.p
+         ) %>% 
+  ggplot(aes(age_7,sero.t)) +
+  geom_point() +
+  geom_hline(yintercept = 7, colour="red") +
+  facet_grid(community_1~Specie)
+```
+
+```{r,fig.height=4,fig.width=12}
+unap10a_rc %>% 
+  dplyr::select(community_1,age_7,#tot.sero.viv,tot.sero.fal,
+                5,8) %>% 
+  gather(Specie,sero.p,-community_1,-age_7) %>% 
+  ggplot(aes(age_7,sero.p)) +
+  geom_point() +
+  facet_grid(Specie~community_1)
+```
+
+```{r,fig.height=4,fig.width=12}
+unap10a_rc_v <- unap10a_rc %>% 
+  dplyr::select(1:5,tot.sero.viv) %>% 
+  filter(!(sero.viv.p==0 | sero.viv.p==1)) #%>% #glimpse()
+  #filter(tot.sero.viv>=7) %>% dplyr::select(-tot.sero.viv)
+
+unap10a_rc_f <- unap10a_rc %>% 
+  dplyr::select(1,2,6:8,tot.sero.fal) %>% 
+  filter(!(sero.fal.p==0 | sero.fal.p==1)) #%>% #dplyr::count(community_1)
+  #filter(tot.sero.fal>=7) %>% dplyr::select(-tot.sero.fal)
+
+
+a <- unap10a_rc_v %>% group_by(community_1) %>% 
+  summarise(min=min(age_7),max=max(age_7))
+f <- levels(as.factor(a$community_1))
+df <- data_frame(community_1=as.character(),
+                 age_7=as.double())
+for (i in 1:length(f)) {
+df_p <- data_frame(community_1=f[i],
+           age_7=seq(as.numeric(a[i,2]),as.numeric(a[i,3]),1))
+df <- union(df,df_p)
+}
+df <- df %>% arrange(community_1,age_7)
+df <- union(df %>% mutate(Specie="viv"),df %>% mutate(Specie="fal"))
+
+f <- levels(unap10a_rc_v$community_1)
+revcat_v <- data_frame(community_1=as.character(),
+                     h=as.double(),
+                     r=as.double())
+for (i in 1:length(f)) {#i=1
+revcat_p <- optim(c(0.1,0.1),fn=Lccm1,
+                  data=unap10a_rc_v %>% 
+                    filter(community_1==f[i]) %>% #i
+                    dplyr::select(-1),
+                  hessian=TRUE) %>% 
+  .$par %>% 
+  data_frame(community_1=f[i],#i
+             h=.[1],
+             r=.[2]) %>% 
+  dplyr::select(-1) %>% slice(1)
+revcat_v <- union(revcat_v,revcat_p)
+}
+
+f <- levels(unap10a_rc_f$community_1)
+revcat_f <- data_frame(community_1=as.character(),
+                     h=as.double(),
+                     r=as.double())
+for (i in 1:length(f)) {#i=3
+revcat_p <- optim(c(0.1,0.1),fn=Lccm1,
+                  data=unap10a_rc_f %>% 
+                    filter(community_1==f[i]) %>% #i
+                    dplyr::select(-1),
+                  hessian=TRUE) %>% 
+  .$par %>% 
+  data_frame(community_1=f[i],#i
+             h=.[1],
+             r=.[2]) %>% 
+  dplyr::select(-1) %>% slice(1)
+revcat_f <- union(revcat_f,revcat_p)
+}
+
+revcat <- union(revcat_v %>% mutate(Specie="viv"),
+      revcat_f %>% mutate(Specie="fal"))
+
+#h <- revcat$par[1] #seroconversion rate
+#r <- revcat$par[2] #seroreversion rate
+
+unap10a_rc_a <- union(unap10a_rc_v %>% 
+  mutate(Specie="viv") %>% 
+  dplyr::rename(tot.sero=tot.sero.viv,
+                sum.sero=sum.sero.viv,
+                sero.p=sero.viv.p),
+  unap10a_rc_f %>% 
+  mutate(Specie="fal") %>% 
+  dplyr::rename(tot.sero=tot.sero.fal,
+                sum.sero=sum.sero.fal,
+                sero.p=sero.fal.p))
+
+revcat_a <- df %>% full_join(unap10a_rc_a,by=c("age_7","community_1","Specie")) %>% 
+  full_join(revcat,by=c("community_1","Specie")) %>% 
+  mutate(y=h/(r+h)*(1-exp(-(r+h)*age_7)))
+  #mutate(community_1=as.factor(community_1))
+#h <- revcat$h
+#r <- revcat$r
+
+unap10a_rc_a %>% 
+  #filter(community_1==f[1]) %>% 
+  ggplot(aes(age_7,sero.p)) +
+  geom_point() +
+  facet_grid(Specie~community_1) +
+  geom_line(aes(y = y), data = revcat_a, colour = "black") +
+  geom_text(aes(x,y,label=lab),
+            data = revcat %>% 
+              mutate(x=38,y=0.05) %>% 
+              mutate(lab=paste0("SCR=",h %>% format(digits=2),
+                                ", SRR=",r %>% format(digits=2)))
+            ,vjust=.5,hjust=0.05,size=3) #+
+  #stat_smooth(formula = )
+```
+
+## Acquisition models
+
+```{r}
+#unap10a#age vs log(Ab.units)
+```
+
+
+## Spatial point patterns
+
+### General mapping
+
+```{r,eval=FALSE,echo=FALSE}
+library(maps)
+library(mapdata)
+
+#par(mfrow=c(1,2))
+#
+maps::map(regions=maps::sov.expand(c("Peru","Ecuador","Brazil","Chile",
+                                     "Bolivia","Colombia","Venezuela")), 
+          xlim=c(-82,-35),ylim=c(-59,20),col="gray95", fill=TRUE)
+maps::map('rivers', add=TRUE, col = "blue")
+maps::map.axes()
+#map.cities(country = "Peru", capitals = 1)
+points(-73.253801, -3.743316, pch=19, col="black", cex=.5)  #plot my sample sites: IQUITOS
+#text(-73.253801, -3.743316,"Iquitos",pos = 2)
+```
+
+```{r}
+library(maps)
+library(mapdata)
+#plot1
+maps::map(regions=maps::sov.expand(c("Peru","Ecuador","Brazil","Chile",
+                                     "Bolivia","Colombia")), 
+          xlim=c(-82,-68),ylim=c(-19,0),col="gray95", fill=TRUE)
+maps::map('rivers', add=TRUE, col = "blue")
+maps::map.axes()
+#map.cities(country = "Peru", capitals = 1)
+points(-73.253801, -3.743316, pch=19, col="black", cex=.5)  #plot my sample sites: IQUITOS
+text(-73.253801, -3.743316,"Iquitos",pos = 2,cex=1.4)
+points(unap10a$longitud, unap10a$latitud, 
+       pch=19, col="red", cex=0.5)  #plot my sample sites
+```
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+per <- ggmap::get_googlemap("amazon golf course",zoom = 12,
+                            maptype = "roadmap"
+                      )
+ggmap::ggmap(per) +
+  geom_point(aes(x=longitud, y=latitud,
+                 colour=community_1), data=unap10a) +
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        legend.position=c(0.88,0.17),#"bottom" #google
+        #legend.position=c(0.9,0.2),#"stamen"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  scale_colour_discrete(name="Community") +
+  xlab("Longitud") +
+  ylab("Latitud") +
+  coord_fixed(ylim = c(-3.87,-3.72)#, ratio = 2/1
+              ) +
+  ggsn::scalebar(dist = 2, st.size=3, height=0.01, dd2km = TRUE, model = 'WGS84',
+                 x.min=-73.40,x.max=-73.28,y.min=-3.86,y.max=-3.76,
+                 location = "bottomright") +
+  ggsn::north(x.min=-73.40,x.max=-73.21,y.min=-3.86,y.max=-3.722,scale = .2,symbol = 5)
+```
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = unap10a, 
+       #maptype = "toner-lite", #only with stamen
+       source="google", #stamen
+       #maptype = "terrain",#"terrain",#"roadmap",
+       zoom = 13,
+       #size = c(640, 640),
+       #urlonly = TRUE,
+       scale=3,
+       #check the effect of I() function
+       color = community_1,
+       alpha = I(.05),
+       #facets = "~community_1",
+       #alpha = .5,
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        legend.position=c(0.83,0.17),#"bottom" #google
+        #legend.position=c(0.9,0.2),#"stamen"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + scale_colour_discrete(name="Community")
+```
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = unap10a, 
+       #maptype = "toner-lite", #only with stamen
+       #source="google", #stamen
+       #maptype = "terrain",#"terrain",#"roadmap",
+       zoom = 13,
+       #size = c(640, 640),
+       #urlonly = TRUE,
+       #scale=3,
+       #check the effect of I() function
+       color = community_1,
+       alpha = I(.2),
+       #mapcolor = "bw",
+       #facets = "~community_1",
+       #alpha = .5,
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        legend.position=c(0.9,0.2),#"stamen"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  scale_colour_discrete(name="Community") +
+  coord_fixed(ylim = c(-3.863,-3.824)#, ratio = 2/1
+              ) +
+  ggsn::scalebar(dist = 1, st.size=3, height=0.01, dd2km = TRUE, model = 'WGS84',
+                 x.min=-73.40,x.max=-73.357,y.min=-3.86,y.max=-3.83,
+                 location = "bottomright") +
+  ggsn::north(x.min=-73.40,x.max=-73.339,y.min=-3.86,y.max=-3.825)
+```
+
+```{r,eval=FALSE,echo=FALSE}
+library(lattice)
+library(sp)
+library(rgdal)
+
+# load in and format the meuse dataset (see bivand, pebesma, and gomez-rubio)
+data(meuse)
+coordinates(meuse) <- c("x", "y")
+proj4string(meuse) <- CRS("+init=epsg:28992")
+meuse <- spTransform(meuse, CRS("+proj=longlat +datum=WGS84"))
+
+library(gstat)
+data(meuse.grid)
+coordinates(meuse.grid) <- c("x", "y")
+proj4string(meuse.grid) <- CRS("+init=epsg:28992")
+meuse.grid <- spTransform(meuse.grid, CRS("+proj=longlat +datum=WGS84"))
+
+m <- data.frame(slot(meuse, "coords"), slot(meuse, "data"))
+names(m)[1:2] <- c("lon", "lat")
+
+mg <- data.frame(slot(meuse.grid, "coords"), slot(meuse.grid, "data"))
+names(mg)[1:2] <- c("lon", "lat")
+
+qmplot(lon, lat, data = mg, shape = I(15), zoom = 14, legend = "topleft") +
+  geom_point(aes(size = zinc), data = m, color = "green",alpha=.5) +
+  scale_size("Zinc (ppm)")
+```
+
+### Hierarchical mapping
+
+#### ggplots
+
+```{r}
+dat <- unap10a %>% 
+  replace_na(replace=list(sero_c="non")) %>% 
+  anti_join(nongps,by = "id") %>% 
+  dplyr::select(id,community_1,micro_c,pcr_c,sero_c,latitud,longitud) %>% 
+  mutate(micro_c=as.character(micro_c),
+               pcr_c=as.character(pcr_c),
+               sero_c=as.character(sero_c)
+               ) %>% 
+  mutate(sero_c=forcats::fct_relevel(sero_c,"fal","viv","mix"),
+         pcr_c=forcats::fct_relevel(pcr_c,"fal","viv","mix"),
+         micro_c=forcats::fct_relevel(micro_c,"fal","viv","mix"))
+
+dat_x <- dat %>% 
+  gather(key=attribute,value=quality,micro_c,pcr_c,sero_c) %>% 
+  mutate(quality=as.factor(quality)) %>% 
+  mutate(quality=forcats::fct_relevel(quality,"fal","viv","mix"))
+        #mutate(micro_c=if_else(micro_c=="non",NA_character_,micro_c),
+         #      pcr_c=if_else(pcr_c=="non",NA_character_,pcr_c),
+          #     sero_c=if_else(sero_c=="non",NA_character_,sero_c)) #%>% 
+  
+```
+
+```{r,fig.height=8.5,fig.width=14,eval=FALSE,echo=FALSE}
+dat_x %>% 
+  #filter(!quality=="non") %>% 
+  ggplot(aes(longitud, latitud)) +
+  geom_point(aes(colour=quality,
+                 #shape=quality,
+                 size=desc(quality)
+                 ),alpha=0.3) +
+  #scale_size_discrete("quality",breaks=c(-4,-3,-2,-1),labels=c(4,3,2,1)) +
+  #scale_color_viridis_d() +
+  #geom_density_2d(aes(colour=quality),alpha=0.5) +
+  facet_wrap(attribute~community_1
+             ,scales = "free",
+             ncol = 4) +
+  theme(axis.text.x = element_text(angle = 15, hjust = 1)) #+
+  #coord_equal(ratio = 1)
+  #coord_fixed(ratio = 1)
+```
+
+```{r,fig.height=3,fig.width=14,eval=FALSE,echo=FALSE}
+dat %>% 
+  #filter(!sero_c=="non") %>% 
+  ggplot(aes(longitud, latitud)) +
+  geom_point(aes(colour=sero_c,
+                 #shape=sero_c,
+                 size=desc(sero_c)),alpha=0.5) +
+  facet_wrap(~community_1,scales = "free",ncol = 4)
+```
+
+```{r,fig.height=3,fig.width=14,eval=FALSE,echo=FALSE}
+dat %>% 
+  filter(!pcr_c=="non") %>% 
+  ggplot(aes(longitud, latitud)) +
+  geom_point(aes(colour=pcr_c,
+                 #shape=sero_c,
+                 size=desc(pcr_c)),alpha=0.5) +
+  facet_wrap(~community_1,scales = "free",ncol = 4)
+```
+
+```{r,fig.height=3,fig.width=14,eval=FALSE,echo=FALSE}
+dat %>% 
+  filter(!pcr_c=="non") %>% 
+  ggplot(aes(longitud, latitud)) +
+  geom_point(aes(colour=micro_c,
+                 #shape=sero_c,
+                 size=desc(micro_c)),alpha=0.5) +
+  facet_wrap(~community_1,scales = "free",ncol = 4)
+```
+
+#### ggmaps
+
+##### all individuals
+
+```{r,fig.height=2.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = dat_x %>% 
+         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
+         filter(community_1=="Zungarococha" & !quality=="non") %>% 
+         add_row(community_1="Zungarococha",attribute="sero_c",quality="mix")
+       , 
+       zoom = 13,
+       #color = community_1,
+       #color = quality,
+       #size= desc(quality),
+       alpha = I(.4),
+       extent = "panel") + 
+  #facet_wrap(community_1~attribute,ncol = 1) +
+  facet_wrap(~community_1,ncol = 1) +
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        #legend.position=c(0.93,0.135),
+        legend.position=c(0.78,0.03),legend.direction = "horizontal",#"stamen"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) +
+  #scale_size_continuous("quality",breaks=c(-3,-2,-1),labels = c("viv","fal","mix")) +
+  #scale_color_discrete("quality",breaks=c("viv","fal","mix"),
+  #                       labels = c("viv","fal","mix")) +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1))
+  #scale_colour_discrete(name="Community") + 
+  #geom_point(aes(color = quality),alpha=.5)
+```
+
+```{r,fig.height=2.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = dat_x %>% 
+         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
+         filter(community_1=="Puerto Almendra" & !quality=="non") %>% 
+         mutate(community_1=forcats::fct_recode(community_1,"Prto. A"="Puerto Almendra"))
+         #add_row(community_1="Puerto Almendra",attribute="sero_c",quality="mix")
+       , 
+       zoom = 13,
+       #color = community_1,
+       #color = quality,
+       #size= desc(quality),
+       alpha = I(.4),
+       extent = "panel") + 
+  #facet_wrap(community_1~attribute,ncol = 1) +
+  facet_wrap(~community_1,ncol = 1) +
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        #legend.position=c(0.93,0.135),
+        legend.position=c(0.78,0.03),legend.direction = "horizontal",#"stamen"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) +
+  #scale_size_continuous("quality",breaks=c(-3,-2,-1),labels = c("viv","fal","mix")) +
+  #scale_color_discrete("quality",breaks=c("viv","fal","mix"),
+  #                       labels = c("viv","fal","mix")) +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1))
+  #scale_colour_discrete(name="Community") + 
+  #geom_point(aes(color = quality),alpha=.5)
+```
+
+```{r,fig.height=2.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = dat_x %>% 
+         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
+         filter(community_1=="Ninarumi" & !quality=="non") #%>% 
+         #add_row(community_1="Zungarococha",attribute="sero_c",quality="mix")
+       , 
+       zoom = 13,
+       #color = community_1,
+       #color = quality,
+       #size= desc(quality),
+       alpha = I(.4),
+       extent = "panel") + 
+  #facet_wrap(community_1~attribute,ncol = 1) +
+  facet_wrap(~community_1,ncol = 1) +
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        #legend.position=c(0.93,0.135),
+        legend.position=c(0.78,0.03),legend.direction = "horizontal",#"stamen"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) +
+  #scale_size_continuous("quality",breaks=c(-3,-2,-1),labels = c("viv","fal","mix")) +
+  #scale_color_discrete("quality",breaks=c("viv","fal","mix"),
+  #                       labels = c("viv","fal","mix")) +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1))
+  #scale_colour_discrete(name="Community") + 
+  #geom_point(aes(color = quality),alpha=.5)
+```
+
+```{r,fig.height=2.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = dat_x %>% 
+         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
+         filter(community_1=="Llanchama" & !quality=="non") #%>% 
+         #add_row(community_1="Zungarococha",attribute="sero_c",quality="mix")
+       , 
+       zoom = 13,
+       #color = community_1,
+       #color = quality,
+       #size= desc(quality),
+       alpha = I(.4),
+       extent = "panel") + 
+  #facet_wrap(community_1~attribute,ncol = 1) +
+  facet_wrap(~community_1,ncol = 1) +
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        #legend.position=c(0.93,0.135),
+        legend.position=c(0.78,0.03),legend.direction = "horizontal",#"stamen"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) +
+  #scale_size_continuous("quality",breaks=c(-3,-2,-1),labels = c("viv","fal","mix")) +
+  #scale_color_discrete("quality",breaks=c("viv","fal","mix"),
+  #                       labels = c("viv","fal","mix")) +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1))
+  #scale_colour_discrete(name="Community") + 
+  #geom_point(aes(color = quality),alpha=.5)
+```
+
+##### all markers
+
+```{r,fig.height=7.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = dat_x %>% 
+         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
+         filter(!quality=="non")
+       , 
+       zoom = 13,
+       color = quality,
+       size= desc(quality),
+       alpha = I(.4),
+       extent = "panel") + 
+  facet_wrap(~attribute,ncol = 1) +
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        #legend.position=c(0.9,0.1),#"stamen"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) +
+  scale_size_continuous("Specie",breaks=c(-3,-2,-1),labels = c("Pv","Pf","Mixed")) +
+  scale_color_discrete("Specie",breaks=c("viv","fal","mix"),
+                         labels = c("Pv","Pf","Mixed"))
+  #scale_colour_discrete(name="Community") + 
+  #geom_point(aes(color = quality),alpha=.5)
+```
+
+##### per community
+
+```{r,fig.height=7.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = dat_x %>% 
+         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
+         filter(community_1=="Zungarococha" & !quality=="non") %>% 
+         add_row(community_1="Zungarococha",attribute="sero_c",quality="mix")
+       , 
+       zoom = 13,
+       color = quality,
+       size= desc(quality),
+       alpha = I(.4),
+       extent = "panel") + 
+  facet_wrap(community_1~attribute,ncol = 1) +
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        legend.position=c(1.1,0.5),
+        #legend.position=c(0.75,0.03),legend.direction = "horizontal",#"stamen"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) +
+  scale_size_continuous("Specie",breaks=c(-3,-2,-1),labels = c("Pv","Pf","Mixed")) +
+  scale_color_discrete("Specie",breaks=c("viv","fal","mix"),
+                         labels = c("Pv","Pf","Mixed")) +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1))
+  #scale_colour_discrete(name="Community") + 
+  #geom_point(aes(color = quality),alpha=.5)
+```
+
+```{r,fig.height=7.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = dat_x %>% 
+         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
+         filter(community_1=="Puerto Almendra" & !quality=="non") %>% 
+         mutate(community_1=forcats::fct_recode(community_1,"Prto. A"="Puerto Almendra"))
+       , 
+       zoom = 13,
+       color = quality,
+       size= desc(quality),
+       alpha = I(.4),
+       extent = "panel") + 
+  facet_wrap(community_1~attribute,ncol = 1) +
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        legend.position=c(1.6,0.135),#"stamen"
+        #legend.position=c(3,0.135),legend.direction = "horizontal",#"stamen"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) +
+  scale_size_continuous("quality",breaks=c(-3,-2,-1),labels = c("viv","fal","mix")) +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1))
+  #scale_colour_discrete(name="Community") + 
+  #geom_point(aes(color = quality),alpha=.5)
+```
+
+```{r,fig.height=7.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = dat_x %>% 
+         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
+         filter(community_1=="Llanchama" & !quality=="non")
+       , 
+       zoom = 13,
+       color = quality,
+       size= desc(quality),
+       alpha = I(.4),
+       extent = "panel") + 
+  facet_wrap(community_1~attribute,ncol = 1) +
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        legend.position=c(1.25,0.135),#"stamen"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) +
+  scale_size_continuous("quality",breaks=c(-3,-2,-1),labels = c("viv","fal","mix")) +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1))
+  #scale_colour_discrete(name="Community") + 
+  #geom_point(aes(color = quality),alpha=.5)
+```
+
+```{r,fig.height=7.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = dat_x %>% 
+         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
+         filter(community_1=="Ninarumi" & !quality=="non")
+       , 
+       zoom = 13,
+       color = quality,
+       size= desc(quality),
+       alpha = I(.4),
+       extent = "panel") + 
+  facet_wrap(community_1~attribute,ncol = 1) +
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        legend.position=c(1.25,0.135),#"stamen"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) +
+  scale_size_continuous("quality",breaks=c(-3,-2,-1),labels = c("viv","fal","mix")) +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1))
+  #scale_colour_discrete(name="Community") + 
+  #geom_point(aes(color = quality),alpha=.5)
+```
+
+## References
