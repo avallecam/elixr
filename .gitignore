@@ -8,8 +8,10 @@ data-raw/*
 figure/*
 notrack/*
 report/*
+test/*
 *manuscript*
 *.pdf
+*.odp
 _book/*
 _bookdown_files/*
 *.html
