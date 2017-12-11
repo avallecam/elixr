@@ -355,7 +355,11 @@ unap6a <- unap6a %>%
   unite(trabajo, tipo_trabajo, otro_tipo_trabajo) %>% 
   mutate(trabajo= str_replace(trabajo,"_NA", "")) %>% #dplyr::count(trabajo, sort = T)
   mutate(trabajo= str_replace(trabajo,"NA_", "")) %>% #dplyr::count(trabajo, sort = T)
-  mutate(trabajo= fct_lump(trabajo, 5)) 
+  mutate(trabajo= str_replace(trabajo,"_", " ")) %>% 
+  mutate(trabajo= str_replace(trabajo,"NA", NA_character_)) %>% 
+  mutate(trabajo= str_replace(trabajo,"(.+)(\\s)casa(\\s)(.+)|(.+)(\\s)casa|carpintero|Comerciante|panadero|(.+)(\\s)salud|administrativo(\\s)(.+)|limpieza|mecanico|Mecanico|pensionista|personal(\\s)(.+)|Profesor|tecnico(\\s)(.+)", "indoor")) %>% 
+  mutate(trabajo= str_replace(trabajo,"Agricultor|obrero(\\s)(.+)|obrero|pescador|vigilante|Vigilante|albanil|mototaxista|Chofer|construccion|contruccion|Ganadero|Granjero|guia(\\s)(.+)|obreri", " outdoor")) #%>% dplyr::count(trabajo, sort = T)
+  #mutate(trabajo= fct_lump(trabajo, 5)) 
 
 #unap6a %>% glimpse()
 
@@ -379,7 +383,9 @@ unap6a <- unap6a %>%
   #group_by(material_paredes, otro_material_paredes) %>% dplyr::count()
   unite(material_pared, material_paredes, otro_material_paredes) %>% 
   mutate(material_pared= str_replace(material_pared,"_NA", "")) %>% #dplyr::count(trabajo, sort = T)
-  mutate(material_pared= str_replace(material_pared,"NA_", "")) 
+  mutate(material_pared= str_replace(material_pared,"NA_", "")) %>% #dplyr::count(material_pared, sort = T)
+  mutate(material_pared= str_replace(material_pared,"Madera(.+)","Madera")) %>% 
+  mutate(material_pared= str_replace(material_pared,"(.+)_cemento_(.+)|(.+)_cemento","cemento")) #%>% dplyr::count(material_pared, sort = T)
 
 #unap6a %>% glimpse()
 
@@ -388,9 +394,14 @@ unap6a %>%
   #mutate(material_pared= fct_lump(material_pared, 3)) %>% dplyr::count(material_pared, sort = T)
   #group_by(trabajo, trabajo_paga_ultima) %>% dplyr::count(trabajo_paga_ultima, sort = T)
   
-unap6a %>% 
-  dplyr::select(1, dplyr::contains("material")) %>% 
-  mutate(material_piso= str_replace(material_piso,"\\d+\\.\\s", "")) %>% dplyr::count(material_piso, sort = T)
+unap6a <- unap6a %>% 
+  #dplyr::select(1, dplyr::contains("material")) %>% 
+  mutate(material_piso= str_replace(material_piso,"\\d+\\.\\s", "")) %>% 
+  mutate(material_piso= str_replace(material_piso,"(.+)madera(.+)|(.+)(\\s)madera","madera")) #%>% 
+  #mutate(material_piso= str_replace(material_piso,"(.+)_cemento_(.+)|(.+)_cemento","cemento")) #%>% 
+  #dplyr::count(material_piso, sort = T)
+
+unap6a %>% dplyr::count(material_piso, sort = T)
 ```
 
 #### banio
@@ -626,6 +637,15 @@ unap6a %>%#dplyr::count(epi_redes_usadas_actualmente)
   dplyr::select(1, dplyr::contains("epi_")) %>% glimpse()
 ```
 
+#### nivel educacion
+
+```{r}
+unap6a <- unap6a %>% #dplyr::count(material_pared,material_piso)
+  #dplyr::select(nivel_educacion) %>% #dplyr::count(nivel_educacion)
+  mutate(nivel_educacion=str_replace(nivel_educacion,"Secundaria Completa|Tecnica(\\s)(.+)|Universidad(\\s)(.+)","Secundaria Completa / +")) %>%
+  mutate(nivel_educacion=str_replace(nivel_educacion,"Primaria(\\s)(.+)","Primaria")) #%>%dplyr::count(nivel_educacion)
+```
+
 #### no patterns
 
 ```{r}
@@ -798,7 +818,7 @@ readr::write_csv(unap6b, "data/04-epidemio-full.csv")
 saveRDS(unap6b, "data/04-epidemio-full.rds")
 
 readr::write_csv(unap6c, "data/04-epidemio-core.csv")
-saveRDS(unap6c, "data/04-epidemio-core.rds")
+readr::write_rds(unap6c, "data/04-epidemio-core.rds")
 ```
 
 ### write dta
