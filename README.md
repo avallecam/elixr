@@ -5,21 +5,13 @@ of ELISA reads across plates.
 It follows K. Miura et al. 2008 experimental procedure.
 
 ## TO DO:
+
 <!-- 
 DONE:
 * Use bookdown to knit all the Rmd reports!
 -->
-* Clean code in standard.Rmd -> make one function then loop
 
-1. Add an alternative initial path: `plater` instead of `XLConnect`.
-2. Generate inter-plate variability measurements: 
-`inter-plate-CV`, `ctrl+`, `ctrl-`.
-3. Check if `ZG182-1` should be corrected to `ZG181-1`.
-4. Use `relational data` to conect `Serological dataset` and 
-`Covariate+Epidemiological dataset`.
-5. Solve inconsistencies in the Epidemiological dataset.
-
-* Write an abstract!
+### abstract!
 
 - Write methodology and limitations
     + Compare against `drLumi` statistical considerations
@@ -27,6 +19,26 @@ DONE:
 - Add table with expected Template distribution
     + `plater` package
 - Add details on K.Miura methods (appendix)
+
+
+### now
+
+1. Clean code in standard.Rmd -> tidy functions in thesis projects.
+2. Individual level heterogeneity:
+    + cluster analisis
+    + regression + spatial ditribution.
+3. Add bootstrap 95%CI to transmission curves.
+
+### technical:
+
+1. Add an alternative initial path: `plater` instead of `readxl+tidyxl`.
+2. Generate inter-plate variability measurements: 
+`inter-plate-CV`, `ctrl+`, `ctrl-`.
+
+### must:
+
+1. Check if `ZG182-1` should be corrected to `ZG181-1`.
+2. Check if you solved inconsistencies in the Epidemiological dataset. (:v)
 
 ## Project suggestions:
 
@@ -41,12 +53,7 @@ DONE:
 
 ## Additional analysis:
 
-- Multinomial Logistic regression
-- Individual level heterogeneity:
-    + map location
-    + climate, geographical differences, altitude, ...
-    + seroprevalence adjusted with covariates
-    + sample coordinates
+
 - Timeline PERU and LORETO malaria case index per year
     + Angel Rosas-Aguirre on VIVAX EPIDEMIO PERU
     + Veronica Soto-Calle on SPATIO-TEMPORAL MALARIA LORETO
@@ -60,6 +67,7 @@ DONE:
 ## Personal communication
 
 - Viviana (28ago2017)
+
 > anexo las bases de resultados y de datos demográficos 
 finales corregidos hasta ahora seria el final, 
 > en la base de resultados està corregido la edad y 
