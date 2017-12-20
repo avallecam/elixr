@@ -195,6 +195,14 @@ Hmisc::latex(s1, caption='Baseline characteristics of the study population',
       ) #change here for LaTeX PDF
 ```
 
+```{r}
+unap10a_bcx %>% #glimpse()
+  #group_by(community_1) %>% 
+  #filter(age_7>=18) %>% 
+  dplyr::count(cuantas_tenido_malaria) %>% 
+  mutate(tot=sum(n),prop= (n*100)/(sum(n)))
+```
+
 ### wall | floor
 
 ```{r}
@@ -309,6 +317,19 @@ unap10a %>%
   group_by(community_1) %>% mutate(tot=sum(n),prop= (n*100)/(sum(n))) %>% 
   filter(sero_c!="non" & sero_c!="mix") %>% 
   arrange(community_1) #%>% 
+  #dplyr::select(2,3,1,everything()) 
+```
+
+```{r}
+#test post save
+unap10a %>% 
+  select(id,community_1,sero_c) %>% 
+  dplyr::count(#community_1,
+               sero_c) %>% 
+  #group_by(community_1) %>% 
+  mutate(tot=sum(n),prop= (n*100)/(sum(n))) #%>% 
+  #filter(sero_c!="non" & sero_c!="mix") #%>% 
+  #arrange(community_1) #%>% 
   #dplyr::select(2,3,1,everything()) 
 ```
 
@@ -1319,21 +1340,6 @@ unap10a_rc <-
   ungroup()
 ```
 
-```{r,fig.height=5,fig.width=4}
-unap10a_rc %>% 
-  dplyr::select(community_1,age_7,#sum.sero.viv,
-                tot.sero.viv,
-                #sum.sero.fal,
-                tot.sero.fal#,5,8
-                ) %>% 
-  gather(Specie,sero.t,-community_1,-age_7#,-sero.viv.p,-sero.fal.p
-         ) %>% 
-  ggplot(aes(age_7,sero.t)) +
-  geom_point() +
-  geom_hline(yintercept = 7, colour="red") +
-  facet_grid(community_1~Specie)
-```
-
 ```{r,fig.height=4,fig.width=12}
 unap10a_rc %>% 
   dplyr::select(community_1,age_7,#tot.sero.viv,tot.sero.fal,
@@ -1345,15 +1351,72 @@ unap10a_rc %>%
 ```
 
 ```{r,fig.height=4,fig.width=12}
-unap10a_rc_v <- unap10a_rc %>% 
-  dplyr::select(1:5,tot.sero.viv) %>% 
-  filter(!(sero.viv.p==0 | sero.viv.p==1)) #%>% #glimpse()
-  #filter(tot.sero.viv>=7) %>% dplyr::select(-tot.sero.viv)
+## ERRORR!!!
+unap10a_rc_x <- unap10a %>% 
+  mutate(exposure_viv=if_else(sero_c=="viv" | sero_c=="mix",1,0),
+         exposure_fal=if_else(sero_c=="fal" | sero_c=="mix",1,0),
+         infection_viv=if_else(pcr_c=="viv" | pcr_c=="mix",1,0),
+         infection_fal=if_else(pcr_c=="fal" | pcr_c=="mix",1,0)
+         ) %>% #dplyr::count(pcr_c,infection_fal)
+  #mutate(exposure_viv=as.factor(exposure_viv),
+   #      exposure_fal=as.factor(exposure_fal),
+    #     infection_viv=as.factor(infection_viv),
+     #    infection_fal=as.factor(infection_fal)
+      #   ) %>% 
+  dplyr::select(id,age_7,community_1,
+                exposure_viv:infection_fal) %>% 
+  #filter(age_7<=60) %>% 
+  mutate(age_ten=cut(age_7,c(0,
+                             quantile(unap10a_rc$age_7,0.1,na.rm = T),
+                             quantile(unap10a_rc$age_7,0.2,na.rm = T),
+                             quantile(unap10a_rc$age_7,0.3,na.rm = T),
+                             quantile(unap10a_rc$age_7,0.4,na.rm = T),
+                             quantile(unap10a_rc$age_7,0.5,na.rm = T),
+                             quantile(unap10a_rc$age_7,0.6,na.rm = T),
+                             quantile(unap10a_rc$age_7,0.7,na.rm = T),
+                             quantile(unap10a_rc$age_7,0.8,na.rm = T),
+                             quantile(unap10a_rc$age_7,0.9,na.rm = T),
+                             Inf))
+         ) %>%
+  group_by(community_1,age_ten) %>% summarise(tot.sero.viv=n(),
+                                sum.sero.viv=sum(exposure_viv),
+                                sero.viv.p=sum(exposure_viv)/n(),
+                                tot.sero.fal=n(),
+                                sum.sero.fal=sum(exposure_fal),
+                                sero.fal.p=sum(exposure_fal)/n()
+                                ) %>% 
+  ungroup()
+```
 
-unap10a_rc_f <- unap10a_rc %>% 
-  dplyr::select(1,2,6:8,tot.sero.fal) %>% 
-  filter(!(sero.fal.p==0 | sero.fal.p==1)) #%>% #dplyr::count(community_1)
-  #filter(tot.sero.fal>=7) %>% dplyr::select(-tot.sero.fal)
+```{r,fig.height=4,fig.width=12}
+## ERRORR!!!
+unap10a_rc_y <- unap10a_rc_x %>% 
+  mutate(age_ten=stringr::str_replace(age_ten,"\\(.+,(.+)\\]","\\1")) %>% 
+  filter(age_ten!="Inf") %>% 
+  mutate(age_ten=as.numeric(age_ten))
+
+unap10a_rc_y %>% 
+  dplyr::select(community_1,age_ten,#age_7,#tot.sero.viv,tot.sero.fal,
+                5,8) %>% 
+  gather(Specie,sero.p,-community_1,-age_ten#-age_7
+         ) %>% 
+  ggplot(aes(age_ten,#age_7,
+             sero.p)) +
+  geom_point() +
+  facet_grid(Specie~community_1) #+
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r,fig.height=4,fig.width=12}
+unap10a_rc_v <- unap10a_rc_y %>% 
+  dplyr::select(1:5) %>% 
+  filter(!(sero.viv.p==0 | sero.viv.p==1)) %>% #glimpse()
+  filter(tot.sero.viv>=3) %>% mutate(age_7=age_ten) #%>% dplyr::select(-tot.sero.viv)
+
+unap10a_rc_f <- unap10a_rc_y %>% 
+  dplyr::select(1,2,6:8) %>% 
+  filter(!(sero.fal.p==0 | sero.fal.p==1)) %>% #dplyr::count(community_1)
+  filter(tot.sero.fal>=3) %>% mutate(age_7=age_ten) #%>% dplyr::select(-tot.sero.fal)
 
 
 a <- unap10a_rc_v %>% group_by(community_1) %>% 
@@ -1428,19 +1491,131 @@ revcat_a <- df %>% full_join(unap10a_rc_a,by=c("age_7","community_1","Specie")) 
   #mutate(community_1=as.factor(community_1))
 #h <- revcat$h
 #r <- revcat$r
-
+specie_name <- c("viv"="P. vivax","fal"="P. falciparum",
+                 "Puerto Almendra"="Puerto Almendra",
+                 "Ninarumi"="Ninarumi",
+                 "Llanchama"="Llanchama",
+                 "Zungarococha"="Zungarococha"
+                 )
 unap10a_rc_a %>% 
   #filter(community_1==f[1]) %>% 
   ggplot(aes(age_7,sero.p)) +
   geom_point() +
-  facet_grid(Specie~community_1) +
+  facet_grid(Specie~community_1,labeller = as_labeller(specie_name)) +
   geom_line(aes(y = y), data = revcat_a, colour = "black") +
   geom_text(aes(x,y,label=lab),
             data = revcat %>% 
-              mutate(x=38,y=0.05) %>% 
+              mutate(x=59,y=0.10) %>% 
               mutate(lab=paste0("SCR=",h %>% format(digits=2),
-                                ", SRR=",r %>% format(digits=2)))
-            ,vjust=.5,hjust=0.05,size=3) #+
+                                "\nSRR=",r %>% format(digits=2)))
+            ,vjust=.5,hjust=0.05,size=3) +
+  xlab("Age") + ylab("Seroprevalence")
+  #stat_smooth(formula = )
+```
+
+```{r,fig.height=4,fig.width=12}
+unap10a_rc_v <- unap10a_rc %>% 
+  dplyr::select(1:5) %>% 
+  filter(!(sero.viv.p==0 | sero.viv.p==1)) %>% #glimpse()
+  filter(tot.sero.viv>=3) #%>% dplyr::select(-tot.sero.viv)
+
+unap10a_rc_f <- unap10a_rc %>% 
+  dplyr::select(1,2,6:8) %>% 
+  filter(!(sero.fal.p==0 | sero.fal.p==1)) %>% #dplyr::count(community_1)
+  filter(tot.sero.fal>=3) #%>% dplyr::select(-tot.sero.fal)
+
+
+a <- unap10a_rc_v %>% group_by(community_1) %>% 
+  summarise(min=min(age_7),max=max(age_7))
+f <- levels(as.factor(a$community_1))
+df <- data_frame(community_1=as.character(),
+                 age_7=as.double())
+for (i in 1:length(f)) {
+df_p <- data_frame(community_1=f[i],
+           age_7=seq(as.numeric(a[i,2]),as.numeric(a[i,3]),1))
+df <- union(df,df_p)
+}
+df <- df %>% arrange(community_1,age_7)
+df <- union(df %>% mutate(Specie="viv"),df %>% mutate(Specie="fal"))
+
+f <- levels(unap10a_rc_v$community_1)
+revcat_v <- data_frame(community_1=as.character(),
+                     h=as.double(),
+                     r=as.double())
+for (i in 1:length(f)) {#i=1
+revcat_p <- optim(c(0.1,0.1),fn=Lccm1,
+                  data=unap10a_rc_v %>% 
+                    filter(community_1==f[i]) %>% #i
+                    dplyr::select(-1),
+                  hessian=TRUE) %>% 
+  .$par %>% 
+  data_frame(community_1=f[i],#i
+             h=.[1],
+             r=.[2]) %>% 
+  dplyr::select(-1) %>% slice(1)
+revcat_v <- union(revcat_v,revcat_p)
+}
+
+f <- levels(unap10a_rc_f$community_1)
+revcat_f <- data_frame(community_1=as.character(),
+                     h=as.double(),
+                     r=as.double())
+for (i in 1:length(f)) {#i=3
+revcat_p <- optim(c(0.1,0.1),fn=Lccm1,
+                  data=unap10a_rc_f %>% 
+                    filter(community_1==f[i]) %>% #i
+                    dplyr::select(-1),
+                  hessian=TRUE) %>% 
+  .$par %>% 
+  data_frame(community_1=f[i],#i
+             h=.[1],
+             r=.[2]) %>% 
+  dplyr::select(-1) %>% slice(1)
+revcat_f <- union(revcat_f,revcat_p)
+}
+
+revcat <- union(revcat_v %>% mutate(Specie="viv"),
+      revcat_f %>% mutate(Specie="fal"))
+
+#h <- revcat$par[1] #seroconversion rate
+#r <- revcat$par[2] #seroreversion rate
+
+unap10a_rc_a <- union(unap10a_rc_v %>% 
+  mutate(Specie="viv") %>% 
+  dplyr::rename(tot.sero=tot.sero.viv,
+                sum.sero=sum.sero.viv,
+                sero.p=sero.viv.p),
+  unap10a_rc_f %>% 
+  mutate(Specie="fal") %>% 
+  dplyr::rename(tot.sero=tot.sero.fal,
+                sum.sero=sum.sero.fal,
+                sero.p=sero.fal.p))
+
+revcat_a <- df %>% full_join(unap10a_rc_a,by=c("age_7","community_1","Specie")) %>% 
+  full_join(revcat,by=c("community_1","Specie")) %>% 
+  mutate(y=h/(r+h)*(1-exp(-(r+h)*age_7)))
+  #mutate(community_1=as.factor(community_1))
+#h <- revcat$h
+#r <- revcat$r
+specie_name <- c("viv"="P. vivax","fal"="P. falciparum",
+                 "Puerto Almendra"="Puerto Almendra",
+                 "Ninarumi"="Ninarumi",
+                 "Llanchama"="Llanchama",
+                 "Zungarococha"="Zungarococha"
+                 )
+unap10a_rc_a %>% 
+  #filter(community_1==f[1]) %>% 
+  ggplot(aes(age_7,sero.p)) +
+  geom_point() +
+  facet_grid(Specie~community_1,labeller = as_labeller(specie_name)) +
+  geom_line(aes(y = y), data = revcat_a, colour = "black") +
+  geom_text(aes(x,y,label=lab),
+            data = revcat %>% 
+              mutate(x=59,y=0.10) %>% 
+              mutate(lab=paste0("SCR=",h %>% format(digits=2),
+                                "\nSRR=",r %>% format(digits=2)))
+            ,vjust=.5,hjust=0.05,size=3) +
+  xlab("Age") + ylab("Seroprevalence")
   #stat_smooth(formula = )
 ```
 
@@ -1831,6 +2006,7 @@ ggmap::qmplot(longitud, latitud,
        , 
        zoom = 13,
        color = quality,
+       #geom = "density2d",
        size= desc(quality),
        alpha = I(.4),
        extent = "panel") + 
@@ -1857,6 +2033,7 @@ ggmap::qmplot(longitud, latitud,
        , 
        zoom = 13,
        color = quality,
+       #geom = "density2d",
        size= desc(quality),
        alpha = I(.4),
        extent = "panel") + 
