@@ -507,7 +507,20 @@ unap10a_ra <- unap10a_bcx %>%
          infection_fal=as.factor(infection_fal)
          ) %>% 
   mutate(community_1=forcats::fct_relevel(community_1,"Zungarococha")
-         ) #%>%
+         ) %>%
+  mutate(sex_8 = as.factor(sex_8),
+         nivel_educacion = as.factor(nivel_educacion),
+         trabajo_tdy = as.factor(trabajo_tdy),
+         electricidad_red_publica = as.factor(electricidad_red_publica),
+         material_pared = as.factor(material_pared),
+         material_piso = as.factor(material_piso),
+         epi_uso_red_dormir = as.factor(epi_uso_red_dormir),
+         tenido_malaria = as.factor(tenido_malaria),
+         cuantas_tenido_malaria = as.factor(cuantas_tenido_malaria),
+         age_d = as.factor(age_d)) %>% 
+  mutate(infection_all=as.numeric(infection_viv)+as.numeric(infection_fal)) %>% 
+  mutate(infection_all=if_else(infection_all==2,0,1)) %>% 
+  mutate(infection_all=as.factor(infection_all))
   #dplyr::count(epi_uso_red_dormir)
   #dplyr::count(trabajo)
 dd <- rms::datadist(unap10a_ra); options(datadist='dd')
@@ -604,24 +617,61 @@ modx <- lrm(infection_viv ~ sex_8 +
 #options(prType='latex')
 ```
 
-### Pv infection
+### All infections
 
-#### rms::lrm
-
-- covariate adjusted model
+#### glm
 
 ```{r}
-modx <- lrm(infection_viv ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
-#modx <- lrm(as.factor(pheno.num) ~ igg + igg1 + igg2 + igg3 + rms::rcs(igg4,3) + rms::rcs(par,3) + edad + sexo, data=mmo_x_rms, x=TRUE, y=TRUE)
-modx
-paste("AIC=",AIC(modx))
+myForm<- as.formula(infection_all ~ sex_8 + age_d + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir)
+
+mod1 <- glm(myForm, data=unap10a_ra,family = binomial(link="logit"))
+#summary(mod1)
+
+sof <- unap10a_ra
+sofNoMis <- sof[which(complete.cases(sof[,all.vars(myForm)])),]
+FulMod2 <- glm(myForm,family=binomial(link="logit"),data=sofNoMis)
+#summary(step(FulMod2,direction="backward",trace=FALSE))
+mod2 <- glm(infection_all ~ sex_8 + age_d + community_1,
+            family=binomial(link="logit"),data=sofNoMis)
+
+#broom::tidy(mod1); broom::augment(mod1); broom::glance(mod1)
+table(unap10a_ra$infection_viv)
+table(unap10a_ra$infection_fal)
+table(unap10a_ra$infection_all)
+
+summary(mod1$model$infection_all)
+OR.vector <- exp(mod1$coef)
+CI.vector <- exp(confint(mod1))
+p.values <- summary(mod1)$coefficients[, 4]
+cbind(OR = OR.vector, CI.vector,p.values)
+
+summary(mod2$model$infection_all)
+OR.vector.2 <- exp(mod2$coef)
+CI.vector.2 <- exp(confint(mod2))
+p.values.2 <- summary(mod2)$coefficients[, 4]
+cbind(OR = OR.vector.2, CI.vector.2,p.values.2)
+
+# Table with ORs and CIs
+stargazer::stargazer(mod1, mod2,
+                     coef = list(OR.vector,OR.vector.2), #ci = T, 
+          ci.custom = list(CI.vector,CI.vector.2), p = list(p.values,p.values.2), 
+          single.row = T, type = "text",
+          t.auto=F, p.auto=F, report = "vcs*",
+          dep.var.labels=c("Malaria infection"),
+          #column.labels=c("All", "After backward elimination"), 
+          title="Multivariate models for malaria infection",
+          notes = "(1) All covariates. (2) After backward elimination."
+          )#backward elimination
 ```
 
-```{r}
-mod1 <- modx
-```
+#### lrm
 
 ##### predictive potential
+
+```{r}
+modx <- lrm(infection_all ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
+mod1 <- modx
+```
 
 ```{r,fig.height=3,fig.width=6}
 #anova(mod1)
@@ -703,7 +753,7 @@ plot(my.calib, las=1)
 #### backward selection
 
 ```{r}
-lrm.full <- lrm(infection_viv ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra,x=TRUE, y=TRUE)
+lrm.full <- lrm(infection_all ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra,x=TRUE, y=TRUE)
 #stargazer::stargazer(lrm.full)
 paste("AIC=",AIC(lrm.full))
 #lrm.full
@@ -713,7 +763,7 @@ rms::fastbw(lrm.full, rule = "p", sls = 0.5)
 ##### selected model
 
 ```{r}
-lrm.finl <- lrm(infection_viv ~ sex_8 + community_1, data=unap10a_ra, x=TRUE, y=TRUE)
+lrm.finl <- lrm(infection_all ~ sex_8 + community_1, data=unap10a_ra, x=TRUE, y=TRUE)
 paste("AIC=",AIC(lrm.finl))
 lrm.finl
 #rms::fastbw(lrm.finl, rule = "p", sls = 0.5)
@@ -763,6 +813,51 @@ lrm.finl_iv <- lrm.finl
 ```
 
 ### Pv exposure
+
+#### glm
+
+```{r}
+myForm<- as.formula(exposure_viv ~ sex_8 + age_d + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir)
+
+mod1 <- glm(myForm, data=unap10a_ra,family = binomial(link="logit"))
+#summary(mod1)
+
+sof <- unap10a_ra
+sofNoMis <- sof[which(complete.cases(sof[,all.vars(myForm)])),]
+FulMod2 <- glm(myForm,family=binomial(link="logit"),data=sofNoMis)
+#summary(step(FulMod2,direction="backward",trace=FALSE))
+mod2 <- glm(exposure_viv ~ age_d + community_1 + epi_uso_red_dormir,
+            family=binomial(link="logit"),data=sofNoMis)
+
+#broom::tidy(mod1); broom::augment(mod1); broom::glance(mod1)
+table(unap10a_ra$exposure_viv)
+table(unap10a_ra$exposure_fal)
+
+summary(mod1$model$exposure_viv)
+OR.vector <- exp(mod1$coef)
+CI.vector <- exp(confint(mod1))
+p.values <- summary(mod1)$coefficients[, 4]
+cbind(OR = OR.vector, CI.vector,p.values)
+
+summary(mod2$model$exposure_viv)
+OR.vector.2 <- exp(mod2$coef)
+CI.vector.2 <- exp(confint(mod2))
+p.values.2 <- summary(mod2)$coefficients[, 4]
+cbind(OR = OR.vector.2, CI.vector.2,p.values.2)
+
+# Table with ORs and CIs
+stargazer::stargazer(mod1, mod2,
+                     coef = list(OR.vector,OR.vector.2), #ci = T, 
+          ci.custom = list(CI.vector,CI.vector.2), p = list(p.values,p.values.2), 
+          single.row = T, type = "text",
+          t.auto=F, p.auto=F, report = "vcs*",
+          dep.var.labels=c("P. vivax exposure"),
+          #column.labels=c("All", "After backward elimination"), 
+          title="Multivariate models for malaria infection",
+          notes = "(1) All covariates. (2) After backward elimination."
+          )#backward elimination
+```
+
 
 #### rms::lrm
 
@@ -919,168 +1014,6 @@ lrm.full_ev <- modx_pen
 lrm.finl_ev <- lrm.finl
 ```
 
-### Pf infection
-
-- 12 casos de 824 observaciones.
-    - _overfitting_: 
-        + Dxy 0.6 (model performance) 
-        + c-index 0.8 (discrimination power) 
-        - R2 0.17 (fit)
-
-#### rms::lrm
-
-- covariate adjusted model
-
-```{r}
-modx <- lrm(infection_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared +  material_piso + epi_uso_red_dormir, data=unap10a_ra %>% filter(community_1!="Puerto Almendra"), x=TRUE, y=TRUE)
-#modx <- lrm(as.factor(pheno.num) ~ igg + igg1 + igg2 + igg3 + rms::rcs(igg4,3) + rms::rcs(par,3) + edad + sexo, data=mmo_x_rms, x=TRUE, y=TRUE)
-modx
-paste("AIC=",AIC(modx))
-```
-```{r}
-mod1 <- modx
-```
-
-##### predictive potential
-
-```{r,fig.height=3,fig.width=6}
-plot(anova(mod1), what='proportion chisq') # relative importance
-#plot(rms::Predict(mod1, fun=plogis)) # predicted values
-```
-
-```{r}
-#summary(mod1)
-#Hmisc::html(summary(mod1),file="",dec=2)
-```
-
-```{r}
-#ggplot2::ggplot(rms::Predict(mod1))
-#ggplot2::ggplot(rms::Predict(mod1,fun=plogis))
-```
-
-```{r}
-#plot(summary(mod1), log=TRUE,main = "log Odds Ratio",cex.main = 0)
-```
-
-
-##### validity
-
-```{r}
-my.valid <- rms::validate(modx, method="boot", B=1000)
-my.valid
-```
-
-##### calibration
-
-```{r,fig.height=3,fig.width=6}
-my.calib <- rms::calibrate(modx, method="boot", B=1000)
-par(bg="white", las=1)
-plot(my.calib, las=1)
-```
-
-#### penalization 
-
-```{r}
-penalty <- rms::pentrace(modx, penalty=seq(-50,50,by=.25), maxit=25)
-#penalty
-modx_pen <- update(modx, penalty=penalty$penalty)
-paste("AIC=",AIC(modx_pen))
-modx_pen
-#rms::effective.df(mod1_pen)
-#mod1_pen
-```
-
-```{r}
-summary(modx_pen)
-Hmisc::html(summary(modx_pen),file="",dec=2)
-```
-
-```{r}
-#ggplot2::ggplot(rms::Predict(modx_pen))
-ggplot2::ggplot(rms::Predict(modx_pen,fun=plogis))
-```
-
-```{r}
-plot(summary(modx_pen), log=TRUE,main = "log Odds Ratio",cex.main = 0)
-```
-
-##### validity
-
-```{r}
-my.valid <- rms::validate(modx_pen, method="boot", B=1000)
-my.valid
-```
-
-##### calibration
-
-```{r,fig.height=3,fig.width=6}
-my.calib <- rms::calibrate(modx_pen, method="boot", B=1000)
-par(bg="white", las=1)
-plot(my.calib, las=1)
-```
-
-
-#### backward selection
-
-```{r}
-lrm.full <- lrm(infection_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
-paste("AIC=",AIC(lrm.full))
-#lrm.full
-rms::fastbw(lrm.full, rule = "p", sls = 0.5)
-```
-
-##### selected model
-
-```{r}
-lrm.finl <- lrm(infection_fal ~ electricidad_red_publica, data=unap10a_ra, x=TRUE, y=TRUE)
-paste("AIC=",AIC(lrm.finl))
-lrm.finl
-#rms::fastbw(lrm.finl, rule = "p", sls = 0.5)
-```
-
-```{r}
-mod1 <- lrm.finl
-#summary(mod1)
-Hmisc::html(summary(mod1),file="",dec=2)
-```
-
-##### validity
-
-```{r}
-#my.valid <- rms::validate(mod1, method="boot", B=1000)
-#my.valid
-```
-
-##### calibration
-
-```{r,fig.height=3,fig.width=6}
-#my.calib <- rms::calibrate(mod1, method="boot", B=1000)
-#par(bg="white", las=1)
-#plot(my.calib, las=1)
-```
-
-#### stargazer
-
-```{r}
-#stargazer::stargazer(modx_pen,lrm.finl,type = "text")
-#options(prType = "plain")
-
-#print(modx_pen,long=F)
-summary(modx_pen)
-#print(lrm.finl,long=F)
-summary(lrm.finl)
-
-stargazer::stargazer(modx_pen,lrm.finl,
-                     type = "text", apply.coef=exp, #apply.ci=exp,
-                     t.auto=F, p.auto=F, report = "vcs*",ci = T,
-                     #no.space = F,
-                     single.row = T
-                     )
-
-lrm.full_if <- modx_pen
-lrm.finl_if <- lrm.finl
-```
-
 ### Pf exposure
 
 - 44 casos de 824 observaciones.
@@ -1088,6 +1021,54 @@ lrm.finl_if <- lrm.finl
         + Dxy 0.6 (model performance) 
         + c-index 0.8 (discrimination power) 
         - R2 0.211 (fit)
+
+#### glm
+
+```{r}
+myForm<- as.formula(exposure_fal ~ sex_8 + age_d + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir)
+
+mod1 <- glm(myForm, data=unap10a_ra,family = binomial(link="logit"))
+#summary(mod1)
+
+sof <- unap10a_ra
+sofNoMis <- sof[which(complete.cases(sof[,all.vars(myForm)])),]
+FulMod2 <- glm(myForm,family=binomial(link="logit"),data=sofNoMis)
+#summary(step(FulMod2,direction="backward",trace=FALSE))
+mod2 <- glm(exposure_fal ~ sex_8 + age_d + community_1 + trabajo_rpl + 
+    material_piso + epi_uso_red_dormir,
+            family=binomial(link="logit"),data=sofNoMis)
+# electricidad_red_publica + trabajo_rpl + epi_uso_red_dormir
+
+#broom::tidy(mod1); broom::augment(mod1); broom::glance(mod1)
+table(unap10a_ra$exposure_viv)
+table(unap10a_ra$exposure_fal)
+
+summary(mod1$model$exposure_fal)
+OR.vector <- exp(mod1$coef)
+CI.vector <- exp(confint(mod1))
+p.values <- summary(mod1)$coefficients[, 4]
+cbind(OR = OR.vector, CI.vector,p.values)
+
+summary(mod2$model$exposure_fal)
+OR.vector.2 <- exp(mod2$coef)
+CI.vector.2 <- exp(confint(mod2))
+p.values.2 <- summary(mod2)$coefficients[, 4]
+cbind(OR = OR.vector.2, CI.vector.2,p.values.2)
+
+# Table with ORs and CIs
+stargazer::stargazer(mod1, mod2,
+                     coef = list(OR.vector,OR.vector.2), #ci = T, 
+          ci.custom = list(CI.vector,CI.vector.2), p = list(p.values,p.values.2), 
+          single.row = T, type = "text",
+          t.auto=F, p.auto=F, report = "vcs*",
+          dep.var.labels=c("P. falciparum exposure"),
+          #column.labels=c("All", "After backward elimination"), 
+          title="Multivariate models for malaria infection",
+          notes = "(1) All covariates. (2) After backward elimination."
+          )#backward elimination
+```
+
+
 
 #### rms::lrm
 
