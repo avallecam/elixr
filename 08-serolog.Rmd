@@ -662,7 +662,7 @@ stargazer::stargazer(mod1, mod2,
           dep.var.labels=c("Malaria infection"),
           #column.labels=c("All", "After backward elimination"), 
           title="Multivariate models for malaria infection",
-          notes = "(1) All covariates. (2) After backward elimination.",
+          notes = "AOR: Adjusted odds ratio. (1): AOR with all covariates. (2): AOR after backward elimination.",
           add.lines = list(c("Events",
                         summary(mod1$model$infection_all)[2],
                         summary(mod2$model$infection_all)[2]
@@ -700,63 +700,64 @@ stargazer::stargazer(mod1, mod2,
 ```{r}
 myForm<- as.formula(exposure_viv ~ sex_8 + age_d + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir)
 
-mod1 <- glm(myForm, data=unap10a_ra,family = binomial(link="logit"))
+mod1v <- glm(myForm, data=unap10a_ra,family = binomial(link="logit"))
 #summary(mod1)
 
 sof <- unap10a_ra
 sofNoMis <- sof[which(complete.cases(sof[,all.vars(myForm)])),]
 FulMod2 <- glm(myForm,family=binomial(link="logit"),data=sofNoMis)
-#summary(step(FulMod2,direction="backward",trace=FALSE))
-mod2 <- glm(exposure_viv ~ age_d + community_1 + epi_uso_red_dormir,
+summary(step(FulMod2,direction="backward",trace=FALSE))
+mod2v <- glm(exposure_viv ~ age_d + community_1 + epi_uso_red_dormir,
             family=binomial(link="logit"),data=sofNoMis)
 
 #broom::tidy(mod1); broom::augment(mod1); broom::glance(mod1)
 #table(unap10a_ra$exposure_viv)
 #table(unap10a_ra$exposure_fal)
 #dim(unap10a_ra)
-length(mod1$na.action) # 419 ommited misssing data
+length(mod1v$na.action) # 419 ommited misssing data
 
-summary(mod1$model$exposure_viv)
-OR.vector <- exp(mod1$coef)
-CI.vector <- exp(confint(mod1))
-p.values <- summary(mod1)$coefficients[, 4]
-cbind(OR = OR.vector, CI.vector,p.values)
+summary(mod1v$model$exposure_viv)
+OR.vector.1.v <- exp(mod1v$coef)
+CI.vector.1.v <- exp(confint(mod1v))
+p.values.1.v <- summary(mod1v)$coefficients[, 4]
+cbind(OR = OR.vector.1.v, CI.vector.1.v,p.values.1.v)
 
-summary(mod2$model$exposure_viv)
-OR.vector.2 <- exp(mod2$coef)
-CI.vector.2 <- exp(confint(mod2))
-p.values.2 <- summary(mod2)$coefficients[, 4]
-cbind(OR = OR.vector.2, CI.vector.2,p.values.2)
+summary(mod2v$model$exposure_viv)
+OR.vector.2.v <- exp(mod2v$coef)
+CI.vector.2.v <- exp(confint(mod2v))
+p.values.2.v <- summary(mod2v)$coefficients[, 4]
+cbind(OR = OR.vector.2.v, CI.vector.2.v,p.values.2.v)
 
 # Table with ORs and CIs
-stargazer::stargazer(mod1, mod2,
-                     coef = list(OR.vector,OR.vector.2), #ci = T, 
-          ci.custom = list(CI.vector,CI.vector.2), p = list(p.values,p.values.2), 
-          single.row = T, type = "text",
-          t.auto=F, p.auto=F, report = "vcs*",
-          dep.var.labels=c("P. vivax exposure"),
-          #column.labels=c("All", "After backward elimination"), 
-          title="Multivariate models for malaria specie-specific exposure",
-          notes = "(1) All covariates. (2) After backward elimination.",
-          add.lines = list(c("Events",
-                        summary(mod1$model$exposure_viv)[2],
-                        summary(mod2$model$exposure_viv)[2]
-                        )),
-          covariate.labels = c("Sex Female:Male",
-                               "Age (17,36]:(8,17]",
-                               "Age (36,85]:(8,17]",
-                               "Community Llanchama:Zungarococha",
-                               "Community Ninarumi:Zungarococha",
-                               "Community Pto.Almendra:Zungarococha",
-                               "Occupation Outdoor:Other",#Farmer/Guard/Logger/Fisher
-                               "Electricity availability No:Yes",
-                               "Wall material Concrete:Wood",
-                               "Wall material Triplay:Wood",
-                               "Floor material Concrete:Wood",
-                               "Floor material Soil or Sand:Wood",
-                               "Bednet usage Never:Always"),
-          omit.stat = c("ll"),digits = 1
-          )
+#stargazer::stargazer(mod1v, mod2v,
+#                     coef = list(OR.vector.1.v,OR.vector.2.v), #ci = T, 
+#          ci.custom = list(CI.vector.1.v,CI.vector.2.v), 
+#          p = list(p.values.1.v,p.values.2.v), 
+#          single.row = T, type = "text",
+#          t.auto=F, p.auto=F, report = "vcs*",
+#          dep.var.labels=c("P.vivax exposure"),
+#          #column.labels=c("All", "After backward elimination"), 
+#          title="Multivariate models for malaria species-specific exposure",
+#          notes = "(1) All covariates. (2) After backward elimination.",
+#          add.lines = list(c("Events",
+#                        summary(mod1v$model$exposure_viv)[2],
+#                        summary(mod2v$model$exposure_viv)[2]
+#                        )),
+#          covariate.labels = c("Sex Female:Male",
+#                               "Age (17,36]:(8,17]",
+#                               "Age (36,85]:(8,17]",
+#                               "Community Llanchama:Zungarococha",
+#                               "Community Ninarumi:Zungarococha",
+#                               "Community Pto.Almendra:Zungarococha",
+#                               "Occupation Outdoor:Other",#Farmer/Guard/Logger/Fisher
+#                               "Electricity availability No:Yes",
+#                               "Wall material Concrete:Wood",
+#                               "Wall material Triplay:Wood",
+#                               "Floor material Concrete:Wood",
+#                               "Floor material Soil or Sand:Wood",
+#                               "Bednet usage Never:Always"),
+#          omit.stat = c("ll"),digits = 1
+#          )
 ```
 
 ### Pf exposure
@@ -772,14 +773,14 @@ stargazer::stargazer(mod1, mod2,
 ```{r}
 myForm<- as.formula(exposure_fal ~ sex_8 + age_d + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir)
 
-mod1 <- glm(myForm, data=unap10a_ra,family = binomial(link="logit"))
+mod1f <- glm(myForm, data=unap10a_ra,family = binomial(link="logit"))
 #summary(mod1)
 
 sof <- unap10a_ra
 sofNoMis <- sof[which(complete.cases(sof[,all.vars(myForm)])),]
 FulMod2 <- glm(myForm,family=binomial(link="logit"),data=sofNoMis)
-#summary(step(FulMod2,direction="backward",trace=FALSE))
-mod2 <- glm(exposure_fal ~ sex_8 + age_d + community_1 + trabajo_rpl + 
+summary(step(FulMod2,direction="backward",trace=FALSE))
+mod2f <- glm(exposure_fal ~ sex_8 + age_d + community_1 + trabajo_rpl + 
     material_piso + epi_uso_red_dormir,
             family=binomial(link="logit"),data=sofNoMis)
 # electricidad_red_publica + trabajo_rpl + epi_uso_red_dormir
@@ -788,33 +789,74 @@ mod2 <- glm(exposure_fal ~ sex_8 + age_d + community_1 + trabajo_rpl +
 #table(unap10a_ra$exposure_viv)
 #table(unap10a_ra$exposure_fal)
 #dim(unap10a_ra)
-length(mod1$na.action) # 419 ommited misssing data
+length(mod1f$na.action) # 419 ommited misssing data
 
-summary(mod1$model$exposure_fal)
-OR.vector <- exp(mod1$coef)
-CI.vector <- exp(confint(mod1))
-p.values <- summary(mod1)$coefficients[, 4]
-cbind(OR = OR.vector, CI.vector,p.values)
+summary(mod1f$model$exposure_fal)
+OR.vector.1.f <- exp(mod1f$coef)
+CI.vector.1.f <- exp(confint(mod1f))
+p.values.1.f <- summary(mod1f)$coefficients[, 4]
+cbind(OR = OR.vector.1.f, CI.vector.1.f,p.values.1.f)
 
-summary(mod2$model$exposure_fal)
-OR.vector.2 <- exp(mod2$coef)
-CI.vector.2 <- exp(confint(mod2))
-p.values.2 <- summary(mod2)$coefficients[, 4]
-cbind(OR = OR.vector.2, CI.vector.2,p.values.2)
+summary(mod2f$model$exposure_fal)
+OR.vector.2.f <- exp(mod2f$coef)
+CI.vector.2.f <- exp(confint(mod2f))
+p.values.2.f <- summary(mod2f)$coefficients[, 4]
+cbind(OR = OR.vector.2.f, CI.vector.2.f,p.values.2.f)
 
 # Table with ORs and CIs
-stargazer::stargazer(mod1, mod2,
-                     coef = list(OR.vector,OR.vector.2), #ci = T, 
-          ci.custom = list(CI.vector,CI.vector.2), p = list(p.values,p.values.2), 
+#stargazer::stargazer(mod1f, mod2f,
+#                     coef = list(OR.vector.1.f,OR.vector.2.f), #ci = T, 
+#          ci.custom = list(CI.vector.1.f,CI.vector.2.f), 
+#          p = list(p.values.1.f,p.values.2.f), 
+#          single.row = T, type = "text",
+#          t.auto=F, p.auto=F, report = "vcs*",
+#          dep.var.labels=c("P.falciparum exposure"),
+#          #column.labels=c("All", "After backward elimination"), 
+#          title="Multivariate models for malaria species-specific exposure",
+#          notes = "(1) All covariates. (2) After backward elimination.",
+#          add.lines = list(c("Events",
+#                        summary(mod1f$model$exposure_fal)[2],
+#                        summary(mod2f$model$exposure_fal)[2]
+#                        )),
+#          covariate.labels = c("Sex Female:Male",
+#                               "Age (17,36]:(8,17]",
+#                               "Age (36,85]:(8,17]",
+#                               "Community Llanchama:Zungarococha",
+#                               "Community Ninarumi:Zungarococha",
+#                               "Community Pto.Almendra:Zungarococha",
+#                               "Occupation Outdoor:Other",#Farmer/Guard/Logger/Fisher
+#                               "Electricity availability No:Yes",
+#                               "Wall material Concrete:Wood",
+#                               "Wall material Triplay:Wood",
+#                               "Floor material Concrete:Wood",
+#                               "Floor material Soil or Sand:Wood",
+#                               "Bednet usage Never:Always"),
+#          omit.stat = c("ll"),digits = 1
+#          )
+```
+
+### Pf+Pv exposure
+
+```{r}
+stargazer::stargazer(mod1v,mod2v,
+                     mod1f,mod2f,
+                     coef = list(OR.vector.1.v,OR.vector.2.v,
+                                 OR.vector.1.f,OR.vector.2.f), #ci = T, 
+          ci.custom = list(CI.vector.1.v,CI.vector.2.v,
+                           CI.vector.1.f,CI.vector.2.f), 
+          p = list(p.values.1.v,p.values.2.v,
+                   p.values.1.f,p.values.2.f), 
           single.row = T, type = "text",
           t.auto=F, p.auto=F, report = "vcs*",
-          dep.var.labels=c("P. falciparum exposure"),
+          dep.var.labels=c("P.vivax","P.falciparum"),
           #column.labels=c("All", "After backward elimination"), 
-          title="Multivariate models for malaria specie-specific exposure",
-          notes = "(1) All covariates. (2) After backward elimination.",
+          title="Multivariate models for malaria species-specific exposure",
+          notes = "AOR: Adjusted odds ratio. (1) and (3): AOR with all covariates. (2) and (4): AOR after backward elimination.",
           add.lines = list(c("Events",
-                        summary(mod1$model$exposure_fal)[2],
-                        summary(mod2$model$exposure_fal)[2]
+                             summary(mod1v$model$exposure_viv)[2],
+                        summary(mod2v$model$exposure_viv)[2],
+                        summary(mod1f$model$exposure_fal)[2],
+                        summary(mod2f$model$exposure_fal)[2]
                         )),
           covariate.labels = c("Sex Female:Male",
                                "Age (17,36]:(8,17]",
@@ -833,56 +875,20 @@ stargazer::stargazer(mod1, mod2,
           )
 ```
 
-### Stargazer presentation
-
-```{r}
-#lrm.full_iv <- lrm(infection_viv ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
-#lrm.full_ev <- lrm(exposure_viv ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
-#lrm.finl_iv <- lrm(infection_viv ~ sex_8 + community_1, data=unap10a_ra, x=TRUE, y=TRUE)
-#lrm.finl_ev <- lrm(exposure_viv ~ age_7 + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
-
-#lrm.full_if <- lrm(infection_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
-#lrm.full_ef <- lrm(exposure_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir, data=unap10a_ra, x=TRUE, y=TRUE)
-#lrm.finl_if <- lrm(infection_fal ~ electricidad_red_publica, data=unap10a_ra, x=TRUE, y=TRUE)
-#lrm.finl_ef <- lrm(exposure_fal ~ age_7 + community_1 + material_pared, data=unap10a_ra, x=TRUE, y=TRUE)
-
-#stargazer::stargazer(lrm.full_ev,lrm.finl_ev,
- #                    lrm.full_iv,lrm.finl_iv,
-  #                   type = "latex", apply.coef=exp, #apply.ci=exp,
-   #                  t.auto=F, p.auto=F, report = "vcs*",ci = T,
-    #                 #no.space = F,
-     #                single.row = T,
-      #               title="Multivariate and backward selected model for P.vivax exposure and infection")
-
-#stargazer::stargazer(lrm.full_ef,lrm.finl_ef,
- #                    lrm.full_if,lrm.finl_if,
-  #                   type = "latex", apply.coef=exp, #apply.ci=exp,
-   #                  t.auto=F, p.auto=F, report = "vcs*",ci = T,
-    #                 #no.space = F,
-     #                single.row = T,
-      #               title="Multivariate and backward selected model for P.falciparum exposure and infection")
-
-stargazer::stargazer(lrm.full_iv,lrm.finl_iv,
-                     lrm.full_if,lrm.finl_if,
-                     type = "latex", apply.coef=exp, #apply.ci=exp,
-                     t.auto=F, p.auto=F, report = "vcs*",ci = T,
-                     #no.space = F,
-                     single.row = T,
-                     title="Multivariate and backward selected model for species-specific malaria infection")
-
-stargazer::stargazer(lrm.full_ev,lrm.finl_ev,
-                     lrm.full_ef,lrm.finl_ef,
-                     type = "latex", apply.coef=exp, #apply.ci=exp,
-                     t.auto=F, p.auto=F, report = "vcs*",ci = T,
-                     #no.space = F,
-                     single.row = T,
-                     title="Multivariate and backward selected model for species-specific malaria exposure")
-
-
+```{r,fig.height=18,fig.width=12}
+par(mfrow=c(6,4))
+plot(mod1)
+plot(mod2)
+plot(mod1v)
+plot(mod2v)
+plot(mod1f)
+plot(mod2f)
+par(mfrow=c(1,1))
 ```
 
+
 ```{r}
-options(prType = "plain") #latex #html
+#options(prType = "plain") #latex #html
 ```
 
 ## Transmission intensity curves
