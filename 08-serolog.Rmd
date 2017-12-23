@@ -585,6 +585,20 @@ step(model.null,
 #options(prType='latex')
 ```
 
+```{r}
+#myForm<- as.formula(infection_all ~ age_d)
+#myForm<- as.formula(exposure_viv ~ age_7)
+myForm<- as.formula(exposure_fal ~ age_d)
+mod1 <- glm(myForm, data=unap10a_ra,family = binomial(link="logit"))
+#summary(mod1)
+AIC(mod1)
+OR.vector <- exp(mod1$coef)
+CI.vector <- exp(confint(mod1))
+p.values <- summary(mod1)$coefficients[, 4]
+cbind(OR = OR.vector, CI.vector,p.values)
+```
+
+
 ### [*] Infection table
 
 #### glm
@@ -630,7 +644,7 @@ stargazer::stargazer(mod1, mod2,
           dep.var.labels=c("Malaria infection"),
           #column.labels=c("All", "After backward elimination"), 
           title="Multivariate models for malaria infection",
-          notes = "AOR: Adjusted odds ratio. (1): AOR with all covariates. (2): AOR after backward elimination.",
+          notes = "(1): all covariates. (2): backward elimination.",
           add.lines = list(c("Events",
                         summary(mod1$model$infection_all)[2],
                         summary(mod2$model$infection_all)[2]
@@ -644,19 +658,19 @@ stargazer::stargazer(mod1, mod2,
                             table(sofNoMis$infection_fal)[[2]]
                             )
                         ),
-          covariate.labels = c("Sex Female:Male",
-                               "Age (17,36]:(8,17]",
-                               "Age (36,85]:(8,17]",
-                               "Community Llanchama:Zungarococha",
-                               "Community Ninarumi:Zungarococha",
-                               "Community Pto.Almendra:Zungarococha",
-                               "Occupation Outdoor:Other",#Farmer/Guard/Logger/Fisher
-                               "Electricity availability No:Yes",
-                               "Wall material Concrete:Wood",
-                               "Wall material Triplay:Wood",
-                               "Floor material Concrete:Wood",
-                               "Floor material Soil or Sand:Wood",
-                               "Bednet usage Never:Always"),
+          covariate.labels = c("Sex: Female",
+                               "Age: (17,36]",
+                               "Age: (36,85]",
+                               "Community: Llanchama",
+                               "Community: Ninarumi",
+                               "Community: Pto.Almendra",
+                               "Occupation: Outdoor",#Farmer/Guard/Logger/Fisher
+                               "Electricity availability: No",
+                               "Wall material: Concrete",
+                               "Wall material: Triplay",
+                               "Floor material: Concrete",
+                               "Floor material: Soil or Sand",
+                               "Bednet usage: Never"),
           omit.stat = c("ll"),digits = 1
           )
 ```
@@ -819,27 +833,27 @@ stargazer::stargazer(mod1v,mod2v,
           dep.var.labels=c("P.vivax","P.falciparum"),
           #column.labels=c("All", "After backward elimination"), 
           title="Multivariate models for malaria species-specific exposure",
-          notes = "AOR: Adjusted odds ratio. (1) and (3): AOR with all covariates. (2) and (4): AOR after backward elimination.",
+          notes = "(1) and (3): all covariates. (2) and (4): backward elimination.",
           add.lines = list(c("Events",
                              summary(mod1v$model$exposure_viv)[2],
                         summary(mod2v$model$exposure_viv)[2],
                         summary(mod1f$model$exposure_fal)[2],
                         summary(mod2f$model$exposure_fal)[2]
                         )),
-          covariate.labels = c("Sex Female:Male",
-                               "Age [15,85]",
-                               #"Age (17,36]:[15,17]",
-                               #"Age (36,85]:[15,17]",
-                               "Community Llanchama:Zungarococha",
-                               "Community Ninarumi:Zungarococha",
-                               "Community Pto.Almendra:Zungarococha",
-                               "Occupation Outdoor:Other",#Farmer/Guard/Logger/Fisher
-                               "Electricity availability No:Yes",
-                               "Wall material Concrete:Wood",
-                               "Wall material Triplay:Wood",
-                               "Floor material Concrete:Wood",
-                               "Floor material Soil or Sand:Wood",
-                               "Bednet usage Never:Always"),
+          covariate.labels = c("Sex: Female",
+                               "Age: [15,85]",
+                               #"Age: (17,36]",
+                               #"Age: (36,85]",
+                               "Community: Llanchama",
+                               "Community: Ninarumi",
+                               "Community: Pto.Almendra",
+                               "Occupation: Outdoor",#Farmer/Guard/Logger/Fisher
+                               "Electricity availability: No",
+                               "Wall material: Concrete",
+                               "Wall material: Triplay",
+                               "Floor material: Concrete",
+                               "Floor material: Soil or Sand",
+                               "Bednet usage: Never"),
           omit.stat = c("ll"),digits = 1
           )
 ```
