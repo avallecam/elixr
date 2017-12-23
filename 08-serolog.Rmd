@@ -545,29 +545,13 @@ unap10a_ra %>% filter(!is.na(trabajo_rpl)) %>% dplyr::count(pcr_c)
 
 ```{r}
 #unap10a_ra #plot like baseline but wrt species-specific exposure+infection
+#summary(mod1$data$age_d)  #all age categories
+#summary(mod1$model$age_d) #after omit missings
+#summary(sofNoMis$age_7)   # regression only 15 or more years old
+#summary(sofNoMis$age_d)
 ```
-
 
 - unadjusted
-
-```{r,eval=FALSE,echo=FALSE}
-modx <- lrm(infection_viv ~ 
-                  #sex_8 #+ 
-                  ##age_d +
-                  #age_7 +
-                  ##rms::rcs(age_7,3) + 
-                  ##rms::rcs(age_7,5) + 
-                  #community_1 + 
-                  #trabajo_rpl + 
-                  #electricidad_red_publica + 
-                  #material_pared + 
-                  #material_piso + 
-                  ##epi_uso_redes_cama + 
-                  #epi_uso_red_dormir
-                , data=unap10a_ra, 
-                x=TRUE, y=TRUE)
-modx
-```
 
 ```{r,eval=FALSE,echo=FALSE}
 model.null = glm(infection_viv ~ 1
@@ -597,27 +581,11 @@ step(model.null,
              data=unap10a_ra)
 ```
 
-```{r,eval=FALSE,echo=FALSE}
-modx <- lrm(infection_viv ~ sex_8 + 
-                  #age_d +
-                  age_7 +
-                  #rms::rcs(age_7,3) + 
-                  #rms::rcs(age_7,5) + 
-                  community_1 + trabajo_rpl + 
-                  electricidad_red_publica + 
-                  material_pared + 
-                  material_piso + 
-                  #epi_uso_redes_cama + 
-                  epi_uso_red_dormir
-                , data=unap10a_ra, 
-                x=TRUE, y=TRUE)
-```
-
 ```{r}
 #options(prType='latex')
 ```
 
-### All infections
+### [*] Infection table
 
 #### glm
 
@@ -698,16 +666,16 @@ stargazer::stargazer(mod1, mod2,
 #### glm
 
 ```{r}
-myForm<- as.formula(exposure_viv ~ sex_8 + age_d + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir)
+myForm<- as.formula(exposure_viv ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir)
 
 mod1v <- glm(myForm, data=unap10a_ra,family = binomial(link="logit"))
-#summary(mod1)
+#summary(mod1v)
 
 sof <- unap10a_ra
 sofNoMis <- sof[which(complete.cases(sof[,all.vars(myForm)])),]
 FulMod2 <- glm(myForm,family=binomial(link="logit"),data=sofNoMis)
 summary(step(FulMod2,direction="backward",trace=FALSE))
-mod2v <- glm(exposure_viv ~ age_d + community_1 + epi_uso_red_dormir,
+mod2v <- glm(exposure_viv ~ age_7 + community_1 + epi_uso_red_dormir,
             family=binomial(link="logit"),data=sofNoMis)
 
 #broom::tidy(mod1); broom::augment(mod1); broom::glance(mod1)
@@ -771,17 +739,17 @@ cbind(OR = OR.vector.2.v, CI.vector.2.v,p.values.2.v)
 #### glm
 
 ```{r}
-myForm<- as.formula(exposure_fal ~ sex_8 + age_d + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir)
+myForm<- as.formula(exposure_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir)
 
 mod1f <- glm(myForm, data=unap10a_ra,family = binomial(link="logit"))
-#summary(mod1)
+#summary(mod1f)
 
 sof <- unap10a_ra
 sofNoMis <- sof[which(complete.cases(sof[,all.vars(myForm)])),]
 FulMod2 <- glm(myForm,family=binomial(link="logit"),data=sofNoMis)
 summary(step(FulMod2,direction="backward",trace=FALSE))
-mod2f <- glm(exposure_fal ~ sex_8 + age_d + community_1 + trabajo_rpl + 
-    material_piso + epi_uso_red_dormir,
+mod2f <- glm(exposure_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + 
+    epi_uso_red_dormir,
             family=binomial(link="logit"),data=sofNoMis)
 # electricidad_red_publica + trabajo_rpl + epi_uso_red_dormir
 
@@ -835,7 +803,7 @@ cbind(OR = OR.vector.2.f, CI.vector.2.f,p.values.2.f)
 #          )
 ```
 
-### Pf+Pv exposure
+### [*] Exposure table
 
 ```{r}
 stargazer::stargazer(mod1v,mod2v,
@@ -859,8 +827,9 @@ stargazer::stargazer(mod1v,mod2v,
                         summary(mod2f$model$exposure_fal)[2]
                         )),
           covariate.labels = c("Sex Female:Male",
-                               "Age (17,36]:(8,17]",
-                               "Age (36,85]:(8,17]",
+                               "Age [15,85]",
+                               #"Age (17,36]:[15,17]",
+                               #"Age (36,85]:[15,17]",
                                "Community Llanchama:Zungarococha",
                                "Community Ninarumi:Zungarococha",
                                "Community Pto.Almendra:Zungarococha",
@@ -874,6 +843,8 @@ stargazer::stargazer(mod1v,mod2v,
           omit.stat = c("ll"),digits = 1
           )
 ```
+
+### [*] Assumption plots
 
 ```{r,fig.height=18,fig.width=12}
 par(mfrow=c(6,4))
