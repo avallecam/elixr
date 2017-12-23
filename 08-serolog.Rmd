@@ -178,10 +178,10 @@ s1 <- Hmisc::summaryM(sex_8 + #age_7 +
                         #epi_uso_redes_cama +
                         epi_uso_red_dormir + #tenido_malaria +
                         cuantas_tenido_malaria
-                      ~ community_1 #+ 
+                      ~ community_1 #+ all#
                       #episodio_previo
                       ,
-               data=unap10a_bcx,
+               data=unap10a_bcx %>% mutate(all="all"),
                overall=FALSE, test=TRUE)
 #s1
 #print(s1)
@@ -387,10 +387,10 @@ unap10a_prx <- Hmisc::upData(unap10a_pr,
 
 ```{r}
 s1 <- Hmisc::summaryM(micro_c + pcr_c + sero_c #+ Ab.unit_Pviv + Ab.unit_Pfal
-                      ~ community_1 #+ 
+                      ~ community_1 #+ all#
                       #episodio_previo
                       ,
-               data=unap10a_prx,
+               data=unap10a_prx %>% mutate(all="all"),
                overall=FALSE, test=TRUE)
 
 Hmisc::latex(s1, caption='Malaria prevalence (microscopy and PCR) and seroprevalence by study site',
@@ -412,20 +412,20 @@ unap10a_prx <- Hmisc::upData(unap10a_pr,
                                     sero_c="Seropositivity"#,
                          ),
                          levels = list(
-                           micro_c=list("non"="fal",
-                                        "non"="viv",
-                                        "non"="non"
-                                        #"Mixed"="mix"
+                           micro_c=list("tot"="fal",
+                                        "tot"="viv",
+                                        "non"="non",
+                                        "tot"="mix"
                                         ),
-                           pcr_c=list("non"="fal",
-                                        "non"="viv",
+                           pcr_c=list("tot"="fal",
+                                        "tot"="viv",
                                       "non"="non",
-                                        "Mixed"="mix"
+                                        "tot"="mix"
                                         ),
-                           sero_c=list("non"="fal",
-                                        "viv"="viv",
+                           sero_c=list("tot"="fal",
+                                        "tot"="viv",
                                        "non"="non",
-                                        "non"="mix"
+                                        "tot"="mix"
                                         )
                                        )
                          )
@@ -433,10 +433,10 @@ unap10a_prx <- Hmisc::upData(unap10a_pr,
 
 ```{r,eval=FALSE,echo=FALSE}
 s1 <- Hmisc::summaryM(micro_c + pcr_c + sero_c #+ Ab.unit_Pviv + Ab.unit_Pfal
-                      ~ community_1 #+ 
+                      ~ all#community_1 #+ 
                       #episodio_previo
                       ,
-               data=unap10a_prx,
+               data=unap10a_prx %>% mutate(all="all"),
                overall=FALSE, test=TRUE)
 
 Hmisc::latex(s1, caption='Malaria prevalence (microscopy and PCR) and seroprevalence by study site',
@@ -445,7 +445,7 @@ Hmisc::latex(s1, caption='Malaria prevalence (microscopy and PCR) and seropreval
       #prmsd=TRUE, brmsd=TRUE, msdsize=mu$smaller2, #NOT-EVALUATE if PDF
       middle.bold=TRUE, long = TRUE,
       #legend.bottom = TRUE, #insert.bottom = TRUE, 
-      what="%"#, html = TRUE
+      what="%", html = TRUE
       ) #change here for LaTeX PDF
 ```
 
@@ -634,12 +634,14 @@ OR.vector.2 <- exp(mod2$coef)
 CI.vector.2 <- exp(confint(mod2))
 p.values.2 <- summary(mod2)$coefficients[, 4]
 cbind(OR = OR.vector.2, CI.vector.2,p.values.2)
+```
 
+```{r,results='asis'}
 # Table with ORs and CIs
 stargazer::stargazer(mod1, mod2,
                      coef = list(OR.vector,OR.vector.2), #ci = T, 
           ci.custom = list(CI.vector,CI.vector.2), p = list(p.values,p.values.2), 
-          single.row = T, type = "text",
+          single.row = T, type = "html",
           t.auto=F, p.auto=F, report = "vcs*",
           dep.var.labels=c("Malaria infection"),
           #column.labels=c("All", "After backward elimination"), 
@@ -819,7 +821,7 @@ cbind(OR = OR.vector.2.f, CI.vector.2.f,p.values.2.f)
 
 ### [*] Exposure table
 
-```{r}
+```{r,results='asis'}
 stargazer::stargazer(mod1v,mod2v,
                      mod1f,mod2f,
                      coef = list(OR.vector.1.v,OR.vector.2.v,
@@ -828,7 +830,7 @@ stargazer::stargazer(mod1v,mod2v,
                            CI.vector.1.f,CI.vector.2.f), 
           p = list(p.values.1.v,p.values.2.v,
                    p.values.1.f,p.values.2.f), 
-          single.row = T, type = "text",
+          single.row = T, type = "html",
           t.auto=F, p.auto=F, report = "vcs*",
           dep.var.labels=c("P.vivax","P.falciparum"),
           #column.labels=c("All", "After backward elimination"), 
@@ -1086,7 +1088,7 @@ unap10a_rc_a %>%
   geom_line(aes(y = y), data = revcat_a, colour = "black") +
   geom_text(aes(x,y,label=lab),
             data = revcat %>% 
-              mutate(x=59,y=0.10) %>% 
+              mutate(x=53,y=0.12) %>% 
               mutate(lab=paste0("SCR=",h %>% format(digits=2),
                                 "\nSRR=",r %>% format(digits=2)))
             ,vjust=.5,hjust=0.05,size=3) +
@@ -1204,16 +1206,16 @@ unap10a_rc_a %>%
 
 - just distribution + loess regression line
 
-```{r,fig.height=3,fig.width=6}
+```{r,fig.height=4,fig.width=12}
 unap10a %>% #age vs log(Ab.units)
   dplyr::select(id,age_7,community_1,Ab.unit_Pfal,Ab.unit_Pviv) %>% 
   gather(Specie,Ab.units,-id,-age_7,-community_1) %>% 
-  filter(Ab.units>=0) %>% 
+  filter(Ab.units>0) %>% 
   ggplot(aes(age_7,Ab.units)) +
   geom_point(alpha=.5)+
   geom_smooth() +
-  scale_y_log10() +
-  facet_grid(~Specie) +
+  #scale_y_log10() +
+  facet_grid(Specie~community_1) +
   scale_y_continuous(breaks = c(1,10,100,1000),trans="log10")
 ```
 
