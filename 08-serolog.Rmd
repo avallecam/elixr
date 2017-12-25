@@ -1198,7 +1198,7 @@ unap10a_rc_a %>%
               mutate(lab=paste0("SCR=",h %>% format(digits=2),
                                 "\nSRR=",r %>% format(digits=2)))
             ,vjust=.5,hjust=0.05,size=3) +
-  xlab("Age") + ylab("Seroprevalence")
+  xlab("Age") + ylab("Seroprevalence (proportion)")
   #stat_smooth(formula = )
 ```
 
@@ -1266,9 +1266,9 @@ ggmap::ggmap(per) +
   theme(#legend.position=c(0.17,0.84),#"bottom" #google
         legend.position=c(0.88,0.17),#"bottom" #google
         #legend.position=c(0.9,0.2),#"stamen"
-        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        legend.margin = margin(0.2,0.2,0.2,0.2)#,axis.title.y=element_blank()
         ) + 
-  scale_colour_discrete(name="Community") +
+  scale_colour_discrete(name="Villages") +
   xlab("Longitud") +
   ylab("Latitud") +
   coord_fixed(ylim = c(-3.87,-3.72)#, ratio = 2/1
@@ -1558,7 +1558,11 @@ ggmap::qmplot(longitud, latitud,
 ```{r,fig.height=7.5,fig.width=7.5,message=FALSE,error=TRUE}
 ggmap::qmplot(longitud, latitud, 
        data = dat_x %>% 
-         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
+         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv"),
+                attribute=forcats::fct_recode(attribute,
+                                              "microscopy+"="micro_c",
+                                              "PCR+"="pcr_c",
+                                              "serology+"="sero_c")) %>% 
          filter(!quality=="non")
        , 
        zoom = 13,
@@ -1585,7 +1589,11 @@ ggmap::qmplot(longitud, latitud,
        data = dat_x %>% 
          mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
          filter(community_1=="Zungarococha" & !quality=="non") %>% 
-         add_row(community_1="Zungarococha",attribute="sero_c",quality="mix")
+         add_row(community_1="Zungarococha",attribute="sero_c",quality="mix") %>% 
+         mutate(attribute=forcats::fct_recode(attribute,
+                                              "microscopy+"="micro_c",
+                                              "PCR+"="pcr_c",
+                                              "serology+"="sero_c"))
        , 
        zoom = 13,
        color = quality,
@@ -1610,9 +1618,13 @@ ggmap::qmplot(longitud, latitud,
 ```{r,fig.height=7.5,fig.width=7.5,message=FALSE,error=TRUE}
 ggmap::qmplot(longitud, latitud, 
        data = dat_x %>% 
-         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
+         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv"),
+                attribute=forcats::fct_recode(attribute,
+                                              "micro+"="micro_c",
+                                              "PCR+"="pcr_c",
+                                              "sero+"="sero_c")) %>% 
          filter(community_1=="Puerto Almendra" & !quality=="non") %>% 
-         mutate(community_1=forcats::fct_recode(community_1,"Prto. A"="Puerto Almendra"))
+         mutate(community_1=forcats::fct_recode(community_1,"Pto. A"="Puerto Almendra"))
        , 
        zoom = 13,
        color = quality,
@@ -1635,7 +1647,11 @@ ggmap::qmplot(longitud, latitud,
 ```{r,fig.height=7.5,fig.width=7.5,message=FALSE,error=TRUE}
 ggmap::qmplot(longitud, latitud, 
        data = dat_x %>% 
-         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
+         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv"),
+                attribute=forcats::fct_recode(attribute,
+                                              "microscopy+"="micro_c",
+                                              "PCR+"="pcr_c",
+                                              "serology+"="sero_c")) %>% 
          filter(community_1=="Llanchama" & !quality=="non")
        , 
        zoom = 13,
@@ -1657,7 +1673,11 @@ ggmap::qmplot(longitud, latitud,
 ```{r,fig.height=7.5,fig.width=7.5,message=FALSE,error=TRUE}
 ggmap::qmplot(longitud, latitud, 
        data = dat_x %>% 
-         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv")) %>% 
+         mutate(quality=forcats::fct_relevel(quality,"mix","fal","viv"),
+                attribute=forcats::fct_recode(attribute,
+                                              "microscopy+"="micro_c",
+                                              "PCR+"="pcr_c",
+                                              "serology+"="sero_c")) %>% 
          filter(community_1=="Ninarumi" & !quality=="non")
        , 
        zoom = 13,
