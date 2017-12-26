@@ -466,14 +466,14 @@ ctr <- end %>% filter(type=="ctr")
 
 #### cv
 
-```{r, fig.height=10, fig.width=10}
+```{r, fig.height=8.4, fig.width=12}
 mdo %>% 
   ggplot(aes(mean.od,cv.od,colour=plate)) +
   geom_point() +
   coord_cartesian(ylim = c(0,100)) +
   geom_hline(aes(yintercept=20),linetype="dashed",size=0.3) +
   geom_vline(aes(xintercept=0.25),linetype="dashed",size=0.3) +
-  facet_wrap(~plate,ncol = 7) +
+  facet_wrap(~plate,ncol = 8) +
   labs(title="QC plot: Intra-plate coefficient of variation")
 ```
 
@@ -483,17 +483,17 @@ mdo %>%
 
 #### 4pll
 
-```{r, fig.height=10, fig.width=11}
+```{r, fig.height=8.4, fig.width=12}
 std %>% 
   mutate(ab=ifelse(ab==0,0.5,ab)) %>% 
   ggplot(aes(ab,od)) +
   geom_hline(aes(yintercept=od,linetype=id),data=ctr) +
-  geom_point(aes(colour=plate)) +
-  #geom_ribbon(data=new, aes(x=resp, y=p, ymin=pmin, ymax=pmax), alpha=0.2) +
-  #geom_line(data=new, aes(x=resp, y=p, colour=plate)) +
+  geom_point(aes(colour=plate),size=.8) +
+  geom_ribbon(data=new, aes(x=resp, y=p, ymin=pmin, ymax=pmax), alpha=0.2) +
+  geom_line(data=new, aes(x=resp, y=p, colour=plate)) +
   scale_x_log10() +#coord_trans(x="log") +
   #theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  facet_wrap(~plate,ncol = 7,scales = "free"
+  facet_wrap(~plate,ncol = 8#,scales = "free"
              ) +
   labs(title="QC plot: 4-parameter log-logistic model per plate")
   #xlab("Ferulic acid (mM)") + ylab("Root length (cm)")
@@ -508,17 +508,19 @@ std %>%
         3. Ruido de fondo en las placas, por deficiencias en el lavado o uso de placas recicladas.
         4. Diferencias en el accionar entre distintos operadores por placa.
 
-```{r, fig.height=8.1, fig.width=11}
+```{r, fig.height=8.5, fig.width=12}
 mdo %>% 
   ggplot(aes(abs,mean.od,colour=plate)) +
   #coord_cartesian(ylim = c(0,1)) +
   geom_point() +
   geom_errorbarh(aes(xmin=Lower,xmax=Upper), colour="black", size=.2) +
-  scale_x_log10() +
+  scale_x_continuous(breaks = c(0.1,1,10,100,1000),labels = c(0.1,1,10,100,1000),
+                     trans="log10") +#scale_x_log10() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   facet_wrap(~plate#+pheno
-             ,ncol = 7,scales = "free"
+             ,ncol = 8#,scales = "free"
              ) + 
-  labs(title="Estimates of Arbitrary Antibody units (AU) per plate and phenotype") +
+  labs(title="Estimates of Arbitrary Antibody units (AU) per plate and species") +
   geom_hline(aes(yintercept=od,linetype=id),data=ctr) ## filter threshold?
   # inverse regression method
   #facet_wrap(igg~pheno,nrow = 2)
@@ -630,9 +632,25 @@ mdo %>%
 #Rmisc::multiplot(b,c,cols = 1)
 ```
 
+#### all
+
+```{r,fig.align='center', fig.width=6, fig.height=5}
+mdo %>% 
+  dplyr::select(code,mean.od,abs,specie) %>% 
+  gather(measure,linear,-code,-specie) %>% 
+  mutate(log=log10(linear)) %>% 
+  gather(transform,value,-measure,-code,-specie) %>% 
+  mutate(measure=forcats::fct_relevel(measure, "mean.od")) %>% 
+  ggplot(aes(value,fill=specie)) +
+  geom_histogram(alpha=.5,position = "identity") +
+  facet_wrap(transform~measure,scales = "free")
+```
 
 
 ## Output
+
+- compare with 01-standard and 02-dtfilter outputs!
+
 ```{r}
 #saveRDS(tbl_df(std.raw), "data/01-standard-raw.rds")
 #saveRDS(tbl_df(std.par), "data/01-parametr.rds")
