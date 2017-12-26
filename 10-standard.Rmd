@@ -212,9 +212,9 @@ for (i in 1:length(allxls)) {
 
 ### read_plates
 
-```{r}
-a <- "data/plater/11fal.csv"
-b <- "data/plater/11viv.csv"
+```{r,eval=FALSE,echo=FALSE}
+a <- "data/plater/23fal.csv"
+b <- "data/plater/23viv.csv"
 #c <- read.csv(a,header = F) 
 #d <- read.csv(b,header = F) 
 #c %>% View; d %>% View
@@ -227,6 +227,410 @@ str(c)
 #c %>% dplyr::count(plate)
 #c
 ```
+
+```{r}
+# lista de muestras en el directorio
+ptr <- list.files("data/plater",full.names = T) #length(smp)
+```
+
+```{r}
+all <- plater::read_plates(files=ptr) %>% 
+  rename_all(funs(stringr::str_to_lower(.))) %>% 
+  mutate(temp=stringr::str_replace(plate,"(.+)fal|viv","\\1")) %>% 
+  separate(wells,c("row","col"),sep = 1,remove = F) %>% 
+  mutate(type=ifelse(row=="A" | id=="Blank","std",
+                     ifelse(id=="C+" | id=="C-","ctr","unk")),
+         ab=ifelse(row=="A",stringr::str_replace(id,"STD 1/(.+)","\\1"),
+                    ifelse(id=="Blank","0",NA_character_))
+         ) %>% 
+  mutate(ab=as.numeric(ab)) %>% 
+  mutate(ab=ifelse(row=="A",max(ab,na.rm=T)/ab,ab)) %>% #select(-row,-loc)
+  filter(!is.na(id)) %>% 
+  #replace_na(list(ID = "na")) %>% 
+  #filter(ID!="na") %>% 
+  mutate(order=seq(1,dim(.)[1])) #%>% 
+  #mutate(specie=as.factor(specie)) %>% 
+  #unite(plate,c("plate","specie"),sep = "_",remove = T)
+```
+
+```{r,eval=FALSE,echo=FALSE}
+all %>% group_by(plate) %>% dplyr::count()
+all %>% filter(type=="unk") %>% dplyr::count(plate)
+```
+
+### standarization
+
+```{r}
+end <- all
+# mod is mean od (plus sd and cv)
+mod <- end %>% 
+  filter(type=="unk") %>% 
+  group_by(plate,#anti,
+           id) %>% 
+  summarise_at(vars(od),c("mean","sd")) %>% 
+  ungroup() %>% 
+  dplyr::rename(mean.od="mean",
+                sd.od="sd") %>% 
+  mutate(cv.od=100*sd.od/mean.od) %>% 
+  mutate(order=seq(1,dim(.)[1]))
+  #filter(ID=="1570")
+
+mab <- end %>% 
+  filter(type=="unk") %>% 
+  group_by(plate,#anti,
+           id) %>% 
+  slice(1) %>% 
+  ungroup() %>% #filter(ID=="1570")
+  mutate(order=seq(1,dim(.)[1])) %>% 
+  full_join(mod %>% dplyr::select(order,mean.od,sd.od,cv.od),
+            by="order") %>% #mutate(test.id= ID.x==ID.y) %>% dplyr::count(test.id)
+  dplyr::select(-order,-od) %>% 
+  mutate(ord=seq(1,dim(.)[1])) %>% 
+  unite(code,id,ord,sep="_",remove = F)
+```
+
+```{r,eval=FALSE, echo=FALSE}
+mab %>% dplyr::count(plate)
+```
+
+#### blank issue
+
+```{r}
+#mascara
+blk <- end %>% 
+  filter(id=="Blank") %>% 
+  group_by(plate) %>% slice(1) %>% ungroup() %>% #
+  dplyr::select(-od)
+#media por par de blancos por placa
+std <- end %>% 
+  filter(id=="Blank") %>% 
+  group_by(plate) %>% #
+  summarise_at(vars(od),mean,na.rm=T) %>% 
+  ungroup() %>% 
+  #dplyr::rename(mean.OD="OD") %>% 
+  full_join(blk,by="plate") %>% 
+  dplyr::select(plate,id,type,ab,od,everything()) %>% 
+  union(end %>% filter(type=="std" & id!="Blank")) %>% 
+  arrange(plate,ab) %>% 
+  mutate(plate=as.factor(plate))
+```
+
+#### 4pll per template
+
+```{r}
+# no phe (from phenoptype)
+phe <- std
+```
+
+```{r,message=FALSE}
+
+mab_ir <- NULL
+mod_bx <- NULL
+
+#
+# new dose levels as support for the line
+#mdo$abs %>% summary()
+new_x <- expand.grid(exp(seq(log(0.1),log(2048),length=100)))
+# db to add predictions of all plates
+new <- data_frame(ord=as.character(),
+                  resp=as.double(),
+                  p=as.double(),
+                  pmin=as.double(),
+                  pmax=as.double(),
+                  plate=as.character())
+#
+
+for (j in 1:length(levels(phe$plate))) {
+  
+#
+# 5 PARAMETER ESTIMATION 4pLL model
+#
+wb.m1 <- drm(od ~ ab, plate, 
+               data= std %>% filter(plate==levels(phe$plate)[j]),#j
+             #data= std,
+               fct = LL.4(names = c("b", "c", "d", "e")))
+#
+wb.model <- wb.m1
+# 6 BOX-COX TRANSFORMATION against RESIDUAL heterogeneity
+wb.model.BX <- boxcox(wb.model, 
+                     main=expression("Optimal " ~ lambda ~ " with confidence intervals"), 
+                     plotit = FALSE)
+#coefficients(wb.model.BX) %>% matrix(7,4)
+mab_p <- mab %>% as.data.frame()
+# 7 UNK abS ESTIMATION by INVERSE REGRESSION
+mir <- ED(wb.model.BX, 
+                 mab_p[mab_p$plate==levels(phe$plate)[j],"mean.od"],#j
+                   #wb_MEAN[1:n,5],
+                   type = "absolute",interval = "delta",
+                   #clevel = "Pfal", 
+                 display = FALSE)
+  
+mab_ir <- rbind(mab_ir,mir)
+mod_bx <- rbind(mod_bx,coefficients(wb.model.BX))
+
+#
+# predictions and confidence intervals
+pdm <- predict(wb.model.BX, newdata = new_x, interval = "confidence")
+# new data with predictions
+new_p <- bind_cols(new_x %>% 
+                     as.tibble() %>% 
+                     rownames_to_column(var = "ord")
+                   , pdm %>% 
+                     as.tibble() %>% 
+                     rownames_to_column(var = "ord")
+                   ) %>%
+  dplyr::select(-ord1) %>% 
+  mutate(plate=levels(phe$plate)[j]) %>% 
+  dplyr::rename(resp=Var1,p=Prediction,pmin=Lower,pmax=Upper)
+
+new <- union(new,new_p)
+#
+
+}
+
+#mab
+#mab[mab$plate==levels(phe$plate)[1],] #%>% duplicated() %>% sum()
+
+# 7.1 FEED UNK abS DATA.FRAME
+mdo <- mab_ir %>% as.data.frame() %>% rownames_to_column() %>% 
+  #dplyr::rename(ord=rowname) %>% 
+  separate(rowname,c("par","plate","mean.od.c"),sep = ":") %>% 
+  rownames_to_column("ord") %>% 
+  #mutate(ord=seq(1,dim(.)[1])) %>% 
+  full_join(mab %>% 
+              mutate(ord=as.character(ord)) %>% 
+              mutate(mean.od.c=as.character(mean.od))
+            ,
+            by = c("ord","plate","mean.od.c")) %>% 
+  dplyr::select(plate,ord,id,code,type,#pheno,igg,
+                mean.od,sd.od,cv.od,abs=Estimate,
+         everything(),-par,-mean.od.c,-ab) #%>% 
+  # ANY MANUAL FILTERING of replicate on different templates could be applied HERE!!!
+  #filter(!code=="2235_137") 
+
+mod_bt <- mod_bx %>% as.data.frame() %>% rownames_to_column() %>% as.tibble() %>% 
+  full_join(std %>% 
+              dplyr::count(plate) %>% dplyr::select(-n) %>% rownames_to_column(),
+            by="rowname") %>% 
+  dplyr::select(plate,everything(),-rowname) %>% 
+  separate(plate,c("temp","specie"),sep = 2,remove = F) #%>% 
+  #dplyr::rename(plate=rowname) %>% 
+  #mutate(plate=stringr::str_replace(plate,"(\\d)","N\\1"))
+
+new <- new %>% mutate(ord=as.numeric(ord)) %>% arrange(plate,ord)
+```
+
+#### outputs
+
+```{r}
+#
+#fin
+#end
+#mod
+#mab
+
+# standard curve data
+std
+
+# estimated ab unit data
+mdo
+
+# estimated parameters per standard curve
+mod_bt
+
+# predicted model per standard curve 
+new
+```
+
+#### *CHECKPOINT
+```{r}
+mdo %>% arrange(id,plate)
+#samples with replicates in other PLATE
+mdo %>% group_by(id) %>%  dplyr::count() %>% arrange(desc(n)) %>% filter(n!=2) 
+mdo %>% filter(id=="LL055-7") %>% arrange(id)
+mdo %>% filter(id=="LL028-2") %>% arrange(id)
+
+mdo %>% filter(id=="ZG181-1" | id=="ZG182-1") %>% arrange(id)
+mdo <- mdo %>% mutate(id=if_else(id=="ZG182-1","ZG181-1",id))
+mdo %>% filter(id=="ZG181-1" | id=="ZG182-1") %>% arrange(id)
+```
+
+### quality control plots
+
+```{r}
+#std
+ctr <- end %>% filter(type=="ctr")
+#ctr %>% filter(plate==levels(phe$plate)[1] & id=="C+") %>% .$od
+#std %>% filter(plate==levels(phe$plate)[1] & id=="Blank") %>% .$od
+```
+
+#### cv
+
+```{r, fig.height=10, fig.width=10}
+mdo %>% 
+  ggplot(aes(mean.od,cv.od,colour=plate)) +
+  geom_point() +
+  coord_cartesian(ylim = c(0,100)) +
+  geom_hline(aes(yintercept=20),linetype="dashed",size=0.3) +
+  geom_vline(aes(xintercept=0.25),linetype="dashed",size=0.3) +
+  facet_wrap(~plate,ncol = 7) +
+  labs(title="QC plot: Intra-plate coefficient of variation")
+```
+
+- __OBSERVACIONES:__
+    + La baja variabilidad permite descartar error de pipeteo.
+    + Todas las réplicas incluidas en las muestras del estudio tienen un CV menor a 22%.
+
+#### 4pll
+
+```{r, fig.height=10, fig.width=11}
+std %>% 
+  mutate(ab=ifelse(ab==0,0.5,ab)) %>% 
+  ggplot(aes(ab,od)) +
+  geom_hline(aes(yintercept=od,linetype=id),data=ctr) +
+  geom_point(aes(colour=plate)) +
+  #geom_ribbon(data=new, aes(x=resp, y=p, ymin=pmin, ymax=pmax), alpha=0.2) +
+  #geom_line(data=new, aes(x=resp, y=p, colour=plate)) +
+  scale_x_log10() +#coord_trans(x="log") +
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~plate,ncol = 7,scales = "free"
+             ) +
+  labs(title="QC plot: 4-parameter log-logistic model per plate")
+  #xlab("Ferulic acid (mM)") + ylab("Root length (cm)")
+```
+
+- __OBSERVACIONES:__
+    + El cruce del control positivo y la tercera dilución de la curva estandar descartan error en el pipeteo. También indican que cualquier otra anomalía es producto a un error sistemático.
+    + Valores de curva estandar por debajo del control negativo anulan la validez de las lecturas por debajo de este valor de od.
+    + Entre las posibles fuentes de error están:
+        1. Efecto de el uso de un buffer sustrato distinto entre el grupo de placas __N1-N7__ (__OPD__ x60min, todas placas con curva defectuosa) y __N8-N18__ (__TMB__ x60min, todas placas con curva adecuadas).
+        2. Alteraciones en la ejecución del protocolo, debido a que las ELISA son muy sensibles a los tiempos de incubación y correcto lavado entre estos.
+        3. Ruido de fondo en las placas, por deficiencias en el lavado o uso de placas recicladas.
+        4. Diferencias en el accionar entre distintos operadores por placa.
+
+```{r, fig.height=8.1, fig.width=11}
+mdo %>% 
+  ggplot(aes(abs,mean.od,colour=plate)) +
+  #coord_cartesian(ylim = c(0,1)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin=Lower,xmax=Upper), colour="black", size=.2) +
+  scale_x_log10() +
+  facet_wrap(~plate#+pheno
+             ,ncol = 7,scales = "free"
+             ) + 
+  labs(title="Estimates of Arbitrary Antibody units (AU) per plate and phenotype") +
+  geom_hline(aes(yintercept=od,linetype=id),data=ctr) ## filter threshold?
+  # inverse regression method
+  #facet_wrap(igg~pheno,nrow = 2)
+```
+
+- __OBSERVACIONES:__
+    + Lecutas de muestras serán descartadas si tienen:
+        - `mean.od` por debajo del cruce con su respectivo control negativo.
+        
+        <!--- Error estandar mayor a 100.
+        + Ver resultado [aqui](#post-quality).-->
+### filtering
+
+#### filter replicates
+
+```{r}
+rept <- mdo %>% group_by(id,specie) %>% 
+  dplyr::count(id) %>% arrange(desc(n)) %>% 
+  filter(n>1) %>% dplyr::select(-n) #replicates
+#rept
+
+rept_sel <- mdo %>% 
+  inner_join(rept,by = c("id","specie")) %>% 
+  arrange(id,specie) %>% 
+  group_by(id,specie) %>% 
+  filter(cv.od == min(cv.od)) # SELECT with the lowest CV
+# all in plate5 with lower CV -but- high AU uncertainty ???????
+rept_sel
+
+length(unique(mdo$id))
+dim(mdo)
+
+mdo <- mdo %>% 
+  anti_join(rept,by = c("id")) %>% 
+  union(rept_sel) %>% 
+  mutate(ord=as.numeric(ord)) %>% 
+  arrange(plate,ord)
+
+length(unique(mdo$id))
+dim(mdo)
+#mdo
+#mdo %>% dplyr::count(id,anti) %>% arrange(desc(n))
+```
+
+#### *CHECKPOINT
+
+```{r}
+mdo %>% filter(id=="LL055-7") %>% arrange(id)
+mdo %>% filter(id=="LL028-2") %>% arrange(id)
+mdo %>% filter(id=="ZG181-1" | id=="ZG182-1") %>% arrange(id)
+```
+
+#### filter NaN
+
+```{r}
+### any NaN??
+
+nan <- mdo %>% 
+  filter(abs=="NaN") # only 7
+nan
+
+#mod_bt[10:13,c(1,2,4,5)]
+
+mdo <- mdo %>% filter(!abs=="NaN")
+```
+
+#### *CHECKPOINT
+
+```{r}
+mdo
+```
+
+### distribution plots
+
+#### linear
+
+##### scale free
+
+```{r,fig.width=6,fig.height=2.2}
+##### ab units
+mdo %>% 
+  ggplot(aes(x=abs#,fill=pheno
+             ))+
+  geom_histogram(aes(x=abs,..density..),
+                 alpha=.5,position = "identity") +
+  geom_density(alpha=.5,position = "identity") +
+  facet_wrap(~specie,scales = "free")
+
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_dens.png")
+#Rmisc::multiplot(b,c,cols = 1)
+```
+
+#### log
+
+##### scale free
+
+```{r,fig.width=6,fig.height=2.2}
+##### ab units
+mdo %>% 
+  ggplot(aes(x=abs#,fill=pheno
+             ))+
+  scale_x_log10() +
+  geom_histogram(aes(x=abs,..density..),
+                 alpha=.5,position = "identity") +
+  geom_density(alpha=.5,position = "identity") +
+  facet_wrap(~specie,scales = "free")
+
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_dens.png")
+#Rmisc::multiplot(b,c,cols = 1)
+```
+
+
 
 ## Output
 ```{r}
@@ -242,7 +646,7 @@ str(c)
 
 ```{r}
 #std.par <- readRDS("data/01-parametr.rds")
-std.par
+#std.par
 ```
 
 ***
