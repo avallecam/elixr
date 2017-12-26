@@ -1,0 +1,250 @@
+# ELISA STANDARDIZATION {#stdrad}
+
+## Aim
+
+* Principal: 
+    - Implement a reproducible standardization of OD values across ELISA plates following 
+    **Miura et.al., 2008**[@Miura2008].
+
+* Secondary: 
+    - Generate useful outputs to compare standardization quality.
+
+
+## To Do
+
+- Implement `plater` and `readxl` data input
+- Assess the **inter-plate-CV** comparing STD variability across plates to generate a 
+**Limit of Quantification**
+    + Actual CV is the **intra-plate-CV**
+    + Generate a tibble of all STD dilutions OD's
+    + Extend `std.par` output to all parameters
+- Other inter-plate measurements:
+    + blank, positive and negative controls
+
+
+## Dependencies
+
+The required R packages for this analysis are:
+
++ `plater` [@plater]
++ `readxl` [@readxl]
++ `tidyxl` [@tidyxl]
++ `drc` [@Ritz2015]
+
+```{r, results='hide', message=FALSE}
+##essential
+library(tidyverse)    # set of tidy packages (readr, tibble, dplyr, tidyr, ggplot2, ¿purr?)
+library(tidyxl)       # read untidy excel formats
+library(readxl)       # read excel files as tidy tables
+library(plater)       # read, tidy, display microtiter plates
+library(drc)          # fit dose-response models
+##accesory
+library(DiagrammeR)   # create flowchart
+```
+
+```{r}
+theme_set(theme_bw())
+```
+
+
+## Method
+
+- using `DiagrammeR` [@DiagrammeR]
+
+```{r, fig.align='center', fig.width=9}
+#install.packages("DiagrammeR")
+#library(DiagrammeR)
+
+DiagrammeR("
+  graph LR
+    A[XLS<br>data] -.-> |<center>readxl<br>+tidyxl</center>| B{<center>CSV<br>data<br>w/<br>PLATER<br>format</center>}
+    B -.-> |plater| C{<center>TIDY<br>data</center>}
+    C --> C1[STD]
+    C --> E[ctr +/-]
+    C --> D1[UNK]
+    
+    C1 -.-> |drc| C2[4pLL model]
+    C2 --> C3[Box-Cox]
+    C3 --> F{<center>UNK<br>Ab.units</center>}
+
+    D1 --> D2[mean.OD]
+    D2 --> D3[OD %CV]
+    D3 --> F
+    
+    F --> G1[Histogram]
+    F --> G2[Density]
+    F --> G3[QQPlot]
+
+    style C fill:#ffffff, stroke:#000000, stroke-width:2px    
+    style A fill:#ffffff, stroke:#000000, stroke-width:2px
+    style B fill:#ffffff, stroke:#000000, stroke-width:2px
+    style C1 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style C2 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style C3 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style D1 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style D2 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style D3 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style E fill:#ffffff, stroke:#000000, stroke-width:2px
+    style F fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G1 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G2 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G3 fill:#ffffff, stroke:#000000, stroke-width:2px
+")
+```
+
+
+### Log-Logistic (4pLL) model
+
+The curve of the **log-logistic symetric** model describe the *response* `f(x)` dependent of the *dose* `x` 
+and **04 parameters**: $$ f(x)=f(x;b,c,d,e)=c+\frac{d-c}{1+\exp[b(log(x)-log(e))]}\ $$ where: 
+  
+- `c` is the **lower limit** of the response when the *dose* `x` approaches infinity, 
+- `d` is the **upper limit** when the *dose* `x` approaches zero,
+- `b` is the **slope** around the **point of inflection**, represented by 
+- `e` defined as **effective dose** and commmonly denoted as [@Ritz2015]:
+    + `ED50`, `EC50` or `IC50` for continuous responses,
+    + `LD50` or `LC50` for binomial responses, and
+    + $T_{50}$ for event-time responses.
+
+## plater
+
+```{r,eval=FALSE,echo=FALSE}
+a <- "data/example-1.csv"
+b <- read.csv(a,header = F) 
+#b %>% View
+plater::check_plater_format(a)
+c <- read_plate(a)
+str(c)
+```
+
+```{r,eval=FALSE,echo=FALSE}
+a <- "data/example-2-part-A.csv"
+d <- "data/example-2-part-B.csv"
+b <- read.csv(a,header = T) 
+e <- read.csv(d,header = F)
+#b %>% View; e %>% View
+#plater::check_plater_format(a)
+plater::check_plater_format(d)
+c <- add_plate(data=b,file=d,well_ids_column = "Wells")
+str(c)
+view_plate(data = c, well_ids_column = "Wells", 
+  columns_to_display = c("Concentration", "Killing"))
+```
+
+```{r,eval=FALSE,echo=FALSE}
+a <- "data/example-1.csv"
+b <- "data/more-bacteria.csv"
+c <- read.csv(a,header = F) 
+d <- read.csv(b,header = F) 
+#c %>% View; d %>% View
+plater::check_plater_format(a)
+plater::check_plater_format(b)
+c <- read_plates(files=c(a,b))
+str(c)
+c %>% dplyr::count(Plate)
+```
+
+## Procedure
+
+### generate list
+
+```{r}
+# lista de muestras en el directorio
+smp <- list.files("data-raw/") #length(smp)
+#smp %>% as.tibble() %>% rename("sample"=value)
+
+# número de muestras por comunidad
+tmp <- smp %>% as.tibble() %>% dplyr::rename("sample"=value) %>% 
+  mutate(template=stringr::str_replace(sample,"(Template_ELISA).+","ok")) %>% 
+  filter(template=="ok")
+#tmp$sample
+
+# loop para generar rutas
+allxls <-  NULL
+for(i in 1:length(tmp$sample)){
+  #a <- list.files(paste0("data-raw/",tmp$sample[i]))
+  b <- paste0("data-raw/",tmp$sample[i]#,"/",a
+              )
+  allxls <- c(allxls,b)
+}
+```
+
+### write_plate
+
+```{r}
+write_plate <- function(path,sheet,id_range,od_range,more_id,id) {
+  f1 <- readxl::read_xlsx(path,range = id_range,
+                        sheet = sheet,col_names = F) %>% as.matrix()
+  f2 <- readxl::read_xlsx(path,range = od_range,
+                        sheet = sheet,col_names = F) %>% as.matrix()
+  
+  f1[1,1] <- "id"; f2[1,1] <- "od"; f2[1,-1] <- 1:12
+  
+  f <- rbind(f1[1,],cbind(f1[-1,1],matrix(id,8,12)))
+  f[1,1] <- more_id
+  
+  n <- matrix("",1,13)#96
+  
+  fx <- rbind(f,n,f1,n,f2) #%>% View()
+  colnames(fx) <- 1:dim(fx)[2]
+  
+  return(fx)
+}
+```
+
+```{r}
+for (i in 1:length(allxls)) {
+  path <- allxls[i]
+  
+  num <- stringr::str_replace(path,"data-raw/Template_ELISA_N(.+).xlsx","\\1")
+  fal <- write_plate(path = path,sheet = 1,
+                   id_range = "B22:N30",od_range = "B33:N41",
+                   more_id = "specie",id = "fal")
+  viv <- write_plate(path,1,"B79:N87","B90:N98","specie","viv")
+  #fal %>% View()
+  #viv %>% View()
+  write.table(fal,paste0("data/plater/",num,"fal.csv"),
+            row.names = F,col.names = F,sep = ",",quote = F)
+  write.table(viv,paste0("data/plater/",num,"viv.csv"),
+            row.names = F,col.names = F,sep = ",",quote = F)
+}
+```
+
+### read_plates
+
+```{r}
+a <- "data/plater/11fal.csv"
+b <- "data/plater/11viv.csv"
+#c <- read.csv(a,header = F) 
+#d <- read.csv(b,header = F) 
+#c %>% View; d %>% View
+plater::check_plater_format(a)
+plater::check_plater_format(b)
+c <- read_plates(files=c(a,b)) %>% 
+  rename_all(funs(stringr::str_to_lower(.))) %>% 
+  mutate(plate=stringr::str_replace(plate,"(.+)fal|viv","\\1"))
+str(c)
+#c %>% dplyr::count(plate)
+#c
+```
+
+## Output
+```{r}
+#saveRDS(tbl_df(std.raw), "data/01-standard-raw.rds")
+#saveRDS(tbl_df(std.par), "data/01-parametr.rds")
+#saveRDS(Pf.ID, "data/01-dilution.rds")
+```
+
+
+***
+
+## APPENDIX: Upper/Lower limits
+
+```{r}
+#std.par <- readRDS("data/01-parametr.rds")
+std.par
+```
+
+***
+
+<!--## References-->
