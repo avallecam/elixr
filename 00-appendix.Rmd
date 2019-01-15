@@ -416,7 +416,7 @@ git log
 
 ## APPENDIX: README file
 
-```{bash}
+```bash
 less README.md
 ```
 

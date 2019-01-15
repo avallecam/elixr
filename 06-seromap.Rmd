@@ -61,6 +61,7 @@ theme_set(theme_bw())
 
 
 ## Input
+
 ```{r}
 std.nty <- readRDS("data/02-dtfilter-nty.rds")
 std.uty <- readRDS("data/02-dtfilter-uty.rds")
@@ -97,15 +98,35 @@ std.wrg %>%
   #ggplot(aes(x=data,fill=Specie)) + theme_bw() +
   #geom_histogram(alpha=.5,position = "identity") +
   #facet_grid(.~community)
+dt <- data_frame(`cut-off`=c("Pfal","Pviv"),
+                 cut=c(7,14))
 std.nty %>% 
   mutate(community=stringr::str_replace(ID, "(..)(.+)","\\1")) %>% 
+  mutate(community=forcats::fct_recode(community,
+                                       "Llanchama"="LL",
+                                       "Ninarumi"="NN",
+                                       "Puerto Almendra"="PA",
+                                       "Zungarococha"="ZG"
+                                       )) %>% 
   ggplot(aes(x=Ab.unit,fill=Specie)) + theme_bw() +
   geom_histogram(alpha=.5,position = "identity") +
-  facet_grid(.~community) +
-  scale_x_log10()
+  facet_grid(.~community) +#scale_x_log10() +
+  scale_x_continuous(labels = c(1,10,100,1000),trans = "log10") +
+  geom_vline(aes(xintercept=log10(cut),linetype=`cut-off`),dt,size=0.3)
+  
   #theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
 ```
 
+```{r,fig.align='center', fig.width=5, fig.height=2.5}
+std.nty %>% 
+  mutate(community=stringr::str_replace(ID, "(..)(.+)","\\1")) %>% 
+  filter(Ab.unit>13) %>% 
+  ggplot(aes(Specie,Ab.unit,fill=Specie)) + theme_bw() +
+  #geom_histogram(alpha=.5,position = "identity") +
+  geom_boxplot(aes(fill=Specie),position=position_dodge(0.8)) +
+  facet_grid(.~community) #+scale_y_log10()
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+```
 ##### compare OD AU
 
 ```{r,fig.height=2,fig.width=6}
@@ -166,7 +187,7 @@ b <- mco %>% #filter(igg=="igg3") %>%
              #,fill=igg
              )) +
   geom_qq(alpha=.2) +
-  geom_qq_line(line.p = c(0.25, 0.75)) +
+  #geom_qq_line(line.p = c(0.25, 0.75)) +
   labs(title="Gaussian quantile-quantile plot") +
   coord_cartesian(ylim = c(0,2000))
 
@@ -1013,6 +1034,7 @@ sero <- msr %>% select(1,ID,Specie,label) %>%
                                                         if_else(Pviv=="viv","viv",
                                                                 NA_character_))))))) %>% 
   dplyr::select(-Pfal,-Pviv,id=ID)
+
 unap10 <- unap9d %>% 
   left_join(sero,by="id") %>% 
   replace_na(replace=list(sero_c="non")) %>% 
@@ -1022,7 +1044,7 @@ unap10 <- unap9d %>%
 #### hierarchical classification
 
 ```{r}
-unap10 %>% dplyr::count(sero_c,pcr_c,micro_c) %>% arrange(desc(n))
+unap10 %>% dplyr::count(sero_c,pcr_c,micro_c) %>% arrange(desc(n)) %>% print(n=Inf)
 ```
 
 #### prevalencies
@@ -1119,6 +1141,7 @@ unapgr <- readxl::read_xlsx("data-raw/UNAP_georeference.xlsx",
 par(mfrow=c(1,2))
 
 #plot1
+#grDevices::png("figure/map-peru_iquitos_river.png")
 maps::map(regions=sov.expand(c("Peru","Ecuador","Brazil","Chile","Bolivia","Colombia")), 
           xlim=c(-82,-68),ylim=c(-19,0),col="gray95", fill=TRUE)
 maps::map('rivers', add=TRUE, col = "blue")
@@ -1128,6 +1151,7 @@ points(-73.253801, -3.743316, pch=19, col="black", cex=.5)  #plot my sample site
 text(-73.253801, -3.743316,"Iquitos",pos = 2)
 points(unapgr$longitud, unapgr$latitud, 
        pch=19, col="red", cex=0.5)  #plot my sample sites
+#dev.off()
 
 #plot2
 maps::map(regions=sov.expand("Peru"), 
@@ -1226,7 +1250,7 @@ pa_cen <- centered_unap_community %>%
 nongps <- unap9d %>% 
   select(id,community_1,latitud,longitud) %>% 
   filter(community_1=="Llanchama") %>% 
-  mutate(nn_distance=sqrt(((nn_cen$lon-.$longitud)^2)+((nn_cen$lat-.$latitud)^2))) %>% 
+  mutate(nn_distance=sqrt(((nn_cen$lon-.$longitud)^2)+((nn_cen$lat-.$latitud)^2))) %>% #distancia eclidiana d2=a2+b2
   arrange(nn_distance) %>% filter(nn_distance<0.01) %>% 
   arrange(id) %>% 
   full_join(
@@ -1530,6 +1554,13 @@ get_stamenmap(center = c(lon=zunga_lon,
                  colour = community_1), 
              data = unap9d, alpha = .5)
 ```
+
+### Modify Village
+
+```{r}
+
+```
+
 
 ### MAPS
 

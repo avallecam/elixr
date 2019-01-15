@@ -141,14 +141,15 @@ A diagram of DB history using `DiagrammeR` [@DiagrammeR]
 ```{r, fig.align='center', fig.width=9, fig.height=3}
 #install.packages("DiagrammeR")
 #library(DiagrammeR)
-
-grViz("
+# node definitions with substituted label text
+# edge definitions with the node IDs
+DiagrammeR::grViz("
 digraph unap_summary {
 
 graph [layout= dot,
         rankdir= LR]
 
-# node definitions with substituted label text
+
 node [fontname = Helvetica]
 a [label = '@@1']
 b [label = '@@2']
@@ -158,7 +159,7 @@ e [label = '@@5', color= red, fontcolor= red]
 f [label = '@@6', color= green, fontcolor= green]
 g [label = '@@7', color= blue, fontcolor= blue]
 
-# edge definitions with the node IDs
+
 a -> {b c}
 a -> {d e}  [color= red]
 f -> a [color= green]
@@ -193,7 +194,8 @@ discoveries:
 
 ```{r}
 unap1 <- haven::read_dta("data/UNAP-1-DB-20sep2016.dta") %>%
-  haven::as_factor()
+  haven::as_factor() #%>% dplyr::select(id,contains("pcr")) %>% mutate(pcrsnou1=as.factor(pcrsnou1),pcrsnou2=as.factor(pcrsnou2)) %>% 
+  #dplyr::count(pcrrubio1,pcrrubio2,pcrsnou1,pcrsnou2,pcrrubio)#summary()
 # previous removing
 unap1.out <- unap1 %>% select(micro2:age3, -pcrrubio)
 unap1 <- unap1 %>% select(-(micro2:age3), pcrrubio)
@@ -219,7 +221,7 @@ discoveries:
 
 ```{r}
 unap2 <- readr::read_csv("data/UNAP-2-DB-03oct2016.csv") %>%
-  dplyr::mutate_each(funs(factor), 2, 4, 5, 9)
+  dplyr::mutate_each(funs(factor), 2, 4, 5, 9) #%>% glimpse()
 #str(unap2)
 unap2.out <- unap2 %>% select(matches(".msp.")) # previous removing
 unap2 <- unap2 %>% select(-matches(".msp.")) # OD reads removing
@@ -246,7 +248,7 @@ discoveries:
 
 ```{r}
 unap3 <- haven::read_dta("data/UNAP-3-DB-02nov2016.dta") %>% 
-  haven::as_factor()
+  haven::as_factor() #%>% glimpse()
 #str(unap3)
 # previous removing
 unap3.out <- unap3 %>% select(micro2:ll_pvmsp1pos, -pcrrubio)
@@ -291,7 +293,7 @@ Covariate labeling is based on labels available in covariate DB sheet 2.
 ```{r}
 unap4.xl <- XLConnect::loadWorkbook("data/UNAP-4-UP-16ene2017.xlsx")
 #
-unap4.lb <- readWorksheet(unap4.xl, header = F,
+unap4.lb <- XLConnect::readWorksheet(unap4.xl, header = F,
                       sheet = 2, 
                       startRow = 8, endRow = 16,
                       startCol = 2, endCol = 6)
@@ -308,11 +310,12 @@ discoveries:
 
 ```{r}
 #read xl
-unap5 <- readxl::read_excel("data/UNAP-5-QC-08feb2017.xlsx", na = "-")
+unap5 <- readxl::read_excel("data/UNAP-5-QC-08feb2017.xlsx", na = "-") %>% 
+  select(1:5) %>% 
 #colnames(unap5)
-unap5 <- unap5[,1:5]
+#unap5 <- unap5[,1:5]
 #
-unap5 <- unap5 %>% 
+#unap5 <- unap5 %>% 
   dplyr::select(id=1, pcr.unap=4, pcr.namr=5,  
                 micro.unap=2, micro.namr=3) %>%
   dplyr::mutate(micro.comp= micro.unap==micro.namr,
@@ -336,6 +339,7 @@ summary(unap5 %>%
     + `_n5`: `_n` vs `_5`
 
 ```{r}
+#unap5 <- readxl::read_excel("data/UNAP-5-QC-08feb2017.xlsx", na = "-")
 unap5c <- unap5 %>%
   select(id, micro_5= micro.unap, pcr_5=pcr.unap) %>%
   join(unap1 %>% #full_join(unap1 %>%
@@ -399,7 +403,7 @@ summary(unap5d)
 
 ```{r}
 #read xl
-unap6 <- readxl::read_excel("data/UNAP-6-EPI-08feb2017.xlsx", sheet = 1)
+unap6 <- readxl::read_excel("data/UNAP-6-EPI-08feb2017.xlsx", sheet = 1) #%>% glimpse()
 #filter NA
 unap6 <- unap6[1:sum(unap6$id_integrante != "", na.rm = T), 
            1:sum(colnames(unap6) != "", na.rm= T)]

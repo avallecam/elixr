@@ -54,16 +54,177 @@ theme_set(theme_bw())
 
 ## Input
 
+```{r,message=FALSE}
+#output
+haven::read_dta("data/UNAP-1-DB-20sep2016.dta") %>%
+  haven::as_factor() %>% dplyr::select(id,contains("pcr"),contains("micro")) %>% mutate(pcrsnou1=as.factor(pcrsnou1),pcrsnou2=as.factor(pcrsnou2)) %>% 
+  dplyr::count(pcrrubio1,pcrrubio2,pcrsnou1,pcrsnou2,pcrrubio,micro1,micro2)#summary()
+readr::read_csv("data/UNAP-2-DB-03oct2016.csv") %>%
+  dplyr::mutate_each(funs(factor), 2, 4, 5, 9) %>% #glimpse()
+  dplyr::count(micro1,pcrrubio)
+haven::read_dta("data/UNAP-3-DB-02nov2016.dta") %>% 
+  haven::as_factor() %>% #glimpse()
+  dplyr::select(id,contains("pcr"),contains("micro")) %>% 
+  dplyr::count(pcrrubio1,pcrrubio2,pcrsnou1,pcrsnou2,pcrrubio,micro1,micro2)#summary()
+readxl::read_excel("data/UNAP-4-UP-16ene2017.xlsx", 
+                            sheet = 1, na = ".") %>%
+  dplyr::select(id=1, sex=3, age=2, community=4, micro1=5, dens1=6, 
+                pcrrubio_Pv=12, pcrrubio_Pf=13, pcrsnounou_Pv=14, pcrsnounou_Pf=15) %>%
+  dplyr::mutate(pcrrubio= pcrrubio_Pf + pcrrubio_Pv,
+                pcrsnounou= pcrsnounou_Pf + pcrsnounou_Pv) %>% 
+  dplyr::select(id,contains("pcr"),contains("micro")) %>% 
+  dplyr::count(pcrrubio_Pv,pcrrubio_Pf,pcrsnounou_Pv,pcrsnounou_Pf,pcrrubio,pcrsnounou,micro1)#summary()
+```
+
+```{r}
+#QC de 222 muestras UNAP vs NAMRU
+readxl::read_excel("data/UNAP-5-QC-08feb2017.xlsx", na = "-") %>% 
+  select(1:5) %>% 
+  dplyr::select(id=1, pcr.unap=4, pcr.namr=5,  
+                micro.unap=2, micro.namr=3) %>%
+  dplyr::mutate(micro.comp= micro.unap==micro.namr,
+                pcr.comp= pcr.unap==pcr.namr) %>%
+  dplyr::select(1:3,7,4:5,6) %>% 
+  dplyr::count(pcr.unap,pcr.namr,pcr.comp) %>% #%>% filter(pcr.comp==TRUE)
+  group_by(pcr.namr) %>% summarise(sum_u=sum(n),
+                                   #tot_u=n(),
+                                   exp_u=sum(n)/222) %>% 
+  ungroup() %>% 
+  mutate(obs_n=c(100,115,7,0)) %>% 
+  mutate(exp_p=exp_u*obs_n) %>% summarise(exp_pt=sum(exp_p)/222)
+(((108+55)/222) + 0.475) / (1 + 0.475) # kappa= 0.82
+#100*0.234
+```
+
+```{r}
+#all covariates
+readr::read_rds("data/06-standard-sero.rds") %>% #glimpse()#966 serology results
+  select(1,ID,Specie,label) %>% #dplyr::count(Specie,label)
+  mutate(sero_c=if_else(label=="s+" & Specie=="Pfal","fal",
+                        if_else(label=="s+" & Specie=="Pviv","viv","non"))) %>% #dplyr::count(Specie,label,sero_c) #non = non-positive = c(s0, s-)
+  dplyr::select(-label,-rowname) %>% #dplyr::count(ID)#966
+  #filter(is.na(sero_c))
+  #replace_na(replace=list(sero_c="non")) %>% #not required
+  spread(Specie,sero_c) %>% #filter(is.na(Pviv))
+  #dplyr::count(Pfal,Pviv)
+  replace_na(replace=list(Pfal="non",Pviv="non")) %>% #41 not tested for Pfal and 8 not tested for Pviv -> non= either negative for Pfal or Pviv
+  #dplyr::count(Pfal,Pviv)
+  mutate(sero_c=if_else(Pfal==Pviv,Pviv,
+                        if_else(Pfal=="fal" & Pviv=="viv","mix",
+                                if_else(Pfal=="non" & is.na(Pviv),"non",
+                                        if_else(Pviv=="non" & is.na(Pfal),"non",
+                                                if_else(Pfal=="fal","fal",
+                                                        if_else(Pviv=="viv","viv",
+                                                                NA_character_))))))) %>% ##### FROM WHERE YOU COPY THIS???? --> IT IS CORRECT!!!
+  #dplyr::count(sero_c) # VALIDATION CODE-LINE
+  dplyr::select(-Pfal,-Pviv,id=ID) %>% #966 subjects
+  #right_join to full covariate dataset of 973 subjects
+  right_join(readr::read_rds("data/04-epidemio-full.rds")) %>% 
+  select(id,community_1,starts_with("epi_"),pcr_c,micro_c,sero_c) #%>% 
+  
+  #VERIFICAR TODOS LOS OUTPUT
+  #dplyr::count(micro_c) #751 without MICRO
+  #dplyr::count(pcr_c) #751 without PCR
+  
+  #dplyr::count(is.na(sero_c)) #7withput serology
+#readr::read_rds("data/06-epidemio-sero.rds") %>% glimpse()
+#readr::read_rds("data/04-epidemio-full.rds") %>% glimpse()
+ # select(id,community_1,starts_with("epi_"))
+
+## WRITE HERE FOR THE DESCRIPTOVE ANALYSIS IN STATA
+nongps <- readr::read_rds("data/06-spatial-nongps.rds") %>% 
+  mutate(community_1=forcats::fct_recode(community_1,Ninarumi="Ninarrumi"))
+
+readr::read_rds("data/05-epidemio-core.rds") %>% #glimpse()
+  mutate(community_1=forcats::fct_recode(community_1,Ninarumi="Ninarrumi")) %>% #dplyr::count(sero_c)
+  mutate(community_1=as.character(community_1)) %>% 
+  mutate(community_1=if_else(id %in% nongps$id,"Ninarumi",community_1)) %>% 
+  mutate(community_1=as.factor(community_1)) %>% #%>% dplyr::count(community_1=="Ninarumi")
+#readr::read_rds("data/04-epidemio-core.rds") %>% 
+#readr::read_rds("data/04-epidemio-full.rds") %>% glimpse() dplyr::count(banio_contectado)
+  dplyr::select(#-trabajo,
+                -ends_with("_c")) %>% # -pcr, -micro
+  full_join(readr::read_rds("data/06-epidemio-sero.rds") %>% 
+              dplyr::select(#id:age_7,contains("trabajo"),
+                id,ends_with("_c")) #+pcr, +micro, +sero
+            ) %>% #glimpse()
+  mutate(age_ten=cut(age_7,c(quantile(age_7,probs = seq(0,1,0.1),na.rm = T)[1],
+                             quantile(age_7,probs = seq(0,1,0.1),na.rm = T)[2],
+                             quantile(age_7,probs = seq(0,1,0.1),na.rm = T)[3],
+                             quantile(age_7,probs = seq(0,1,0.1),na.rm = T)[4],
+                             quantile(age_7,probs = seq(0,1,0.1),na.rm = T)[5],
+                             quantile(age_7,probs = seq(0,1,0.1),na.rm = T)[6],
+                             quantile(age_7,probs = seq(0,1,0.1),na.rm = T)[7],
+                             quantile(age_7,probs = seq(0,1,0.1),na.rm = T)[8],
+                             quantile(age_7,probs = seq(0,1,0.1),na.rm = T)[9],
+                             quantile(age_7,probs = seq(0,1,0.1),na.rm = T)[10],
+                             quantile(age_7,probs = seq(0,1,0.1),na.rm = T)[11]),
+                     include.lowest = T),
+         age_quart=cut(age_7,c(quantile(age_7,probs = seq(0,1,0.25),na.rm = T)[1],
+                             quantile(age_7,probs = seq(0,1,0.25),na.rm = T)[2],
+                             quantile(age_7,probs = seq(0,1,0.25),na.rm = T)[3],
+                             quantile(age_7,probs = seq(0,1,0.25),na.rm = T)[4],
+                             quantile(age_7,probs = seq(0,1,0.25),na.rm = T)[5]),
+                     include.lowest = T),
+         Ab.unit_Pfal_4=cut(Ab.unit_Pfal,
+                            c(quantile(Ab.unit_Pfal,probs = seq(0,1,0.25),na.rm = T)[1],
+                             quantile(Ab.unit_Pfal,probs = seq(0,1,0.25),na.rm = T)[2],
+                             quantile(Ab.unit_Pfal,probs = seq(0,1,0.25),na.rm = T)[3],
+                             quantile(Ab.unit_Pfal,probs = seq(0,1,0.25),na.rm = T)[4],
+                             quantile(Ab.unit_Pfal,probs = seq(0,1,0.25),na.rm = T)[5]),
+                     include.lowest = T),
+         Ab.unit_Pviv_4=cut(Ab.unit_Pviv,
+                            c(quantile(Ab.unit_Pviv,probs = seq(0,1,0.25),na.rm = T)[1],
+                             quantile(Ab.unit_Pviv,probs = seq(0,1,0.25),na.rm = T)[2],
+                             quantile(Ab.unit_Pviv,probs = seq(0,1,0.25),na.rm = T)[3],
+                             quantile(Ab.unit_Pviv,probs = seq(0,1,0.25),na.rm = T)[4],
+                             quantile(Ab.unit_Pviv,probs = seq(0,1,0.25),na.rm = T)[5]),
+                     include.lowest = T)
+         
+         ) %>% #filter(is.na(age_ten)) %>% dplyr::select(id,age_7) %>% 
+  mutate(vivienda=stringr::str_replace(id,"(.....).+","\\1")) %>% #dplyr::count(age_four)
+  #dplyr::count(vivienda,community_1,sort = T)
+  #glimpse()
+  write_rds("data/x-zungaro_basal.rds") # ------------------ VA AL STATA!!!!!
+  #readr::write_csv("data/x-zungaro_basal.csv") # ------------------ VA AL STATA!!!!!
+#readr::read_rds("data/06-epidemio-sero.rds") %>% glimpse()
+```
+
 ```{r}
 unap10s <- readr::read_rds("data/06-standard-sero.rds")
 unap10a <- readr::read_rds("data/06-epidemio-sero.rds") %>% 
-  mutate(community_1=forcats::fct_recode(community_1,Ninarumi="Ninarrumi")) #%>% 
+  mutate(community_1=forcats::fct_recode(community_1,Ninarumi="Ninarrumi")) %>% #dplyr::count(sero_c)
+  #unite(posit_c,c(micro_c,pcr_c),remove=F) %>% dplyr::count(posit_c)
+  mutate(posit_c=if_else(micro_c=="fal" & pcr_c=="viv","viv",
+                         if_else(pcr_c=="mix","mix",
+                                 if_else(micro_c=="non" & pcr_c=="non","non",
+                                         if_else(micro_c=="fal"&pcr_c=="non"|micro_c=="fal"&pcr_c=="fal","fal",
+                                                 if_else(micro_c=="viv" | pcr_c!="fal","viv",NA_character_)
+                                                 )
+                                         )
+                                 )
+                         )
+         ) %>% #dplyr::count(sero_c)#glimpse()
+  mutate(prev_fal=if_else(posit_c=="fal" | posit_c=="mix", "positive","negative"),
+         prev_viv=if_else(posit_c=="viv" | posit_c=="mix", "positive","negative"),
+         prev_mix=if_else(posit_c=="mix", "positive","negative"),
+         sero_fal=if_else(sero_c=="fal" | sero_c=="mix", "positive","negative"),
+         sero_viv=if_else(sero_c=="viv" | sero_c=="mix", "positive","negative"),
+         sero_mix=if_else(sero_c=="mix", "positive","negative")
+         ) %>% #%>% dplyr::count(prev_mix)
+  mutate(epi_redes_usadas_actualmente=stringr::str_to_lower(epi_redes_usadas_actualmente),
+         residence_fct=if_else(residence<3,"<=2",">2"))
+  #%>% dplyr::count(posit_c)
+  #mutate(pcr_n=as.numeric(pcr_c),micro_n=as.numeric(micro_c)) %>% dplyr::count(micro_c,micro_n)
   #dplyr::count(community_1,material_pared)
 nongps <- readr::read_rds("data/06-spatial-nongps.rds") %>% 
   mutate(community_1=forcats::fct_recode(community_1,Ninarumi="Ninarrumi"))
+#unap10a %>% glimpse()
 ```
 
 ## Baseline characteristics of the study population
+
+- HERE 15 years FILTER! ALSO 18 FILTER!
 
 ```{r}
 unap10a_bc <- unap10a %>% 
@@ -86,6 +247,7 @@ unap10a_bc <- unap10a %>%
          trabajo_rpl=as.character(trabajo_rpl),
          #material_pared=as.character(material_pared),
          epi_uso_red_dormir=as.character(epi_uso_red_dormir),
+         epi_redes_usadas_actualmente=as.character(epi_redes_usadas_actualmente),
          nivel_educacion=as.character(nivel_educacion),
          tenido_malaria=as.character(tenido_malaria)
          ) %>% 
@@ -93,10 +255,13 @@ unap10a_bc <- unap10a %>%
                            trabajo_tdy=="desempleado" |
                            trabajo_tdy=="independiente"
                            ,NA_character_,trabajo_tdy),
-         epi_uso_red_dormir=if_else(epi_uso_red_dormir=="no sabe" | 
-                                      epi_uso_red_dormir=="recientemente",
-                                    NA_character_,epi_uso_red_dormir),
-         #material_pared=if_else(material_pared=="tripley",
+         epi_uso_red_dormir=if_else(epi_uso_red_dormir=="no sabe" ,
+                                    NA_character_,
+                                    if_else(epi_uso_red_dormir=="recientemente",
+                                            "desde siempre",epi_uso_red_dormir)),
+        epi_redes_usadas_actualmente=if_else(epi_uso_red_dormir=="nunca" | epi_uso_red_dormir=="no sabe", # correccion!!
+                                NA_character_,epi_redes_usadas_actualmente), 
+        #material_pared=if_else(material_pared=="tripley",
           #                      NA_character_,material_pared),
          nivel_educacion=if_else(nivel_educacion=="inicial",
                                 NA_character_,nivel_educacion),
@@ -112,24 +277,44 @@ unap10a_bc <- unap10a %>%
          trabajo_rpl=as.factor(trabajo_rpl),
          #material_pared=as.factor(material_pared),
          epi_uso_red_dormir=as.factor(epi_uso_red_dormir),
+         epi_redes_usadas_actualmente=as.factor(epi_redes_usadas_actualmente),
          nivel_educacion=as.factor(nivel_educacion),
          tenido_malaria=as.factor(tenido_malaria)
          ) %>% #dplyr::count(tenido_malaria)
   mutate(sex_8=forcats::fct_relevel(sex_8,"female"),
          electricidad_red_publica=forcats::fct_relevel(electricidad_red_publica,
                                                        "si","no"),
-         tenido_malaria=forcats::fct_relevel(tenido_malaria,"si","no"),
-         epi_uso_red_dormir=forcats::fct_relevel(epi_uso_red_dormir,"siempre","nunca")
+         tenido_malaria=forcats::fct_relevel(tenido_malaria,"si","no")#,
+         #epi_uso_red_dormir=forcats::fct_relevel(epi_uso_red_dormir,"siempre","nunca")#,
+         #epi_redes_usadas_actualmente=forcats::fct_relevel(epi_redes_usadas_actualmente,"siempre","nunca")
          ) #%>% dplyr::count(community_1,material_pared)
-#unap10a_bc
+unap10a %>% dplyr::count(epi_uso_red_dormir)
+unap10a_bc %>% dplyr::count(epi_uso_red_dormir)
+unap10a_bc %>% dplyr::count(epi_redes_usadas_actualmente)
+unap10a_bc %>% dplyr::count(residence_fct)
+unap10a_bc %>% dplyr::count(age_d)
+table(unap10a_bc$trabajo_tdy,unap10a_bc$actualmente_estudiando)
+
+100*table(unap10a_bc$material_pared,unap10a_bc$material_piso)/dim(unap10a_bc)[1]
+100*ftable(table(unap10a_bc$material_pared,unap10a_bc$material_piso,unap10a_bc$community_1))/dim(unap10a_bc)[1]
+
+summary(unap10a_bc$age_7)
+hist(unap10a_bc$age_7,breaks = 85)
+Ecdf(unap10a_bc$age_7)
+summary(unap10a$residence)
+hist(unap10a$residence,breaks = 80)
+Ecdf(unap10a$residence)#20% poblacion, reporta haber vivdo más de 30 años
+plot(unap10a$age_7,unap10a$residence)
+#unap10a %>% dplyr::count(epi_redes_usadas_actualmente)
 ```
 
 ```{r}
 ###### TEST Hmisc::upData
-unap10a_bcx <- Hmisc::upData(unap10a_bc,
+unap10a_bcx <- Hmisc::upData(unap10a_bc %>% mutate(all="Total"),
                          labels = c(sex_8="Sex", 
                                     age_7="Age (years)", 
                                     age_d="Age groups (years)",
+                                    all="Total",
                                     community_1="Community",
                                     nivel_educacion="Education (>=18 years)",
                                     trabajo_tdy="Occupation (>=15 years)",
@@ -137,27 +322,43 @@ unap10a_bcx <- Hmisc::upData(unap10a_bc,
                                     material_pared="Predominant material in wall",
                                     material_piso="Predominant material in floor",
                                     #epi_uso_redes_cama="Sleeping under bednet",
-                                    epi_uso_red_dormir="Sleeping under bednet", 
+                                    epi_uso_red_dormir="Sleeping under bednet (last 2 weeks)", 
+                                    epi_redes_usadas_actualmente="Impregnated bednet", 
                                     tenido_malaria="Self-report of confirmed previous episode of malaria",
-                                    cuantas_tenido_malaria="Self-report of confirmed malaria episodes"
+                                    cuantas_tenido_malaria="Self-report of confirmed malaria episodes",
+                                    residence_fct="Time in village (years)"
                          ),
                          levels = list(
                            electricidad_red_publica=list("Yes"="si",
                                                     "No"="no"),
+                           age_d=list("<=8"="(0,8]",
+                                      "9-17"="(8,17]",
+                                      "18-36"="(17,36]",
+                                      ">36"="(36,Inf]"),
                            tenido_malaria=list("No"="no",
                                                             "Yes"="si"),
-                           epi_uso_red_dormir=list("Always"="desde siempre",
-                                                   "Never"="nunca"),
+                           epi_uso_red_dormir=list("Yes"="desde siempre",
+                                                   "No"="nunca"#,
+                                                   #"Not know"="no sabe",
+                                                   #"Recently"="recientemente"
+                                                   ),
+                           epi_redes_usadas_actualmente=list("Yes"="1. si, redes de fabrica sin insecticida",
+                                                   "No"="2. si, redes de fabrica con insecticida"),
                                        sex_8=list("Male"="male",
                                                  "Female"="female"),
                            nivel_educacion=list("Primary"="primaria",
                                                 "Incomplete secondary"="secundaria incompleta",
-                                                "Complete seconday/+"="secundaria completa / +",
+                                                "Complete secondary/+"="secundaria completa / +",
                                                 "None"="sin educacion"
                                                 ),
                            material_pared=list("Wood"="madera",
                                                "Concrete"="cemento",
                                                "Triplay"="tripley"),
+                           cuantas_tenido_malaria=list("0"="(-Inf,0]",
+                                                       "1"="(0,1]",
+                                                       "2-3"="(1,3]",
+                                                       ">=4"="(3, Inf]"),
+                           #residence_fct=list(=">2"),
                         material_piso=list("Wood"="madera",
                                                "Concrete"="cemento",
                                            "Soil or sand"="tierra o arena")
@@ -177,21 +378,27 @@ s1 <- Hmisc::summaryM(sex_8 + #age_7 +
                         material_piso +
                         #epi_uso_redes_cama +
                         epi_uso_red_dormir + #tenido_malaria +
+                        epi_redes_usadas_actualmente +
+                        residence_fct +
                         cuantas_tenido_malaria
-                      ~ community_1 #+ all#
+                      ~ community_1 #+ all #+ 
+                        #all# here for a total descriptive summar
                       #episodio_previo
                       ,
-               data=unap10a_bcx %>% mutate(all="all"),
-               overall=FALSE, test=TRUE)
+               data=unap10a_bcx,
+               overall=TRUE, test=TRUE)
 #s1
 #print(s1)
 Hmisc::latex(s1, caption='Baseline characteristics of the study population',
-      exclude1=TRUE, npct='both', file="",
+      exclude1=FALSE, npct='numerator', #npct='both', 
+      file="",
+      #prn=FALSE,
+      test=TRUE , prtest="P",
       #digits=2, eps = 0.01,
       #prmsd=TRUE, brmsd=TRUE, msdsize=mu$smaller2, #NOT-EVALUATE if PDF
       middle.bold=TRUE, long = TRUE,
       #legend.bottom = TRUE, #insert.bottom = TRUE, 
-      what="%", html = TRUE
+      what="%", html = FALSE
       ) #change here for LaTeX PDF
 ```
 
@@ -201,6 +408,43 @@ unap10a_bcx %>% #glimpse()
   #filter(age_7>=18) %>% 
   dplyr::count(cuantas_tenido_malaria) %>% 
   mutate(tot=sum(n),prop= (n*100)/(sum(n)))
+```
+
+### prevalence by factor
+
+```{r,eval=FALSE}
+s1 <- Hmisc::summaryM(sex_8 + #age_7 + 
+                        age_d +
+                        #community_1 +
+                        nivel_educacion +
+                        trabajo_tdy + #trabajo_rpl +
+                        electricidad_red_publica +
+                        material_pared +
+                        material_piso +
+                        #epi_uso_redes_cama +
+                        epi_uso_red_dormir + #tenido_malaria +
+                        epi_redes_usadas_actualmente +
+                        residence_fct +
+                        cuantas_tenido_malaria
+                      ~ sero_c + community_1 #+ all #+ 
+                        #all# here for a total descriptive summar
+                      #episodio_previo
+                      ,
+               data=unap10a_bcx,
+               overall=TRUE, test=TRUE)
+#s1
+#print(s1)
+Hmisc::latex(s1, caption='Baseline characteristics of the study population',
+      exclude1=FALSE, npct='numerator', #npct='both', 
+      file="",
+      #prn=FALSE,
+      test=TRUE , prtest="P",
+      #digits=2, eps = 0.01,
+      #prmsd=TRUE, brmsd=TRUE, msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = TRUE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%", html = FALSE
+      ) #change here for LaTeX PDF
 ```
 
 ### wall | floor
@@ -337,6 +581,11 @@ unap10a %>%
 unap10a_pr <- unap10a %>% #dplyr::count(pcr_c)
   select(id,community_1,micro_c:pcr_c,sero_c) 
 
+#unap10a_pr %>% gather(key,value,-id,-community_1) %>% dplyr::count(key,value)
+unap10a_pr %>% dplyr::count(micro_c)
+unap10a_pr %>% dplyr::count(pcr_c)
+unap10a_pr %>% dplyr::count(sero_c)
+
 #unap10a_pr %>% dplyr::select(-community_1) %>% 
 #  gather(attribute,quality,-id) %>% 
 #  mutate(quality=if_else(quality!="non","par",quality)) %>% 
@@ -359,7 +608,7 @@ unap10a_pr <- unap10a %>% #dplyr::count(pcr_c)
 
 ```{r}
 ###### TEST Hmisc::upData
-unap10a_prx <- Hmisc::upData(unap10a_pr,
+unap10a_prx <- Hmisc::upData(unap10a_pr %>% mutate(all="Total"),
                          labels = c(community_1="Community",
                                     micro_c="Microscopy",
                                     pcr_c="PCR",
@@ -387,45 +636,79 @@ unap10a_prx <- Hmisc::upData(unap10a_pr,
 
 ```{r}
 s1 <- Hmisc::summaryM(micro_c + pcr_c + sero_c #+ Ab.unit_Pviv + Ab.unit_Pfal
-                      ~ community_1 #+ all#
+                      ~ community_1 #+ 
+                      #all#
                       #episodio_previo
                       ,
-               data=unap10a_prx %>% mutate(all="all"),
-               overall=FALSE, test=TRUE)
-
+               data=unap10a_prx,
+               overall=TRUE, test=TRUE)
+#s1
 Hmisc::latex(s1, caption='Malaria prevalence (microscopy and PCR) and seroprevalence by study site',
-      exclude1=FALSE, npct='both', file="", 
-      digits=2, #eps = 0.01,
+      exclude1=FALSE, npct='numerator', #npct='both', 
+      file="",
+      #prn=TRUE,#prN=TRUE,
+      test=TRUE , prtest="P",
+      #digits=2, eps = 0.01,
       #prmsd=TRUE, brmsd=TRUE, msdsize=mu$smaller2, #NOT-EVALUATE if PDF
       middle.bold=TRUE, long = TRUE,
       #legend.bottom = TRUE, #insert.bottom = TRUE, 
-      what="%", html = TRUE
+      what="%", html = FALSE
       ) #change here for LaTeX PDF
 ```
 
+#### total
+
 ```{r,eval=FALSE,echo=FALSE}
 ###### TEST Hmisc::upData
-unap10a_prx <- Hmisc::upData(unap10a_pr,
+unap10a_prx <- Hmisc::upData(unap10a_pr %>% mutate(all="Total"),
                          labels = c(community_1="Community",
                                     micro_c="Microscopy",
                                     pcr_c="PCR",
                                     sero_c="Seropositivity"#,
                          ),
                          levels = list(
-                           micro_c=list("tot"="fal",
-                                        "tot"="viv",
-                                        "non"="non",
-                                        "tot"="mix"
+                           micro_c=list("non"="fal",
+                                        "non"="viv",
+                                        "non"="non"#,
+                                        #"Total"="mix"
                                         ),
-                           pcr_c=list("tot"="fal",
-                                        "tot"="viv",
+                           pcr_c=list("non"="fal",
+                                        "non"="viv",
                                       "non"="non",
-                                        "tot"="mix"
+                                        "mix"="mix"
                                         ),
-                           sero_c=list("tot"="fal",
-                                        "tot"="viv",
+                           sero_c=list("non"="fal",
+                                        "non"="viv",
                                        "non"="non",
-                                        "tot"="mix"
+                                        "mix"="mix"
+                                        )
+                                       )
+                         )
+```
+
+```{r,eval=FALSE,echo=FALSE}
+###### TEST Hmisc::upData
+unap10a_prx <- Hmisc::upData(unap10a_pr %>% mutate(all="Total"),
+                         labels = c(community_1="Community",
+                                    micro_c="Microscopy",
+                                    pcr_c="PCR",
+                                    sero_c="Seropositivity"#,
+                         ),
+                         levels = list(
+                           micro_c=list("Total"="fal",
+                                        "Total"="viv",
+                                        "non"="non"#,
+                                        #"Total"="mix"
+                                        ),
+                           pcr_c=list("Total"="fal",
+                                        "Total"="viv",
+                                      "non"="non",
+                                        "Total"="mix"
+                                        ),
+                           sero_c=list("Total"="fal",
+                                        "Total"="viv",
+                                       "non"="non",
+                                        "Total"="mix"
                                         )
                                        )
                          )
@@ -433,19 +716,23 @@ unap10a_prx <- Hmisc::upData(unap10a_pr,
 
 ```{r,eval=FALSE,echo=FALSE}
 s1 <- Hmisc::summaryM(micro_c + pcr_c + sero_c #+ Ab.unit_Pviv + Ab.unit_Pfal
-                      ~ all#community_1 #+ 
+                      ~ community_1 #+ 
+                      #all#
                       #episodio_previo
                       ,
-               data=unap10a_prx %>% mutate(all="all"),
-               overall=FALSE, test=TRUE)
-
+               data=unap10a_prx,
+               overall=TRUE, test=TRUE)
+#s1
 Hmisc::latex(s1, caption='Malaria prevalence (microscopy and PCR) and seroprevalence by study site',
-      exclude1=FALSE, npct='both', file="", 
-      digits=2, #eps = 0.01,
+      exclude1=FALSE, npct='numerator', #npct='both', 
+      file="",
+      #prn=TRUE,#prN=TRUE,
+      test=TRUE , prtest="P",
+      #digits=2, eps = 0.01,
       #prmsd=TRUE, brmsd=TRUE, msdsize=mu$smaller2, #NOT-EVALUATE if PDF
       middle.bold=TRUE, long = TRUE,
       #legend.bottom = TRUE, #insert.bottom = TRUE, 
-      what="%", html = TRUE
+      what="%", html = FALSE
       ) #change here for LaTeX PDF
 ```
 
@@ -474,6 +761,9 @@ unap10a_pr_hh %>%
   #arrange(hh,attribute) %>% 
   #mutate(value=1) #%>% spread(quality,value)
   #group_by(hh) %>% summarise()
+
+unap10a_pr_hh_ind %>% 
+  dplyr::count(ind_hh)
 ```
 
 
@@ -483,6 +773,26 @@ unap10a_pr_hh %>%
 
 ```{r}
 summary(unap10a_bc$age_7)
+Ecdf(unap10a_bc$age_7)
+unap10a_bc %>% 
+  ggplot(aes(age_7, colour= community_1)) +
+  stat_ecdf(geom = "step")
+
+unap10a_bc %>% 
+  #group_by(community_1) %>% 
+  summarise(q00=quantile(age_7,probs = seq(0,1,0.1))[1],
+            q01=quantile(age_7,probs = seq(0,1,0.1))[2],
+            q02=quantile(age_7,probs = seq(0,1,0.1))[3],
+            q03=quantile(age_7,probs = seq(0,1,0.1))[4],
+            q04=quantile(age_7,probs = seq(0,1,0.1))[5],
+            q05=quantile(age_7,probs = seq(0,1,0.1))[6],
+            q06=quantile(age_7,probs = seq(0,1,0.1))[7],
+            q07=quantile(age_7,probs = seq(0,1,0.1))[8],
+            q08=quantile(age_7,probs = seq(0,1,0.1))[9],
+            q09=quantile(age_7,probs = seq(0,1,0.1))[10],
+            q10=quantile(age_7,probs = seq(0,1,0.1))[11])
+
+#quantile(unap10a_bc$age_7,probs = seq(0,1,0.1))
 ```
 
 ```{r,fig.height=3,fig.width=10}
@@ -601,6 +911,39 @@ cbind(OR = OR.vector, CI.vector,p.values)
 
 ### [*] Infection table
 
+#### uni
+
+```{r}
+unap10a_ra %>% 
+  mutate(age_d=as.character(age_d)) %>% 
+  mutate(age_d=if_else(age_7<15,NA_character_,age_d)) %>% dplyr::count(age_d)
+```
+
+```{r}
+fct <- c("sex_8", "age_d", 
+         "community_1", "trabajo_rpl", 
+         "electricidad_red_publica", "material_pared", "material_piso", "epi_uso_red_dormir")
+
+for (i in 1:length(fct)) {
+  
+myForm<- as.formula(paste("infection_all ~ ",fct[i]))
+mod1 <- glm(myForm, data=unap10a_ra %>% filter(age_7>=15),family = binomial(link="logit"))
+#summary(mod1)
+print(length(mod1$na.action)) # ommited misssing data
+print(summary(mod1$model$infection_all)) #101 cases
+OR.vector.u <- exp(mod1$coef)#[-1]
+CI.vector.u <- exp(confint(mod1))#[-1,]
+#CI.vector.d <- dimnames(CI.vector.u)[[1]][-1]
+#CI.vector.r <- CI.vector.u[-1,]
+#dimnames(CI.vector.r) <- CI.vector.d
+p.values.u <- summary(mod1)$coefficients[,4]
+
+print(cbind(#fct=as.matrix(names(OR.vector.u)[-1]),
+      OR = OR.vector.u, CI.vector.u, p.value=p.values.u))#[-1,]
+  
+}
+```
+
 #### glm
 
 ```{r}
@@ -641,7 +984,9 @@ cbind(OR = OR.vector.2, CI.vector.2,p.values.2)
 stargazer::stargazer(mod1, mod2,
                      coef = list(OR.vector,OR.vector.2), #ci = T, 
           ci.custom = list(CI.vector,CI.vector.2), p = list(p.values,p.values.2), 
-          single.row = T, type = "html",
+          single.row = T, 
+          #type = "html",
+          type = "latex",
           t.auto=F, p.auto=F, report = "vcs*",
           dep.var.labels=c("Malaria infection"),
           #column.labels=c("All", "After backward elimination"), 
@@ -679,10 +1024,37 @@ stargazer::stargazer(mod1, mod2,
 
 ### Pv exposure
 
+#### uni
+
+```{r}
+fct <- c("sex_8", "age_d", 
+         "community_1", "trabajo_rpl", 
+         "electricidad_red_publica", "material_pared", "material_piso", "epi_uso_red_dormir")
+
+for (i in 1:length(fct)) {
+  
+myForm<- as.formula(paste("exposure_viv ~ ",fct[i]))
+mod1 <- glm(myForm, data=unap10a_ra %>% filter(age_7>=15),family = binomial(link="logit"))
+#summary(mod1)
+print(length(mod1$na.action)) # ommited misssing data
+print(summary(mod1$model$exposure_viv)) #101 cases
+OR.vector.u <- exp(mod1$coef)#[-1]
+CI.vector.u <- exp(confint(mod1))#[-1,]
+#CI.vector.d <- dimnames(CI.vector.u)[[1]][-1]
+#CI.vector.r <- CI.vector.u[-1,]
+#dimnames(CI.vector.r) <- CI.vector.d
+p.values.u <- summary(mod1)$coefficients[,4]
+
+print(cbind(#fct=as.matrix(names(OR.vector.u)[-1]),
+      OR = OR.vector.u, CI.vector.u, p.value=p.values.u))#[-1,]
+  
+}
+```
+
 #### glm
 
 ```{r}
-myForm<- as.formula(exposure_viv ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir)
+myForm<- as.formula(exposure_viv ~ sex_8 + age_d + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir)
 
 mod1v <- glm(myForm, data=unap10a_ra,family = binomial(link="logit"))
 #summary(mod1v)
@@ -691,7 +1063,7 @@ sof <- unap10a_ra
 sofNoMis <- sof[which(complete.cases(sof[,all.vars(myForm)])),]
 FulMod2 <- glm(myForm,family=binomial(link="logit"),data=sofNoMis)
 summary(step(FulMod2,direction="backward",trace=FALSE))
-mod2v <- glm(exposure_viv ~ age_7 + community_1 + epi_uso_red_dormir,
+mod2v <- glm(exposure_viv ~ age_d + community_1 + epi_uso_red_dormir,
             family=binomial(link="logit"),data=sofNoMis)
 
 #broom::tidy(mod1); broom::augment(mod1); broom::glance(mod1)
@@ -752,10 +1124,37 @@ cbind(OR = OR.vector.2.v, CI.vector.2.v,p.values.2.v)
         + c-index 0.8 (discrimination power) 
         - R2 0.211 (fit)
 
+#### uni
+
+```{r}
+fct <- c("sex_8", "age_d", 
+         "community_1", "trabajo_rpl", 
+         "electricidad_red_publica", "material_pared", "material_piso", "epi_uso_red_dormir")
+
+for (i in 1:length(fct)) {
+  
+myForm<- as.formula(paste("exposure_fal ~ ",fct[i]))
+mod1 <- glm(myForm, data=unap10a_ra %>% filter(age_7>=15),family = binomial(link="logit"))
+#summary(mod1)
+print(length(mod1$na.action)) # ommited misssing data
+print(summary(mod1$model$exposure_fal)) #101 cases
+OR.vector.u <- exp(mod1$coef)#[-1]
+CI.vector.u <- exp(confint(mod1))#[-1,]
+#CI.vector.d <- dimnames(CI.vector.u)[[1]][-1]
+#CI.vector.r <- CI.vector.u[-1,]
+#dimnames(CI.vector.r) <- CI.vector.d
+p.values.u <- summary(mod1)$coefficients[,4]
+
+print(cbind(#fct=as.matrix(names(OR.vector.u)[-1]),
+      OR = OR.vector.u, CI.vector.u, p.value=p.values.u))#[-1,]
+  
+}
+```
+
 #### glm
 
 ```{r}
-myForm<- as.formula(exposure_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir)
+myForm<- as.formula(exposure_fal ~ sex_8 + age_d + community_1 + trabajo_rpl + electricidad_red_publica + material_pared + material_piso + epi_uso_red_dormir)
 
 mod1f <- glm(myForm, data=unap10a_ra,family = binomial(link="logit"))
 #summary(mod1f)
@@ -764,7 +1163,7 @@ sof <- unap10a_ra
 sofNoMis <- sof[which(complete.cases(sof[,all.vars(myForm)])),]
 FulMod2 <- glm(myForm,family=binomial(link="logit"),data=sofNoMis)
 summary(step(FulMod2,direction="backward",trace=FALSE))
-mod2f <- glm(exposure_fal ~ sex_8 + age_7 + community_1 + trabajo_rpl + 
+mod2f <- glm(exposure_fal ~ sex_8 + age_d + community_1 + trabajo_rpl + 
     epi_uso_red_dormir,
             family=binomial(link="logit"),data=sofNoMis)
 # electricidad_red_publica + trabajo_rpl + epi_uso_red_dormir
@@ -899,6 +1298,30 @@ sum( - (k)*log(p) - (n-k)*log(1-p) )
 ```
 
 ```{r}
+Lccm1c <- function(theta, r,data) {
+  
+  # theta : vector of length two, including h, r (parameters to be maximized)
+  # h = seroconversion rate, r = seroreversion rate
+  # (to maximize over a single parameter, e.g. h, replace theta with
+  # separate args for h and r and pass an r value to the function)
+  # data : data frame with columns = age / n / k
+
+  h <- rep(theta,nrow(data)) #incidence rate
+  r <- rep(r,nrow(data)) #recovery rate
+  t <- data[,1] #time(age strata)
+  n <- data[,2] #number tested
+  k <- data[,3] #number positive
+  
+  # probability of infection in time t
+  p <- h/(r+h)*(1-exp(-(r+h)*t)) 
+  
+  # negative log likelihood function
+  sum( - (k)*log(p) - (n-k)*log(1-p) )
+
+  }
+```
+
+```{r}
 unap10a_rc <- 
   unap10a %>% 
   mutate(exposure_viv=if_else(sero_c=="viv" | sero_c=="mix",1,0),
@@ -949,17 +1372,17 @@ unap10a_rc_x <- unap10a %>%
   dplyr::select(id,age_7,community_1,
                 exposure_viv:infection_fal) %>% 
   #filter(age_7<=60) %>% 
-  mutate(age_ten=cut(age_7,c(0,
-                             quantile(unap10a_rc$age_7,0.1,na.rm = T),
-                             quantile(unap10a_rc$age_7,0.2,na.rm = T),
-                             quantile(unap10a_rc$age_7,0.3,na.rm = T),
-                             quantile(unap10a_rc$age_7,0.4,na.rm = T),
-                             quantile(unap10a_rc$age_7,0.5,na.rm = T),
-                             quantile(unap10a_rc$age_7,0.6,na.rm = T),
-                             quantile(unap10a_rc$age_7,0.7,na.rm = T),
-                             quantile(unap10a_rc$age_7,0.8,na.rm = T),
-                             quantile(unap10a_rc$age_7,0.9,na.rm = T),
-                             Inf))
+  mutate(age_ten=cut(age_7,c(quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[1],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[2],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[3],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[4],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[5],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[6],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[7],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[8],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[9],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[10],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[11]),include.lowest = T)
          ) %>%
   group_by(community_1,age_ten) %>% summarise(tot.sero.viv=n(),
                                 sum.sero.viv=sum(exposure_viv),
@@ -969,15 +1392,84 @@ unap10a_rc_x <- unap10a %>%
                                 sero.fal.p=sum(exposure_fal)/n()
                                 ) %>% 
   ungroup()
+unap10a_rc_x %>% dplyr::count(age_ten)
+quantile(unap10a_rc$age_7,probs = seq(0,1,0.1))
+quantile(unap10a$age_7,probs = seq(0,1,0.1))
 ```
 
 ```{r,fig.height=4,fig.width=12}
-## ERRORR!!!
+unap10a %>% #glimpse()
+  select(id:community_1,"PCR +"=pcr_c,"Serology +"=sero_c) %>% 
+  mutate(age_ten=cut(age_7,c(quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[1],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[2],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[3],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[4],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[5],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[6],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[7],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[8],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[9],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[10],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[11]),include.lowest = T)
+         ) %>% 
+  select(-age_7,-sex_8) %>% 
+  gather(key,Specie,-id,-age_ten,-community_1) %>% 
+  mutate(Specie=forcats::fct_recode(Specie,
+                                    "P.falciparum"="fal","P.vivax"="viv",
+                                    "Mix infection"="mix","Negative"="non")) %>% 
+  ggplot(aes(age_ten,fill=Specie)) +
+  geom_bar(position = "fill") +
+  facet_grid(key~community_1)+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("Age group (deciles)") + ylab("Proportion")
+ggsave("figure/decile-pcr_sero.png")
+```
+
+```{r,fig.height=3,fig.width=12}
+unap10a %>% #glimpse()
+  select(id:community_1,densidad:mean.OD_Pviv) %>% 
+  mutate(age_ten=cut(age_7,c(quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[1],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[2],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[3],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[4],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[5],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[6],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[7],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[8],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[9],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[10],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[11]),include.lowest = T)
+         ) %>% 
+  #filter(is.na(age_ten)) %>% print(n=Inf)
+  select(id,community_1,age_ten,contains("Ab.unit")) %>% 
+  gather(Specie,value,-id,-age_ten,-community_1) %>% 
+  mutate(Specie=forcats::fct_recode(Specie,"P.falciparum"="Ab.unit_Pfal","P.vivax"="Ab.unit_Pviv")) %>% 
+  ggplot(aes(age_ten,value,fill=Specie)) +
+  geom_boxplot() +
+  scale_y_log10() +
+  facet_grid(~community_1) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("Age group (deciles)") + ylab("Antobody Units (log-scale)")
+ggsave("figure/decile-abunits.png")
+```
+
+```{r}
+## ERRORR!!! SOLVED
 unap10a_rc_y <- unap10a_rc_x %>% 
-  mutate(age_ten=stringr::str_replace(age_ten,"\\(.+,(.+)\\]","\\1")) %>% 
+  mutate(age_ten=stringr::str_replace(age_ten,"(\\(|\\[)(.+),(.+)\\]","\\2")) %>% 
   filter(age_ten!="Inf") %>% 
   mutate(age_ten=as.numeric(age_ten))
 
+#unap10a_rc_x %>% print(n=Inf)
+#unap10a_rc_y %>% print(n=Inf)
+
+unap10a_rc_y %>% write_rds("data/z0_revcat.rds")
+unap10a_rc_y %>% 
+  rename_all(funs(str_replace_all(.,"\\.","_"))) %>% 
+  haven::write_dta("data/z0_revcat.dta")
+```
+
+```{r,fig.height=4,fig.width=12}
 unap10a_rc_y %>% 
   dplyr::select(community_1,age_ten,#age_7,#tot.sero.viv,tot.sero.fal,
                 5,8) %>% 
@@ -989,6 +1481,8 @@ unap10a_rc_y %>%
   facet_grid(Specie~community_1) #+
   #theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
+
+### two estimates: h, r
 
 ```{r,fig.height=4,fig.width=12}
 unap10a_rc_v <- unap10a_rc_y %>% 
@@ -1002,54 +1496,69 @@ unap10a_rc_f <- unap10a_rc_y %>%
   filter(tot.sero.fal>=3) %>% mutate(age_7=age_ten) #%>% dplyr::select(-tot.sero.fal)
 
 
-a <- unap10a_rc_v %>% group_by(community_1) %>% 
+a <- unap10a_rc_v %>% 
+  group_by(community_1) %>% 
   summarise(min=min(age_7),max=max(age_7))
 f <- levels(as.factor(a$community_1))
 df <- data_frame(community_1=as.character(),
                  age_7=as.double())
+
+
 for (i in 1:length(f)) {
-df_p <- data_frame(community_1=f[i],
-           age_7=seq(as.numeric(a[i,2]),as.numeric(a[i,3]),1))
-df <- union(df,df_p)
+  df_p <- data_frame(community_1=f[i],
+                     age_7=seq(as.numeric(a[i,2]),as.numeric(a[i,3]),1))
+  df <- union(df,df_p)
 }
+
 df <- df %>% arrange(community_1,age_7)
 df <- union(df %>% mutate(Specie="viv"),df %>% mutate(Specie="fal"))
 
+#-----------------------------------------------------------------------#### VIVAX ###
+
 f <- levels(unap10a_rc_v$community_1)
+
 revcat_v <- data_frame(community_1=as.character(),
                      h=as.double(),
-                     r=as.double())
+                     r=as.double(),
+                     l=as.double())
+
 for (i in 1:length(f)) {#i=1
 revcat_p <- optim(c(0.1,0.1),fn=Lccm1,
                   data=unap10a_rc_v %>% 
                     filter(community_1==f[i]) %>% #i
                     dplyr::select(-1),
                   hessian=TRUE) %>% 
-  .$par %>% 
   data_frame(community_1=f[i],#i
-             h=.[1],
-             r=.[2]) %>% 
+             h=.$par[1],
+             r=.$par[2],
+             l=.$value[1]) %>% 
   dplyr::select(-1) %>% slice(1)
 revcat_v <- union(revcat_v,revcat_p)
 }
 
+
+#-----------------------------------------------------------------------#### FALCIPARUM ###
+
 f <- levels(unap10a_rc_f$community_1)
 revcat_f <- data_frame(community_1=as.character(),
                      h=as.double(),
-                     r=as.double())
+                     r=as.double(),
+                     l=as.double())
 for (i in 1:length(f)) {#i=3
 revcat_p <- optim(c(0.1,0.1),fn=Lccm1,
                   data=unap10a_rc_f %>% 
                     filter(community_1==f[i]) %>% #i
                     dplyr::select(-1),
                   hessian=TRUE) %>% 
-  .$par %>% 
   data_frame(community_1=f[i],#i
-             h=.[1],
-             r=.[2]) %>% 
+             h=.$par[1],
+             r=.$par[2],
+             l=.$value[1]) %>% 
   dplyr::select(-1) %>% slice(1)
 revcat_f <- union(revcat_f,revcat_p)
 }
+
+#-----------------------------------------------------------------------#### UNION BOTH ###
 
 revcat <- union(revcat_v %>% mutate(Specie="viv"),
       revcat_f %>% mutate(Specie="fal"))
@@ -1068,18 +1577,27 @@ unap10a_rc_a <- union(unap10a_rc_v %>%
                 sum.sero=sum.sero.fal,
                 sero.p=sero.fal.p))
 
+
+#-----------------------------------------------------------------------#### FINAL DATAFRAME ###
+
 revcat_a <- df %>% full_join(unap10a_rc_a,by=c("age_7","community_1","Specie")) %>% 
   full_join(revcat,by=c("community_1","Specie")) %>% 
   mutate(y=h/(r+h)*(1-exp(-(r+h)*age_7)))
   #mutate(community_1=as.factor(community_1))
 #h <- revcat$h
 #r <- revcat$r
+
+#-----------------------------------------------------------------------#### SET LABELS ###
+
 specie_name <- c("viv"="P. vivax","fal"="P. falciparum",
                  "Puerto Almendra"="Puerto Almendra",
                  "Ninarumi"="Ninarumi",
                  "Llanchama"="Llanchama",
                  "Zungarococha"="Zungarococha"
                  )
+
+#-----------------------------------------------------------------------#### PLOT INFORMATION ###
+
 unap10a_rc_a %>% 
   #filter(community_1==f[1]) %>% 
   ggplot(aes(age_7,sero.p)) +
@@ -1088,13 +1606,188 @@ unap10a_rc_a %>%
   geom_line(aes(y = y), data = revcat_a, colour = "black") +
   geom_text(aes(x,y,label=lab),
             data = revcat %>% 
-              mutate(x=53,y=0.12) %>% 
-              mutate(lab=paste0("SCR=",h %>% format(digits=2),
+              mutate(x=2,y=0.84) %>% 
+              mutate(lab=paste0("SCR= ",h %>% format(digits=2),
                                 "\nSRR=",r %>% format(digits=2)))
             ,vjust=.5,hjust=0.05,size=3) +
   xlab("Age") + ylab("Seroprevalence")
   #stat_smooth(formula = )
+ggsave("figure/decile-seroconvrt_01.png")
 ```
+
+```{r}
+# table + loglik
+revcat %>% arrange(community_1,Specie)
+#revcat_a
+```
+
+### one estimate: h
+
+```{r,fig.height=4,fig.width=12}
+unap10a_rc_v <- unap10a_rc_y %>% 
+  dplyr::select(1:5) %>% 
+  filter(!(sero.viv.p==0 | sero.viv.p==1)) %>% #glimpse()
+  filter(tot.sero.viv>=3) %>% mutate(age_7=age_ten) #%>% dplyr::select(-tot.sero.viv)
+
+unap10a_rc_f <- unap10a_rc_y %>% 
+  dplyr::select(1,2,6:8) %>% 
+  filter(!(sero.fal.p==0 | sero.fal.p==1)) %>% #dplyr::count(community_1)
+  filter(tot.sero.fal>=3) %>% mutate(age_7=age_ten) #%>% dplyr::select(-tot.sero.fal)
+
+
+a <- unap10a_rc_v %>% 
+  group_by(community_1) %>% 
+  summarise(min=min(age_7),max=max(age_7))
+f <- levels(as.factor(a$community_1))
+df <- data_frame(community_1=as.character(),
+                 age_7=as.double())
+
+
+for (i in 1:length(f)) {
+  df_p <- data_frame(community_1=f[i],
+                     age_7=seq(as.numeric(a[i,2]),as.numeric(a[i,3]),1))
+  df <- union(df,df_p)
+}
+
+df <- df %>% arrange(community_1,age_7)
+df <- union(df %>% mutate(Specie="viv"),df %>% mutate(Specie="fal"))
+
+#-----------------------------------------------------------------------#### VIVAX ###
+
+f <- levels(unap10a_rc_v$community_1)
+
+revcat_v <- data_frame(community_1=as.character(),
+                     h=as.double(),
+                     r=as.double(),
+                     l=as.double())
+
+rhv <- 0.074
+
+for (i in 1:length(f)) {#i=1
+revcat_p <- optim(0.1,fn=Lccm1c, r=rhv,
+                  data=unap10a_rc_v %>% 
+                    filter(community_1==f[i]) %>% #i
+                    dplyr::select(-1),
+                  hessian=TRUE) %>% 
+  data_frame(community_1=f[i],#i
+             h=.$par[1],
+             r=rhv,#.$par[2],
+             l=.$value[1]) %>% 
+  dplyr::select(-1) %>% slice(1)
+revcat_v <- union(revcat_v,revcat_p)
+}
+
+
+#-----------------------------------------------------------------------#### FALCIPARUM ###
+
+f <- levels(unap10a_rc_f$community_1)
+revcat_f <- data_frame(community_1=as.character(),
+                     h=as.double(),
+                     r=as.double(),
+                     l=as.double())
+
+rhf <- 0.029
+
+for (i in 1:length(f)) {#i=3
+revcat_p <- optim(0.1,fn=Lccm1c,r=rhf,
+                  data=unap10a_rc_f %>% 
+                    filter(community_1==f[i]) %>% #i
+                    dplyr::select(-1),
+                  hessian=TRUE) %>% 
+  data_frame(community_1=f[i],#i
+             h=.$par[1],
+             r=rhf,#.$par[2],
+             l=.$value[1]) %>% 
+  dplyr::select(-1) %>% slice(1)
+revcat_f <- union(revcat_f,revcat_p)
+}
+
+#-----------------------------------------------------------------------#### UNION BOTH ###
+
+revcat <- union(revcat_v %>% mutate(Specie="viv"),
+      revcat_f %>% mutate(Specie="fal"))
+
+#h <- revcat$par[1] #seroconversion rate
+#r <- revcat$par[2] #seroreversion rate
+
+unap10a_rc_a <- union(unap10a_rc_v %>% 
+  mutate(Specie="viv") %>% 
+  dplyr::rename(tot.sero=tot.sero.viv,
+                sum.sero=sum.sero.viv,
+                sero.p=sero.viv.p),
+  unap10a_rc_f %>% 
+  mutate(Specie="fal") %>% 
+  dplyr::rename(tot.sero=tot.sero.fal,
+                sum.sero=sum.sero.fal,
+                sero.p=sero.fal.p))
+
+
+#-----------------------------------------------------------------------#### FINAL DATAFRAME ###
+
+revcat_a <- df %>% full_join(unap10a_rc_a,by=c("age_7","community_1","Specie")) %>% 
+  full_join(revcat,by=c("community_1","Specie")) %>% 
+  mutate(y=h/(r+h)*(1-exp(-(r+h)*age_7)))
+  #mutate(community_1=as.factor(community_1))
+#h <- revcat$h
+#r <- revcat$r
+
+#-----------------------------------------------------------------------#### SET LABELS ###
+
+specie_name <- c("viv"="P. vivax","fal"="P. falciparum",
+                 "Puerto Almendra"="Puerto Almendra",
+                 "Ninarumi"="Ninarumi",
+                 "Llanchama"="Llanchama",
+                 "Zungarococha"="Zungarococha"
+                 )
+
+#-----------------------------------------------------------------------#### PLOT INFORMATION ###
+
+unap10a_rc_a %>% 
+  #filter(community_1==f[1]) %>% 
+  ggplot(aes(age_7,sero.p)) +
+  geom_point() +
+  facet_grid(Specie~community_1,labeller = as_labeller(specie_name)) +
+  geom_line(aes(y = y), data = revcat_a, colour = "black") +
+  ylim(0,1) +
+  geom_text(aes(x,y,label=lab),
+            data = revcat %>% 
+              mutate(x=2,y=0.92) %>% 
+              mutate(lab=paste0("SCR= ",h %>% format(digits=2),
+                                "\nSRR= ",r %>% format(digits=2)))
+            ,vjust=.5,hjust=0.05,size=3) +
+  xlab("Age") + ylab("Seroprevalence")
+  #stat_smooth(formula = )
+ggsave("figure/decile-seroconvrt_02.png")
+```
+
+```{r}
+# table + loglik
+revcat %>% arrange(community_1,Specie)
+#revcat_a
+```
+
+### [**] test hypothesis
+
+- rev.cat.model assumptions:
+    + subjects spent their entire live in community
+    + migration is neglible
+    + no indovidual differences in SCR between subjects of same community/village
+    + disease transmission is in a endemic steady-state: SCR constant over time
+- compare LogLik of less-assumption (h,r) vs more-assumption (h,r=cte) models (between villages)
+- lowest -loglik or highest -(-loglik) is prefered
+- Ho: equalty between models, 
+- if p>0.05: then both are the best model, but due to parsimony, prefer the one with more assumptions
+- if p<0.05: then both are different -> prefer the one with best loglik value
+
+### change point
+
+### [**] test hypothesis
+
+- test LogLik
+- Ho: no change in tranmission
+- same decision rule
+
+### whole data | two estimates
 
 ```{r,fig.height=4,fig.width=12}
 unap10a_rc_v <- unap10a_rc %>% 
@@ -1222,7 +1915,257 @@ unap10a %>% #age vs log(Ab.units)
 
 ## Spatial point patterns
 
-### General mapping
+### ISSUE: Modify community
+
+```{r}
+unap10a <- unap10a %>% #dplyr::count(community_1=="Ninarumi")
+  #filter(id %in% nongps$id) %>% 
+  mutate(community_1=as.character(community_1)) %>% 
+  mutate(community_1=if_else(id %in% nongps$id,"Ninarumi",community_1)) %>% 
+  mutate(community_1=as.factor(community_1)) #%>% dplyr::count(community_1=="Ninarumi")
+```
+
+```{r}
+unap10a.save <- unap10a
+#unap10a <- unap10a.save
+```
+
+
+### HOUSEHOLD data
+
+```{r,eval=FALSE}
+censo <- readxl::read_xlsx("data-raw/Base_Censo_2014.xlsx") %>% 
+  rename_all(funs(stringr::str_to_lower(.))) #%>% 
+  #mutate(fecha_registro=lubridate::as_date(fecha_registro))
+
+censo %>% #dplyr::count(estado)
+  dplyr::rename()
+```
+
+#### discrete
+
+```{r}
+# resumen por vivienda
+#unap10a
+
+unap10a_hh <- unap10a %>% #glimpse()
+  mutate(hh=stringr::str_replace(id,"(.+)-(.+)","\\1")) %>% 
+  dplyr::select(id,hh,community_1,latitud,longitud,prev_fal:sero_mix,-ends_with("_mix")) 
+
+unap10a_pre <- unap10a_hh %>% #dplyr::select(-id) %>% 
+  gather(key,value,-id,
+         -hh,-community_1,-latitud,-longitud) %>% #dplyr::count(value)
+  mutate(value=if_else(value=="positive",1,0)) %>% #dplyr::count(value)
+  group_by(community_1,hh,latitud,longitud,key) %>% 
+  summarise(prop=(sum(value)/n())*100,
+            freq=sum(value),
+            totl=n()) %>% 
+  ungroup() 
+
+unap10a <- unap10a_pre %>% 
+  dplyr::select(-freq,-totl) %>% ##### use proportion
+  spread(key,prop)
+  #dplyr::select(-prop,-totl) %>% #### use frequency
+  #spread(key,freq)
+  
+# cuantas vivendas con numeros de individuos hay
+unap10a_hh %>% 
+  select(1,2) %>% 
+  group_by(hh) %>% summarise(ind_hh=n()) %>% 
+  ungroup() %>% dplyr::count(ind_hh)
+# 936 individuos
+# 270 viviendas
+# (1*53)+(2*50)+(3*50)+(4*44)+(5*25)+(6*24)+(7*13)+(8*4)+(9*5)+(10*2)
+
+# cuantos 100% son por 1-3 individuos por vivienda
+unap10a_pre %>% 
+  filter(prop==100) %>% group_by(key) %>% 
+  dplyr::count(freq)
+```
+
+##### distancia entre fronteras
+
+```{r}
+extreme <- unap10a %>% dplyr::select(1:4) %>% 
+  group_by(community_1) %>% 
+  summarise(men.lat=mean(latitud),
+            men.lon=mean(longitud),
+            gmn.lat=exp(mean(log(abs(latitud))))*(-1),
+            gmn.lon=exp(mean(log(abs(longitud))))*(-1),
+            max.lat= max(latitud),
+            min.lat= min(latitud),
+            max.lon= max(longitud),
+            min.lon= min(longitud)) %>% 
+  ungroup() 
+
+tomatrix <- function(data){
+  data %>% 
+    rename(longitude=longitud, latitude=latitud) %>% 
+    gather(sample,measure,-hh,-community_1,-point) %>% 
+    mutate(sample=as.factor(sample)) %>% 
+    mutate(sample=forcats::fct_relevel(sample,"longitude")) %>% 
+    reshape2::acast(point ~ sample,
+                    value.var = "measure")# %>% class()
+}
+
+LL.min.lon <- unap10a %>% dplyr::select(1:4) %>% 
+  filter(community_1=="Llanchama" & 
+           longitud==extreme %>% 
+           filter(community_1=="Llanchama") %>% 
+           dplyr::select(min.lon) %>% .$min.lon) %>% 
+  mutate(point="Llanchama.min.lon") %>% 
+  tomatrix() %>% print()
+
+LL.max.lon <- unap10a %>% dplyr::select(1:4) %>% 
+  filter(community_1=="Llanchama" & 
+           longitud==extreme %>% 
+           filter(community_1=="Llanchama") %>% 
+           dplyr::select(max.lon) %>% .$max.lon) %>% 
+  mutate(point="Llanchama.max.lon") %>% 
+  tomatrix() %>% print()
+  
+
+NN.min.lon <- unap10a %>% dplyr::select(1:4) %>% #dplyr::count(community_1)
+  filter(community_1=="Ninarumi" & 
+           longitud==extreme %>% 
+           filter(community_1=="Ninarumi") %>% 
+           dplyr::select(min.lon) %>% .$min.lon) %>% 
+  mutate(point="Ninarumi.min.lon") %>% 
+  tomatrix() %>% print()
+
+NN.max.lat <- unap10a %>% dplyr::select(1:4) %>% #dplyr::count(community_1)
+  filter(community_1=="Ninarumi" & 
+           latitud==extreme %>% 
+           filter(community_1=="Ninarumi") %>% 
+           dplyr::select(max.lat) %>% .$max.lat) %>% 
+  mutate(point="Ninarumi.max.lat") %>% 
+  tomatrix() %>% print()
+
+PA.min.lat <- unap10a %>% dplyr::select(1:4) %>% #dplyr::count(community_1)
+  filter(community_1=="Puerto Almendra" & 
+           latitud==extreme %>% 
+           filter(community_1=="Puerto Almendra") %>% 
+           dplyr::select(min.lat) %>% .$min.lat) %>% 
+  mutate(point="PtoAlmendra.min.lat") %>% 
+  tomatrix() %>% print()
+
+PA.max.lon <- unap10a %>% dplyr::select(1:4) %>% #dplyr::count(community_1)
+  filter(community_1=="Puerto Almendra" & 
+           longitud==extreme %>% 
+           filter(community_1=="Puerto Almendra") %>% 
+           dplyr::select(max.lon) %>% .$max.lon) %>% 
+  mutate(point="PtoAlmendra.max.lon") %>% 
+  tomatrix() %>% print()
+
+ZG.min.lon <- unap10a %>% dplyr::select(1:4) %>% #dplyr::count(community_1)
+  filter(community_1=="Zungarococha" & 
+           longitud==extreme %>% 
+           filter(community_1=="Zungarococha") %>% 
+           dplyr::select(min.lon) %>% .$min.lon) %>% 
+  mutate(point="Zungarococha.min.lon") %>% 
+  tomatrix() %>% print()
+
+ZG.max.lon <- unap10a %>% dplyr::select(1:4) %>% #dplyr::count(community_1)
+  filter(community_1=="Zungarococha" & 
+           longitud==extreme %>% 
+           filter(community_1=="Zungarococha") %>% 
+           dplyr::select(max.lon) %>% .$max.lon) %>% 
+  mutate(point="Zungarococha.max.lon") %>% 
+  tomatrix() %>% print()
+
+geosphere::distm(LL.max.lon,NN.min.lon)
+geosphere::distm(NN.max.lat,PA.min.lat)
+geosphere::distm(PA.max.lon,ZG.min.lon)
+geosphere::distm(LL.min.lon,ZG.max.lon)
+```
+
+```{r}
+tomatrix <- function(data){
+  data %>% 
+    rename(longitude=gmn.lon, latitude=gmn.lat) %>% 
+    gather(sample,measure,#-hh,
+           -community_1,-point
+           ) %>% 
+    mutate(sample=as.factor(sample)) %>% 
+    mutate(sample=forcats::fct_relevel(sample,"longitude")) %>% 
+    reshape2::acast(point ~ sample,
+                    value.var = "measure")# %>% class()
+}
+
+NN.ctr.lat <- extreme %>% dplyr::select(community_1,contains("gmn")) %>% #dplyr::count(community_1)
+  filter(community_1=="Ninarumi") %>% 
+  mutate(point="Ninarumi.ctr.lat") %>% 
+  tomatrix() %>% print()
+
+PA.ctr.lat <- extreme %>% dplyr::select(community_1,contains("gmn")) %>% #dplyr::count(community_1)
+  filter(community_1=="Puerto Almendra") %>% 
+  mutate(point="PtoAlmendra.ctr.lat") %>% 
+  tomatrix() %>% print()
+
+geosphere::distm(NN.max.lat,NN.ctr.lat)
+geosphere::distm(NN.max.lat,PA.ctr.lat)
+```
+
+##### distribution of % positives
+
+```{r,fig.height=2,fig.width=8}
+unap10a %>% 
+  gather(key,value,#-id,
+         -hh,-community_1,-latitud,-longitud) %>% #dplyr::count(value)
+  group_by(key) %>% 
+  summarise(q25=quantile(value,.25),
+            q50=quantile(value,.5),
+            #median=median(value),
+            q75=quantile(value,.75),
+            var=var(value))
+
+unap10a %>% 
+  gather(key,value,#-id,
+         -hh,-community_1,-latitud,-longitud) %>% #dplyr::count(value)
+  #filter(value!=0) %>% 
+  ggplot(aes(x=value)) +
+  geom_histogram() +
+  facet_grid(~key)
+```
+
+#### continuous
+
+```{r}
+unap10a_ab <- unap10a.save %>% 
+  mutate(hh=stringr::str_replace(id,"(.+)-(.+)","\\1")) %>% 
+  dplyr::select(#id,
+                hh,community_1,latitud,longitud,Ab.unit_Pfal,Ab.unit_Pviv) %>% 
+  gather(key,value,#-id,
+         -hh,-community_1,-latitud,-longitud) %>% 
+  group_by(hh,community_1,latitud,longitud,key) %>% 
+  summarise(median_ab=median(value,na.rm=T)) %>% 
+  ungroup() %>% 
+  spread(key,median_ab)
+```
+
+##### distribution of serology
+
+```{r,fig.height=3,fig.width=5}
+unap10a_ab %>% 
+  gather(key,value,#-id,
+         -hh,-community_1,-latitud,-longitud) %>% 
+  group_by(key) %>% 
+  summarise(q25=quantile(value,.25,na.rm=T),
+            q50=quantile(value,.5,na.rm=T),
+            #median=median(value),
+            q75=quantile(value,.75,na.rm=T),
+            var=var(value,na.rm=T))
+
+unap10a_ab %>% 
+  gather(key,value,#-id,
+         -hh,-community_1,-latitud,-longitud) %>% 
+  ggplot(aes(value,fill=key)) +
+  geom_histogram(alpha=.5,position = "identity") +
+  scale_x_log10() #+
+  #facet_grid(~key)
+```
+
+### [**] General mapping
 
 ```{r,eval=FALSE,echo=FALSE}
 library(maps)
@@ -1244,25 +2187,29 @@ points(-73.253801, -3.743316, pch=19, col="black", cex=.5)  #plot my sample site
 library(maps)
 library(mapdata)
 #plot1
+#grDevices::png("figure/map-peru_iquitos_river.png")
+#grDevices::pdf("figure/map-peru_iquitos_river.pdf")
 maps::map(regions=maps::sov.expand(c("Peru","Ecuador","Brazil","Chile",
                                      "Bolivia","Colombia")), 
           xlim=c(-82,-68),ylim=c(-19,0),col="gray95", fill=TRUE)
 maps::map('rivers', add=TRUE, col = "blue")
 maps::map.axes()
 #map.cities(country = "Peru", capitals = 1)
-points(-73.253801, -3.743316, pch=19, col="black", cex=.5)  #plot my sample sites: IQUITOS
-text(-73.253801, -3.743316,"Iquitos",pos = 2,cex=1.4)
+points(-73.253801, -3.743316, pch=19, col="red", cex=1.5)  #plot my sample sites: IQUITOS
+text(-73.253801, -3.743316,"Iquitos",pos = 2,cex=2)
+#dev.off()
 points(unap10a$longitud, unap10a$latitud, 
        pch=19, col="red", cex=0.5)  #plot my sample sites
 ```
 
 ```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+dtmp <- readr::read_csv("data/x-zungaro_basal.csv")
 per <- ggmap::get_googlemap("amazon golf course",zoom = 12,
                             maptype = "roadmap"
                       )
 ggmap::ggmap(per) +
   geom_point(aes(x=longitud, y=latitud,
-                 colour=community_1), data=unap10a) +
+                 colour=community_1), data=dtmp) +
   theme(#legend.position=c(0.17,0.84),#"bottom" #google
         legend.position=c(0.88,0.17),#"bottom" #google
         #legend.position=c(0.9,0.2),#"stamen"
@@ -1277,11 +2224,14 @@ ggmap::ggmap(per) +
                  x.min=-73.40,x.max=-73.28,y.min=-3.86,y.max=-3.76,
                  location = "bottomright") +
   ggsn::north(x.min=-73.40,x.max=-73.21,y.min=-3.86,y.max=-3.722,scale = .2,symbol = 5)
+#ggsave("figure/map-iquitos_zungaro.png")
+ggsave("figure/map-iquitos_zungaro.png")
+ggsave("figure/map-iquitos_zungaro.pdf")
 ```
 
 ```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
 ggmap::qmplot(longitud, latitud, 
-       data = unap10a, 
+       data = dtmp, 
        #maptype = "toner-lite", #only with stamen
        source="google", #stamen
        #maptype = "terrain",#"terrain",#"roadmap",
@@ -1304,23 +2254,61 @@ ggmap::qmplot(longitud, latitud,
 
 ```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
 ggmap::qmplot(longitud, latitud, 
-       data = unap10a, 
+       data = dtmp, 
        #maptype = "toner-lite", #only with stamen
-       #source="google", #stamen
-       #maptype = "terrain",#"terrain",#"roadmap",
+       #source="google", #stamen ########################### change here
+       #maptype = "satellite",#"terrain",#"roadmap", ####### change here
        zoom = 13,
        #size = c(640, 640),
        #urlonly = TRUE,
        #scale=3,
        #check the effect of I() function
        color = community_1,
-       alpha = I(.2),
+       alpha = I(.4),
        #mapcolor = "bw",
        #facets = "~community_1",
        #alpha = .5,
        extent = "panel") +#facet_wrap(~community_1)
   theme(#legend.position=c(0.17,0.84),#"bottom" #google
-        legend.position=c(0.9,0.2),#"stamen"
+        legend.position=c(0.9,0.2),#"stamen" ############ change here
+        #legend.position=c(0.9,0.3),#"satellite"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  #scale_colour_discrete(name="Community") +
+  scale_colour_discrete(name="Villages") +
+  xlab("Longitud") +
+  ylab("Latitud") +
+  coord_fixed(ylim = c(-3.863,-3.824)#, ratio = 2/1
+              ) +
+  ggsn::scalebar(dist = 1, st.size=3, height=0.01, dd2km = TRUE, model = 'WGS84',
+                 x.min=-73.40,x.max=-73.357,y.min=-3.86,y.max=-3.83,
+                 location = "bottomright") +
+  #ggsn::north(x.min=-73.40,x.max=-73.339,y.min=-3.86,y.max=-3.825) ############# may change this?!
+  ggsn::north(x.min=-73.40,x.max=-73.339,y.min=-3.86,y.max=-3.825)
+ggsave("figure/map-iquitos_zungaro-bw.png")
+ggsave("figure/map-iquitos_zungaro-bw.pdf")
+```
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = dtmp, 
+       #maptype = "toner-lite", #only with stamen
+       source="google", #stamen ########################### change here
+       maptype = "satellite",#"terrain",#"roadmap", ####### change here
+       zoom = 13,
+       #size = c(640, 640),
+       #urlonly = TRUE,
+       #scale=3,
+       #check the effect of I() function
+       color = community_1,
+       #alpha = I(.4),
+       #mapcolor = "bw",
+       #facets = "~community_1",
+       #alpha = .5,
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        #legend.position=c(0.9,0.2),#"stamen" ############ change here
+        legend.position=c(0.9,0.3),#"satellite"
         legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
         ) + 
   scale_colour_discrete(name="Community") +
@@ -1329,8 +2317,549 @@ ggmap::qmplot(longitud, latitud,
   ggsn::scalebar(dist = 1, st.size=3, height=0.01, dd2km = TRUE, model = 'WGS84',
                  x.min=-73.40,x.max=-73.357,y.min=-3.86,y.max=-3.83,
                  location = "bottomright") +
+  #ggsn::north(x.min=-73.40,x.max=-73.339,y.min=-3.86,y.max=-3.825) ############# may change this?!
   ggsn::north(x.min=-73.40,x.max=-73.339,y.min=-3.86,y.max=-3.825)
 ```
+
+```{r}
+data <- unap10a #%>%
+  #mutate(prev_fal=forcats::fct_relevel(prev_fal,"positive")) %>% 
+  #mutate(prev_viv=forcats::fct_relevel(prev_viv,"positive")) %>%
+  #mutate(sero_fal=forcats::fct_relevel(sero_fal,"positive")) %>% 
+  #mutate(sero_viv=forcats::fct_relevel(sero_viv,"positive")) #%>%  
+  #filter(prev_fal=="negative") %>% #among negatives
+  #filter(sero_fal=="positive") %>% #seropositives
+  #filter(community_1=="Ninarumi")
+```
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+com <- levels(data$community_1)
+comu <- com[4]
+ggmap::qmplot(longitud, latitud, 
+       data = unap10a %>% filter(community_1==comu), 
+       #maptype = "toner-lite", #only with stamen
+       source="google", #stamen ########################### change here
+       maptype = "satellite",#"terrain",#"roadmap", ####### change here
+       zoom = 15,
+       #size = c(640, 640),
+       #urlonly = TRUE,
+       #scale=3,
+       #check the effect of I() function
+       color = community_1,
+       #alpha = I(.6),
+       #mapcolor = "bw",
+       #facets = "~community_1",
+       #alpha = .5,
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.17,0.84),#"bottom" #google
+        #legend.position=c(0.9,0.2),#"stamen" ############ change here
+        #legend.position=c(0.9,0.3),#"satellite"
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  scale_colour_discrete(name="Community") #+
+  #coord_fixed(ylim = c(-3.863,-3.824)#, ratio = 2/1
+  #            ) +
+  #ggsn::scalebar(dist = 1, st.size=3, height=0.01, dd2km = TRUE, model = 'WGS84',
+  #               x.min=-73.40,x.max=-73.357,y.min=-3.86,y.max=-3.83,
+  #               location = "bottomright") +
+  #ggsn::north(x.min=-73.40,x.max=-73.339,y.min=-3.86,y.max=-3.825) ############# may change this?!
+  #ggsn::north(x.min=-73.40,x.max=-73.339,y.min=-3.86,y.max=-3.825)
+```
+
+### Discrete mapping
+
+#### prevalence
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = unap10a, 
+       zoom = 13,
+       color = prev_fal,
+       size= prev_fal,
+       alpha = I(.5),
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  viridis::scale_color_viridis("% of positive",#trans="log10",
+                               direction = -1) +
+  scale_size_continuous("% of positive") +
+  labs(title=expression(paste("Positive cases for ",
+                              italic("Plasmodium falciparum")," malaria")))
+```
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = unap10a #%>% mutate(prev_fal=as.factor(prev_viv)) %>% 
+         #mutate(prev_viv=forcats::fct_relevel(prev_viv,"positive"))
+       , 
+       zoom = 13,
+       color = prev_viv,
+       size= prev_viv,
+       alpha = I(.5),
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  viridis::scale_color_viridis("% of positive",#trans="log10",
+                               direction = -1) +
+  scale_size_continuous("% of positive") +
+  labs(title=expression(paste("Positive cases for ",
+                              italic("Plasmodium vivax")," malaria")))
+```
+
+#### seroprevalence
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = unap10a %>% filter(prev_viv==0), 
+       zoom = 13,
+       color = sero_fal,
+       size= sero_fal,
+       alpha = I(.5),
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  viridis::scale_color_viridis("% of seropositive",#trans="log10",
+                               direction = -1) +
+  scale_size_continuous("% of seropositive") +
+  labs(title=expression(paste("Seropositive cases for ",
+                              italic("Plasmodium falciparum")," malaria among negatives")))
+```
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = unap10a %>% filter(prev_viv==0), 
+       zoom = 13,
+       color = sero_viv,
+       size= sero_viv,
+       alpha = I(.5),
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  viridis::scale_color_viridis("% of seropositive",#trans="log10",
+                               direction = -1) +
+  scale_size_continuous("% of seropositive") +
+  labs(title=expression(paste("Seropositive cases for ",
+                              italic("Plasmodium vivax")," malaria among negatives")))
+```
+
+### Continuous mapping
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE,eval=FALSE}
+ggmap::qmplot(longitud, latitud, 
+       data = unap10a %>% mutate(prev_fal=as.factor(prev_fal)) %>% 
+         mutate(prev_fal=forcats::fct_relevel(prev_fal,"positive")) %>% filter(prev_fal=="positive"), 
+       zoom = 13,
+       color = densidad,
+       size= densidad,
+       alpha = I(.3),
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(legend.position=c(0.895,0.35),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  viridis::scale_color_viridis(trans="log10",direction = -1) +
+  scale_size_continuous(trans = "log10") +
+  #scale_size_continuous("Microscopy or PCR",breaks=c(-1,-2),labels = c("Positive","Negative")) +
+  #scale_color_discrete("Microscopy or PCR",#breaks=c("Positive","Negative"),
+  #                       labels = c("Positive","Negative")
+  #                     ) +
+  #scale_colour_discrete(name="Positive(micro|PCR)") +
+  #coord_fixed(ylim = c(-3.863,-3.824)#, ratio = 2/1
+  #            ) +
+  #ggsn::scalebar(dist = 1, st.size=3, height=0.01, dd2km = TRUE, model = 'WGS84',
+  #               x.min=-73.40,x.max=-73.357,y.min=-3.86,y.max=-3.83,
+  #               location = "bottomright") +
+  ##ggsn::north(x.min=-73.40,x.max=-73.339,y.min=-3.86,y.max=-3.825) ############# may change this?!
+  #ggsn::north(x.min=-73.40,x.max=-73.339,y.min=-3.86,y.max=-3.825) +
+  labs(title=expression(paste("Positive cases for ",
+                              italic("Plasmodium falciparum")," malaria")))
+```
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE,eval=FALSE}
+ggmap::qmplot(longitud, latitud, 
+       data = unap10a %>% mutate(prev_fal=as.factor(prev_viv)) %>% 
+         mutate(prev_viv=forcats::fct_relevel(prev_viv,"positive")) %>% filter(prev_viv=="positive"), 
+       zoom = 13,
+       color = densidad,
+       size= densidad,
+       alpha = I(.3),
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(legend.position=c(0.895,0.35),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  viridis::scale_color_viridis(trans="log10",direction = -1) +
+  scale_size_continuous(trans = "log10") +
+  #scale_size_continuous("Microscopy or PCR",breaks=c(-1,-2),labels = c("Positive","Negative")) +
+  #scale_color_discrete("Microscopy or PCR",#breaks=c("Positive","Negative"),
+  #                       labels = c("Positive","Negative")
+  #                     ) +
+  #scale_colour_discrete(name="Positive(micro|PCR)") +
+  #coord_fixed(ylim = c(-3.863,-3.824)#, ratio = 2/1
+  #            ) +
+  #ggsn::scalebar(dist = 1, st.size=3, height=0.01, dd2km = TRUE, model = 'WGS84',
+  #               x.min=-73.40,x.max=-73.357,y.min=-3.86,y.max=-3.83,
+  #               location = "bottomright") +
+  ##ggsn::north(x.min=-73.40,x.max=-73.339,y.min=-3.86,y.max=-3.825) ############# may change this?!
+  #ggsn::north(x.min=-73.40,x.max=-73.339,y.min=-3.86,y.max=-3.825) +
+  labs(title=expression(paste("Positive cases for ",
+                              italic("Plasmodium vivax")," malaria")))
+```
+
+#### serology
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = unap10a_ab, 
+       zoom = 13,
+       color = Ab.unit_Pfal,
+       size= Ab.unit_Pfal,
+       alpha = I(.5),
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  viridis::scale_color_viridis("median Ab\nresponse",#trans="log10",
+                               direction = -1) +
+  scale_size_continuous("median Ab\nresponse") +
+  labs(title=expression(paste("Seropositive cases for ",
+                              italic("Plasmodium falciparum")," malaria")))
+```
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = unap10a_ab, 
+       zoom = 13,
+       color = Ab.unit_Pviv,
+       size= Ab.unit_Pviv,
+       alpha = I(.5),
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  viridis::scale_color_viridis("median Ab\nresponse",#trans="log10",
+                               direction = -1) +
+  scale_size_continuous("median Ab\nresponse") +
+  labs(title=expression(paste("Seropositive cases for ",
+                              italic("Plasmodium vivax")," malaria")))
+```
+
+### PER COMMUNITY
+
+#### prevalence
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+com <- levels(data$community_1)
+comu <- com[3]
+data %>% glimpse()
+ggmap::qmplot(longitud, latitud, 
+       #data = data, 
+       data = data %>% filter(community_1==comu) %>%
+         add_row(community_1=comu,prev_fal=1)
+         , 
+       zoom = 13,
+       alpha = I(.5),
+       colour=prev_fal,size= prev_fal,
+       #geom="density2d",
+       extent = "panel") +
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  viridis::scale_color_viridis("% of positive",#trans="log10",
+                               direction = -1) +
+  scale_size_continuous("% of positive") +
+  labs(title=comu, 
+       subtitle=expression(paste("Positive cases for ",
+                                 italic("Plasmodium falciparum")," malaria"))
+       )
+
+ggmap::qmplot(longitud, latitud, 
+       #data = data, 
+       data = data %>% filter(community_1==comu) %>%
+         add_row(community_1=comu,prev_viv=1)
+         , 
+       zoom = 13,
+       alpha = I(.5),
+       colour=prev_viv,size= prev_viv,
+       #geom="density2d",
+       extent = "panel") +
+  theme(legend.margin = margin(0,0,0,0)) + 
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  viridis::scale_color_viridis("% of positive",#trans="log10",
+                               direction = -1) +
+  scale_size_continuous("% of positive") +
+  labs(title=comu, 
+       subtitle=expression(paste("Positive cases for ",
+                                 italic("Plasmodium vivax")," malaria"))
+       )
+```
+
+#### seroprevalence
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+com <- levels(data$community_1)
+comu <- com[3]
+data %>% glimpse()
+ggmap::qmplot(longitud, latitud, 
+       #data = data, 
+       data = data %>% filter(community_1==comu) %>%
+         add_row(community_1=comu,sero_fal=1) %>% 
+         filter(prev_fal==0)# %>% #among negatives
+         #filter(sero_fal=="positive") %>% #seropositives
+         , 
+       zoom = 13,
+       alpha = I(.3),
+       colour=sero_fal,size= sero_fal,
+       #geom="density2d",
+       extent = "panel") +
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  viridis::scale_color_viridis("% of seropositive",#trans="log10",
+                               direction = -1) +
+  scale_size_continuous("% of seropositive") +
+  labs(title=comu, 
+       subtitle=expression(paste("Seropositive cases for ",
+                                 italic("Plasmodium falciparum")," malaria among negatives"))
+       )
+
+ggmap::qmplot(longitud, latitud, 
+       #data = data, 
+       data = data %>% filter(community_1==comu) %>%
+         add_row(community_1=comu,sero_viv=1) %>% 
+         filter(prev_viv==0)# %>% #among negatives
+         #filter(sero_viv=="positive") %>% #seropositives
+         , 
+       zoom = 13,
+       alpha = I(.3),
+       colour=sero_viv,size= sero_viv,
+       #geom="density2d",
+       extent = "panel") +
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  viridis::scale_color_viridis("% of seropositive",#trans="log10",
+                               direction = -1) +
+  scale_size_continuous("% of seropositive") +
+  labs(title=comu, 
+       subtitle=expression(paste("Seropositive cases for ",
+                                 italic("Plasmodium vivax")," malaria among negatives"))
+       )
+```
+
+#### serology
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+com <- levels(data$community_1)
+comu <- com[3]
+data %>% glimpse()
+ggmap::qmplot(longitud, latitud, 
+       #data = data, 
+       data = unap10a_ab %>% filter(community_1==comu) #%>%
+         #add_row(community_1=comu,sero_fal=1)# %>% 
+         #filter(prev_fal==0)# %>% #among negatives
+         #filter(sero_fal=="positive") %>% #seropositives
+         , 
+       zoom = 13,
+       alpha = I(.3),
+       colour=Ab.unit_Pfal,size= Ab.unit_Pfal,
+       #colour=Ab.unit_Pfal,size= Ab.unit_Pfal,
+       #geom="density2d",
+       extent = "panel") +
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  viridis::scale_color_viridis("median Ab\nresponse",#trans="log10",
+                               direction = -1) +
+  scale_size_continuous("median Ab\nresponse") +
+  labs(title=comu, 
+       subtitle=expression(paste("Antibody responses against ",
+                                 italic("Plasmodium falciparum")," malaria"))
+       )
+
+ggmap::qmplot(longitud, latitud, 
+       #data = data, 
+       data = unap10a_ab %>% filter(community_1==comu)# %>%
+         #add_row(community_1=comu,sero_viv=1) #%>% 
+         #filter(prev_viv==0)# %>% #among negatives
+         #filter(sero_viv=="positive") %>% #seropositives
+         , 
+       zoom = 13,
+       alpha = I(.3),
+       colour=Ab.unit_Pviv,size= Ab.unit_Pviv,
+       #colour=Ab.unit_Pviv,size= Ab.unit_Pviv,
+       #geom="density2d",
+       extent = "panel") +
+  theme(legend.margin = margin(0,0,0,0)) + 
+  viridis::scale_color_viridis("median Ab\nresponse",#trans="log10",
+                               direction = -1) +
+  scale_size_continuous("median Ab\nresponse") +
+  labs(title=comu, 
+       subtitle=expression(paste("Antibody responses against ",
+                                 italic("Plasmodium vivax")," malaria"))
+       )
+```
+
+### OUTPUT
+
+```{r}
+data %>% dplyr::select(-contains("sero")) %>% readr::write_csv("data/zungaro-spatial.csv")
+#full_join(unap10a_ab,data) %>% readr::write_csv("data/zungaro-spatial.csv")
+```
+
+```{r}
+#unap10a_pre %>% 
+#  filter(key=="prev_fal" | key=="prev_viv")
+
+#unap10a_pre %>% 
+#  filter(key=="prev_fal" | key=="prev_viv") %>% 
+#  group_by(community_1,hh,latitud,longitud,totl) %>% 
+#  summarise(tot_freq=sum(freq)) %>% 
+#  ungroup() %>% 
+#  mutate(tot_prop=100*tot_freq/totl) %>% 
+#  filter(tot_prop>100)
+
+nongps <- readr::read_rds("data/06-spatial-nongps.rds") %>% 
+  mutate(community_1=forcats::fct_recode(community_1,Ninarumi="Ninarrumi"))
+
+p <- readr::read_rds("data/06-epidemio-sero.rds") %>% 
+  mutate(community_1=forcats::fct_recode(community_1,Ninarumi="Ninarrumi")) %>% 
+  mutate(community_1=as.character(community_1)) %>% 
+  mutate(community_1=if_else(id %in% nongps$id,"Ninarumi",community_1)) %>% 
+  mutate(hh=stringr::str_replace(id,"(.+)-(.+)","\\1")) %>% 
+  dplyr::select(id,community_1,hh,latitud,longitud,micro_c,pcr_c) %>% 
+  mutate(positive=if_else(micro_c=="non" & pcr_c=="non",0,1)) %>% 
+  group_by(community_1,hh,latitud,longitud) %>% 
+  summarise(prop=(sum(positive)/n())*100,
+            freq=sum(positive),
+            totl=n()) %>% 
+  ungroup() 
+
+p %>% readr::write_csv("data/zungaro-spatial.csv")
+
+p
+
+#unap10a_pre %>% dplyr::select(hh,totl)
+```
+
+#### prevalence
+
+```{r,fig.height=4.5,fig.width=7.5,message=FALSE,error=TRUE}
+com <- levels(as.factor(p$community_1))
+
+#p %>% glimpse()
+
+for (i in 1:length(com)) {
+  
+  comu <- com[i]
+  
+  px <- ggmap::qmplot(longitud, latitud, 
+       #data = data, 
+       data = p %>% filter(community_1==comu) #%>%
+         #add_row(community_1=comu,prop=1)
+         , 
+       zoom = 13,
+       alpha = I(.5),
+       #colour=prop,size= prop,
+       colour=freq,size= freq,
+       #geom="density2d",
+       extent = "panel") +
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+    #scale_color_continuous(low = "white",high = "red") +
+  viridis::scale_color_viridis("% of positive"#,#trans="log10",
+                               ,direction = -1
+                               #,option = "C"
+                               ) +
+  scale_size_continuous("% of positive") +
+  labs(title=comu, 
+       subtitle=expression(paste("Positive cases for ",
+                                 italic("Plasmodium falciparum")," or ",italic("P. vivax")))
+       )
+  
+print(px)
+
+}
+```
+
+```{r,fig.width=10,message=FALSE,error=TRUE}
+com <- levels(as.factor(p$community_1))
+
+#p %>% glimpse()
+
+for (i in 1:length(com)) {
+  
+  comu <- com[i]#i=4
+  zz <- if_else(com[i]=="Puerto Almendra",17,
+                if_else(com[i]=="Llanchama",16,15))
+  
+  px <- ggmap::qmplot(longitud, latitud, 
+       #data = data, 
+       data = p %>% filter(community_1==comu) #%>%
+         #add_row(community_1=comu,prop=1)
+         , maptype = "satellite",source = "google",
+       #zoom = 15,
+       zoom = zz,
+       alpha = I(.8),
+       #colour=prop,size= prop,
+       colour=freq,size= freq,
+       #geom="density2d",
+       extent = "panel") +
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+    scale_color_continuous("Household\nfrecuency",low = "white",high = "red") +
+  #viridis::scale_color_viridis("% of positive"#,#trans="log10",
+   #                            ,direction = -1
+    #                           #,option = "C"
+     #                          ) +
+  #scale_size_continuous("% of positive") +
+    scale_size_continuous("Household\nfrecuency") +
+  labs(title=comu, 
+       subtitle=expression(paste("Positive cases for ",
+                                 italic("Plasmodium falciparum")," or ",italic("P. vivax")))
+       )
+  
+print(px)
+
+}
+```
+
+
+### summaries
+
+```{r}
+unap10a %>% 
+  mutate(sero_c=forcats::fct_relevel(sero_c,"viv","mix","fal","non")) %>% 
+  dplyr::count(community_1,
+                         #posit_c
+                         sero_c
+                         ) %>%  
+  group_by(community_1) %>% 
+  mutate(prop=(n/sum(n))*100)# %>% 
+  #%>% as.matrix()
+  #knitr::kable(caption = "Prevalence per community",#format = "latex",
+  #             booktabs = T) #%>% 
+  #kableExtra::kable_styling(latex_options = c("striped", "hold_position"),full_width = F)
+```
+
+```{r,fig.height=2.7,fig.width=6}
+unap10a %>% select(id,community_1,sero_c,posit_c) %>% 
+  gather(key,value, -id, -community_1) %>% 
+  mutate(value=forcats::fct_relevel(value,"viv","mix","fal","non")) %>% 
+  ggplot(aes(x=community_1,fill=value)) +
+  geom_bar(position = "fill") +
+  facet_grid(~key) +
+  #scale_fill_grey() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 15, hjust = 1))
+```
+
 
 ```{r,eval=FALSE,echo=FALSE}
 library(lattice)
@@ -1569,6 +3098,7 @@ ggmap::qmplot(longitud, latitud,
        color = quality,
        size= desc(quality),
        alpha = I(.4),
+       #geom = "density2d",
        extent = "panel") + 
   facet_wrap(~attribute,ncol = 1) +
   theme(#legend.position=c(0.17,0.84),#"bottom" #google
@@ -1600,6 +3130,7 @@ ggmap::qmplot(longitud, latitud,
        #geom = "density2d",
        size= desc(quality),
        alpha = I(.4),
+       #geom = "density2d",
        extent = "panel") + 
   facet_wrap(community_1~attribute,ncol = 1) +
   theme(#legend.position=c(0.17,0.84),#"bottom" #google
@@ -1695,5 +3226,12 @@ ggmap::qmplot(longitud, latitud,
   #scale_colour_discrete(name="Community") + 
   #geom_point(aes(color = quality),alpha=.5)
 ```
+
+# rsession
+
+```{r}
+devtools::session_info()
+```
+
 
 ## References

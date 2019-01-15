@@ -587,41 +587,41 @@ unap6a %>%
 
 ```{r}
 unap6a <- unap6a %>%
-  dplyr::select(-epi_especifique_viajo_fuera_villa) %>% 
+  dplyr::select(-epi_especifique_viajo_fuera_villa) %>% ##dato crudo nulo (pocos reportan pucallpa)
   mutate(epi_tipo_fuente_agua= str_replace(epi_tipo_fuente_agua,"\\d+\\.\\s", "")) %>% 
   #dplyr::count(epi_tipo_fuente_agua)
   mutate(epi_distancia_fuente_agua= str_replace(epi_distancia_fuente_agua,"\\d+\\.\\s", "")) %>% 
   #dplyr::count(epi_distancia_fuente_agua)
   
-  mutate(epi_uso_repelente_mosquito= str_replace(epi_uso_repelente_mosquito,"\\d+\\.\\s", "")) %>% 
-  #dplyr::count(epi_uso_repelente_mosquito)
-  mutate(epi_uso_mangas_largas= str_replace(epi_uso_mangas_largas,"\\d+\\.\\s", "")) %>% 
-  #dplyr::count(epi_uso_mangas_largas)
-  mutate(epi_uso_ropa_impregnada= str_replace(epi_uso_ropa_impregnada,"\\d+\\.\\s", "")) %>% 
-  #dplyr::count(epi_uso_ropa_impregnada)
-  mutate(epi_cercania_fuente_agua= str_replace(epi_cercania_fuente_agua,"\\d+\\.\\s", "")) %>% 
-  #dplyr::count(epi_cercania_fuente_agua)
-  mutate(epi_estuvo_campo_antes= str_replace(epi_estuvo_campo_antes,"\\d+\\.\\s", "")) %>% 
-  #dplyr::count(epi_estuvo_campo_antes)
+  #mutate(epi_uso_repelente_mosquito= str_replace(epi_uso_repelente_mosquito,"\\d+\\.\\s", "")) %>% 
+  ##dplyr::count(epi_uso_repelente_mosquito)
+  #mutate(epi_uso_mangas_largas= str_replace(epi_uso_mangas_largas,"\\d+\\.\\s", "")) %>% 
+  ##dplyr::count(epi_uso_mangas_largas)
+  #mutate(epi_uso_ropa_impregnada= str_replace(epi_uso_ropa_impregnada,"\\d+\\.\\s", "")) %>% 
+  ##dplyr::count(epi_uso_ropa_impregnada)
+  #mutate(epi_cercania_fuente_agua= str_replace(epi_cercania_fuente_agua,"\\d+\\.\\s", "")) %>% 
+  ##dplyr::count(epi_cercania_fuente_agua)
+  #mutate(epi_estuvo_campo_antes= str_replace(epi_estuvo_campo_antes,"\\d+\\.\\s", "")) %>% 
+  ##dplyr::count(epi_estuvo_campo_antes)
   
-  mutate(epi_uso_redes_cama= str_replace(epi_uso_redes_cama,"\\d+\\.\\s", "")) %>% 
-  #dplyr::count(epi_uso_redes_cama)
-  mutate(epi_duerme_ventanas_abiertas= str_replace(epi_duerme_ventanas_abiertas,"\\d+\\.\\s", "")) %>%
-  #dplyr::count(epi_duerme_ventanas_abiertas)
-  mutate(epi_duerme_cerca_monte= str_replace(epi_duerme_cerca_monte,"\\d+\\.\\s", "")) %>% 
-  #dplyr::count(epi_duerme_cerca_monte)
-  mutate(epi_rocia_con_insecticida= str_replace(epi_rocia_con_insecticida,"\\d+\\.\\s", "")) %>% 
-  #dplyr::count(epi_rocia_con_insecticida)
+  #mutate(epi_uso_redes_cama= str_replace(epi_uso_redes_cama,"\\d+\\.\\s", "")) %>% 
+  ##dplyr::count(epi_uso_redes_cama)
+  #mutate(epi_duerme_ventanas_abiertas= str_replace(epi_duerme_ventanas_abiertas,"\\d+\\.\\s", "")) %>%
+  ##dplyr::count(epi_duerme_ventanas_abiertas)
+  #mutate(epi_duerme_cerca_monte= str_replace(epi_duerme_cerca_monte,"\\d+\\.\\s", "")) %>% 
+  ##dplyr::count(epi_duerme_cerca_monte)
+  #mutate(epi_rocia_con_insecticida= str_replace(epi_rocia_con_insecticida,"\\d+\\.\\s", "")) %>% 
+  ##dplyr::count(epi_rocia_con_insecticida)
   mutate(epi_ultimas_semanas_viajo= str_replace(epi_ultimas_semanas_viajo,"\\d+\\.\\s", "")) %>% 
   #dplyr::count(epi_ultimas_semanas_viajo)
   
   mutate(epi_frecuencia_rocia_casa= str_replace(epi_frecuencia_rocia_casa,"\\d+\\.\\s", "")) %>% 
   #dplyr::count(epi_frecuencia_rocia_casa)
   
-  mutate(epi_estado_campos_agricultura= str_replace(epi_estado_campos_agricultura,"\\d+\\.\\s", "")) %>% 
-  #dplyr::count(epi_estado_campos_agricultura)
-  mutate(epi_estado_canal_agua= str_replace(epi_estado_canal_agua,"\\d+\\.\\s", "")) %>% 
-  #dplyr::count(epi_estado_canal_agua)
+  #mutate(epi_estado_campos_agricultura= str_replace(epi_estado_campos_agricultura,"\\d+\\.\\s", "")) %>% 
+  ##dplyr::count(epi_estado_campos_agricultura)
+  #mutate(epi_estado_canal_agua= str_replace(epi_estado_canal_agua,"\\d+\\.\\s", "")) %>% 
+  ##dplyr::count(epi_estado_canal_agua)
   mutate(epi_adquirio_redes_dormir= str_replace(epi_adquirio_redes_dormir,"\\d+\\.\\s", "")) %>% 
   #dplyr::count(epi_adquirio_redes_dormir)
   

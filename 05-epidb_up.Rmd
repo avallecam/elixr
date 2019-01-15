@@ -108,13 +108,13 @@ unap6c <- readr::read_rds("data/04-epidemio-core.rds")
 
 ### Information of updates
 
-```{bash}
+```bash
 #less README.md
 ```
 
 ### Standard file names
 
-```{bash}
+```bash
 cp data-raw/RESULTADOS_BARRIDO_2015-I_FINAL_SETIEMBRE.xlsx \
 data/UNAP-7-DB-25ago2017.xlsx
 
@@ -128,7 +128,7 @@ cp data-raw/BASE_BARRIDO_2015-I_LIMPIA_2.xlsx \
 data/UNAP-8-EPI-19set2017.xlsx
 ```
 
-```{bash}
+```bash
 ls -shrt data/UNAP-*
 ```
 
@@ -146,7 +146,7 @@ unap7_pr <- readxl::read_excel("data/UNAP-7-DB-25ago2017.xlsx", sheet = 1,na = "
   dplyr::mutate(id= str_replace_all(id, "_","-")) 
 
 unap7 <- unap7_pr %>% #mejor cambialo a "_"
-  select(id,sexo_corregido,edad_DNI,Pv_MSP1,Pf_MSP1,densidad=Densidad_1er)
+  dplyr::select(id,sexo_corregido,edad_DNI,Pv_MSP1,Pf_MSP1,densidad=Densidad_1er)
 ```
 
 ### Tidy UNAP-8: BASE BARRIDO
@@ -213,7 +213,7 @@ unap8_ps <- readxl::read_excel("data/UNAP-8-EPI-19set2017.xlsx", sheet = 1) %>%
 unap8 <- unap8_ps %>% #mejor cambialo a "_"
   #select(id, contains("edad"), -enfermedad_cronica)
   #select(id, contains("sexo"))
-  select(id, edad_DNI, residence, sexo_consentimiento) #%>% #summary()
+  dplyr::select(id, edad_DNI, residence, sexo_consentimiento) #%>% #summary()
 ```
 
 #### edad and residence test
@@ -324,7 +324,7 @@ unap8_ps %>%
   #select(id,household,everything()) %>% 
   #dplyr::count(household) %>% 
   #filter(household=="LL003") %>% 
-  select(id,household,electricidad_red_publica:otro_banio_conectado,
+  dplyr::select(id,household,electricidad_red_publica:otro_banio_conectado,
          epi_cerca_fuente_agua:epi_distancia_fuente_agua) %>% 
   group_by(household) %>% 
   dplyr::summarise_all(unique=n_distinct(electricidad_red_publica))
@@ -519,7 +519,7 @@ unap6c %>%
         e.g. malaria en los últimos 12 meses.
 
 ```{r}
-unap9c <- unap6c %>% 
+unap9c <- unap6c %>% #glimpse()
   inner_join(unap7 %>% 
               full_join(unap8, by="id", suffix=c(".7",".8")),
             by="id", suffix=c(".6",".8")) %>% 
@@ -531,23 +531,25 @@ unap9c <- unap6c %>%
                                                          "Female"="F",
                                                          "Male"="M")
                 ) %>% 
-  select(-age_1,-age_4,-edad_DNI.8,-sex_1,-sex_4,-sexo_corregido,-Pf_MSP1,-Pv_MSP1,-residence.6) %>% 
+  dplyr::select(-age_1,-age_4,-edad_DNI.8,-sex_1,-sex_4,-sexo_corregido,-Pf_MSP1,-Pv_MSP1,-residence.6) %>% 
   dplyr::rename(age_7=edad_DNI.7,
                 sex_8=sexo_consentimiento,
-                residence=residence.8) %>% #glimpse()
-  dplyr::select(id, sex_8, age_7, community_1,
-         nivel_educacion, trabajo, residence,
-         electricidad_red_publica,
-         material_pared, material_piso,
-         epi_uso_redes_cama, #epi_adquirio_redes_dormir, 
-         epi_uso_red_dormir, #epi_redes_usadas_actualmente,
-         tenido_malaria, cuantas_tenido_malaria, densidad,
-         Ab.unit_Pfal,Ab.unit_Pviv,
-         mean.OD_Pfal, mean.OD_Pviv,
-         micro_c,pcr_c
-         )
+                residence=residence.8) #%>% #glimpse()
+  #dplyr::select(id, sex_8, age_7, community_1,
+  #       nivel_educacion, trabajo, residence,
+  #       electricidad_red_publica,
+  #       material_pared, material_piso,
+  #       epi_uso_redes_cama, #epi_adquirio_redes_dormir, 
+  #       epi_uso_red_dormir, epi_redes_usadas_actualmente, #mosquitero impregnado -> BUT CHECK ISSUE
+  #       actualmente_estudiando,
+  #       tenido_malaria, cuantas_tenido_malaria, densidad,
+  #       Ab.unit_Pfal,Ab.unit_Pviv,
+  #       mean.OD_Pfal, mean.OD_Pviv,
+  #       micro_c,pcr_c
+  #       )
 
 unap9c %>% glimpse()
+table(unap6c$epi_uso_red_dormir,unap6c$epi_redes_usadas_actualmente) #issue!!!!
 ```
 
 ##### Resumen descriptivo
@@ -592,7 +594,39 @@ unap8_ps.ty <- unap8_ps %>%
   mutate(trabajo= str_replace(trabajo,"NA_", "")) %>% #dplyr::count(trabajo, sort = T)
   mutate(trabajo= str_replace(trabajo,"_", " ")) %>% #dplyr::count(trabajo)
   mutate(trabajo= str_replace(trabajo,"NA", NA_character_)) %>% 
-  #dplyr::count(trabajo, sort = T)
+  mutate(trabajo=str_replace(trabajo,
+                                 "(.+)(\\s)casa(\\s)(.+)|(.+)(\\s)casa","Ama de casa"
+                                 )) %>% 
+  mutate(trabajo=str_replace(trabajo,
+                                 "(.+)(\\()estudiante(\\))(.+)|estudiante","Estudiante"
+                                 )) %>% 
+  mutate(trabajo=str_replace(trabajo,
+                                 "Agricultor|agricultor","Agricultor"
+                                 )) %>% 
+  mutate(trabajo=str_replace(trabajo,
+                                 "Granjero|granjero","Granjero"
+                                 )) %>% 
+  mutate(trabajo=str_replace(trabajo,
+                                 "(.+)(\\()vigilante(\\))(.+)|vigilante|Vigilante","Vigilante"
+                                 )) %>% 
+  mutate(trabajo=str_replace(trabajo,
+                                 "(.+)(\\()obrero(\\))|obrero(\\s)(.+)|obrero|obreri|albanil|albañil|construccion|contruccion","Obrero/albanil/construccion"
+                                 )) %>% 
+  mutate(trabajo=str_replace(trabajo,
+                                 "Comerciante|comerciante","Comerciante"
+                                 )) %>% 
+  mutate(trabajo=str_replace(trabajo,
+                                 "Chofer|chofer","Chofer"
+                                 )) %>% 
+  mutate(trabajo=str_replace(trabajo,
+                                 "administrativo(\\s)(.+)|limpieza|personal(\\s)(.+)|Profesor","Administrativo/limpieza/profesor"
+                                 )) %>% 
+  mutate(trabajo=str_replace(trabajo,
+                                 "mecanico|Mecanico|tecnico(\\s)(.+)","Mecanico/tecnico"
+                                 )) %>% 
+  #dplyr::count(trabajo) %>% print(n=Inf)
+
+
   mutate(trabajo_tdy=trabajo) %>% 
   mutate(trabajo_tdy=str_replace(trabajo_tdy,
                                  "(.+)(\\s)casa(\\s)(.+)|(.+)(\\s)casa","Housewife"
@@ -624,27 +658,36 @@ unap8_ps.ty <- unap8_ps %>%
   mutate(material_pared= str_replace(material_pared,"NA_", "")) %>% 
   mutate(material_pared= str_replace(material_pared,"Madera(.+)","Madera")) %>% 
   mutate(material_pared= str_replace(material_pared,"(.+)_cemento_(.+)|(.+)_cemento","cemento")) %>% 
-  mutate(nivel_educacion=str_replace(nivel_educacion,"Secundaria Completa|Tecnica(\\s)(.+)|Universidad(\\s)(.+)","Secundaria Completa / +")) %>%
+  mutate(nivel_educacion=str_replace(nivel_educacion,"Secundaria Completa","Secundaria Completa")) %>%
+  mutate(nivel_educacion=str_replace(nivel_educacion,"Tecnica(\\s)(.+)","Tecnica")) %>%
+  mutate(nivel_educacion=str_replace(nivel_educacion,"Universidad(\\s)(.+)","Universitaria")) %>%
   mutate(nivel_educacion=str_replace(nivel_educacion,"Primaria(\\s)(.+)","Primaria")) %>% 
   mutate(epi_uso_redes_cama= str_replace(epi_uso_redes_cama,"\\d+\\.\\s", "")) %>% 
-  mutate(epi_uso_red_dormir= str_replace(epi_uso_red_dormir,"\\d+\\.\\s", "")) %>% 
-  dplyr::select(id, #sex_8, age_7, community_1,
-         nivel_educacion, trabajo,trabajo_tdy,trabajo_rpl, residence,
-         electricidad_red_publica,
-         material_pared, material_piso,
-         epi_uso_redes_cama, #epi_adquirio_redes_dormir, 
-         epi_uso_red_dormir, #epi_redes_usadas_actualmente,
-         tenido_malaria, cuantas_tenido_malaria#,
+  mutate(epi_uso_red_dormir= str_replace(epi_uso_red_dormir,"\\d+\\.\\s", "")) #%>% ######### DIFERENCE HERE!!!
+  #dplyr::select(id, #sex_8, age_7, community_1,
+  #       nivel_educacion, trabajo,trabajo_tdy,trabajo_rpl, residence,
+  #       electricidad_red_publica,
+  #       material_pared, material_piso,
+  #       epi_uso_redes_cama, #epi_adquirio_redes_dormir, 
+  #       epi_uso_red_dormir, epi_redes_usadas_actualmente, #mosquitero impregnado -> BUT CHECK ISSUE
+  #       actualmente_estudiando,
+  #       tenido_malaria, cuantas_tenido_malaria#,
          #Ab.unit_Pfal,Ab.unit_Pviv,
          #micro_c,pcr_c
-         ) #%>% dplyr::count(trabajo)
+  #       ) #%>% dplyr::count(trabajo)
 #unap9c %>% dim()
 #unap9c %>% glimpse()
 
 #unap9c %>% select(id:community_1,Ab.unit_Pfal:longitud)
 
-unap9d <- unap8_ps.ty %>% inner_join(unap9c, by="id", suffix=c(".8",".9")) %>% #glimpse()
-  select(-ends_with(".9")) %>% 
+unap9d <- unap8_ps.ty %>% #glimpse()#dplyr::select(contains("sex"))#glimpse()
+  dplyr::select(id,#residence, sexo_consentimiento,
+                trabajo,
+                trabajo_tdy,trabajo_rpl,material_piso,#material_paredes,
+                material_pared,nivel_educacion#,epi_uso_redes_cama,epi_uso_red_dormir
+                ) %>% #dplyr::count(trabajo,trabajo_tdy,trabajo_rpl) %>% print(n=Inf) #glimpse()
+  inner_join(unap9c, by="id", suffix=c(".8",".9")) %>% #dplyr::select(id,contains("epi_uso_red")) %>% print(n=Inf) #glimpse()
+  dplyr::select(-ends_with(".9")) %>% #OJO, PRIORIZA  sobre 9, ¿pero en cuales?
   rename_all(
       funs(
         #stringr::str_to_lower(.) %>%
@@ -663,8 +706,9 @@ unap9d <- unap8_ps.ty %>% inner_join(unap9c, by="id", suffix=c(".8",".9")) %>% #
                                    fal="PF",
                                    mix="PV/PF")
          ) %>% 
-  replace_na(list(micro_c = "non",
-                  pcr_c = "non")) %>% 
+  
+  replace_na(list(micro_c = "non", pcr_c = "non")) %>%  #DO NOT REPLACE NA!!(2018-05-14) --> TAKE NOTE OF REASON
+  
   #mutate(nivel_educacion= stringr::str_to_lower(nivel_educacion),
    #      trabajo= stringr::str_to_lower(trabajo),
   #       residence= stringr::str_to_lower(residence),
@@ -693,7 +737,7 @@ unap9d <- unap8_ps.ty %>% inner_join(unap9c, by="id", suffix=c(".8",".9")) %>% #
       stringr::str_to_lower(.)
     )
   ) %>% 
-  select(id,sex_8,age_7,community_1,everything()) %>% 
+  dplyr::select(id,sex_8,age_7,community_1,everything()) %>% 
   mutate_if(is.character,
             funs(
       as.factor(.)
@@ -731,9 +775,10 @@ tmp <- gplots::venn(list(unap9d=i9_unap,unap_geo=ig_epid,unap7=i7_sero,unap6c=i6
 #readr::write_csv(unap6b, "data/04-epidemio-full.csv")
 #saveRDS(unap6b, "data/04-epidemio-full.rds")
 
-#unap9c
+#unap9c 
+#unap9d %>% glimpse()
 readr::write_csv(unap9d, "data/05-epidemio-core.csv")
-saveRDS(unap9d, "data/05-epidemio-core.rds")
+readr::write_rds(unap9d, "data/05-epidemio-core.rds")
 ```
 
 ### write dta
