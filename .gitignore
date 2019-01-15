@@ -17,3 +17,6 @@ _bookdown_files/*
 *.html
 s1.tex
 01-complete.md
+*.tex
+*.log
+table/*

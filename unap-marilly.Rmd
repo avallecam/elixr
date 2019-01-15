@@ -1,0 +1,2130 @@
+---
+title: "unap-marilly"
+author: "Andree Valle Campos"
+date: '`r Sys.Date()`'
+output:
+  html_notebook:
+  #html_document:
+    fig_caption: yes
+    toc: yes
+    number_sections: true
+    toc_depth: 5
+    toc_float:
+      collapsed: yes
+    code_folding: "hide"
+    #df_print: paged
+bibliography: analysis/SeroMarker.bib
+biblio-style: apalike
+link-citations: yes
+csl: analysis/american-medical-association.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, #fig.path = "01-",
+                      warning = FALSE)
+#knitr::opts_knit$set(root.dir = '../.')
+
+options(width = 60) # expand limits of CONSOLE output
+
+#require(Hmisc)
+#mu <- markupSpecs$html   # markupSpecs is in Hmisc
+# hidden command (<code>r mu$widescreen()</code>) to use an entire wide screen. # mu$widescreen()
+#`r mu$widescreen()`
+```
+
+# ELISA STANDARDIZATION {#stdrad}
+
+## Aim
+
+* Principal: 
+    - Implement a reproducible standardization of OD values across ELISA plates following 
+    **Miura et.al., 2008**[@Miura2008].
+
+* Secondary: 
+    - Generate useful outputs to compare standardization quality.
+
+
+## To Do
+
+- Write methods for the manuscript.
+
+## Dependencies
+
+The required R packages for this analysis are:
+
++ `plater` [@plater]
++ `readxl` [@readxl]
++ `tidyxl` [@tidyxl]
++ `drc` [@Ritz2015]
+
+```{r, results='hide', message=FALSE}
+##essential
+library(tidyverse)    # set of tidy packages (readr, tibble, dplyr, tidyr, ggplot2, ¿purr?)
+library(tidyxl)       # read untidy excel formats
+library(readxl)       # read excel files as tidy tables
+library(drc)          # fit dose-response models
+##accesory
+library(DiagrammeR)   # create flowchart
+```
+
+```{r}
+theme_set(theme_bw())
+```
+
+
+## Method
+
+- using `DiagrammeR` [@DiagrammeR]
+
+```{r, fig.align='center', fig.width=9}
+#install.packages("DiagrammeR")
+#library(DiagrammeR)
+
+DiagrammeR("
+  graph LR
+    A[<center>XLS<br>data</center>] -.-> |readxl| B{<center>R<br>data</center>}
+    B --> C1[STD]
+    B --> E[ctr +/-]
+    B --> D1[UNK]
+    
+    C1 -.-> |drc| C2[4pLL model]
+    C2 --> C3[Box-Cox]
+    C3 --> F{<center>UNK<br>Ab.units</center>}
+
+    D1 --> D2[mean.OD]
+    D2 --> D3[OD %CV]
+    D3 --> F
+    
+    F --> G1[<center>filter<br>replicates</center>]
+    F --> G2[<center>filter<br>NaN</center>]
+    F --> G3[<center>filter<br>%CV>21</center>]
+    G1 --> G4[<center>classify<br>seropositives<br>mean+3sd</center>]
+    G2 --> G4
+    G3 --> G4
+    G4 --> G5{<center>statistical<br>analysis<br>plan</center>}
+
+    style A fill:#ffffff, stroke:#000000, stroke-width:2px
+    style B fill:#ffffff, stroke:#000000, stroke-width:2px
+    style C1 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style C2 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style C3 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style D1 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style D2 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style D3 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style E fill:#ffffff, stroke:#000000, stroke-width:2px
+    style F fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G1 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G2 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G3 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G4 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G5 fill:#ffffff, stroke:#000000, stroke-width:2px
+")
+```
+
+### Log-Logistic (4pLL) model
+
+The curve of the **log-logistic symetric** model describe the *response* `f(x)` dependent of the *dose* `x` 
+and **04 parameters**: $$ f(x)=f(x;b,c,d,e)=c+\frac{d-c}{1+\exp[b(log(x)-log(e))]}\ $$ where: 
+  
+- `c` is the **lower limit** of the response when the *dose* `x` approaches infinity, 
+- `d` is the **upper limit** when the *dose* `x` approaches zero,
+- `b` is the **slope** around the **point of inflection**, represented by 
+- `e` defined as **effective dose** and commmonly denoted as [@Ritz2015]:
+    + `ED50`, `EC50` or `IC50` for continuous responses,
+    + `LD50` or `LC50` for binomial responses, and
+    + $T_{50}$ for event-time responses.
+
+## Procedure
+
+**12 summary plots** per ELISA Template:
+
+- **3x3 plots** of STD and UNK distribution, residual variance distribution, and model transformation.
+- **1x3 plots** of OD~450nm~, mean.OD and Ab.units distributions by Density plots.
+
+```{r}
+getwd()
+```
+
+### data
+
+#### two plates per sheet
+
+```{r}
+rng <- data_frame(anti=gl(2,2,labels = c("gest","falstatin")),
+                  data=rep(1:2,2) %>% as.factor(),
+                  range=c("B21:N29","B32:N40","B80:N88","B91:N99")) %>% 
+  mutate(data= forcats::fct_recode(data,"id"="1","od"="2"))
+
+#rng
+```
+
+```{r pre_loop,message=FALSE}
+#j <- 6 #template
+#i <- 2 #antigen
+
+a <- "data-raw/raw/unap-tesis/MARILLY-data/0-ELISA_Saby_Marilly.xlsx"
+wb_sheet <- readxl::excel_sheets(a)
+
+
+all <- data_frame(ID=as.character(),
+                  OD=as.double(),
+                  Plate=as.character(),
+                  Type=as.character(),
+                  Ab.unit=as.double(),
+                  order=as.integer(),
+                  anti=as.character()
+                  )
+#str(all)
+
+# 2 GENERATE R DATA.FRAME
+for (j in 1:length(wb_sheet[1:7])) {#j=1
+  
+  for (i in 1:length(levels(rng$anti))) {#i=2
+
+wb_Pf_main <- readxl::read_xlsx(a,#j
+                  range = rng[rng$anti==levels(rng$anti)[i] & #i
+                                rng$data==levels(rng$data)[1],] %>% .$range,
+                  sheet = j)
+
+wb_Pf <- readxl::read_xlsx(a,#j
+                  range = rng[rng$anti==levels(rng$anti)[i] & #i
+                                rng$data==levels(rng$data)[2],] %>% .$range,
+                  sheet = j)
+
+all_p <- wb_Pf_main %>% 
+  dplyr::rename(row="X__1") %>% 
+  mutate(`2`= ifelse(row == "H" & is.na(`2`), `1`, `2`), #ANOTACION AUSCENTE
+         `4`= ifelse(row == "H" & is.na(`4`), `3`, `4`),
+         `6`= ifelse(row == "H" & is.na(`6`), `5`, `6`),
+         `8`= ifelse(row == "H" & is.na(`8`), `7`, `8`)
+         ) %>% 
+  gather(loc,ID,-row) %>% 
+  mutate(loc=as.numeric(loc)) %>% 
+  arrange(row,loc) %>% 
+  #mutate(ID= ifelse(row == "H" & loc == 9, "Blank", ID)) %>% #ANOTACION AUSCENTE
+  spread(row,ID) %>% #ANOTACION AUSCENTE EN TEMPLATES
+  mutate(C=if_else(is.na(C),B,C),
+         E=if_else(is.na(E),D,E),
+         G=if_else(is.na(G) & (F!=lead(F,default = "F")),F,G)) %>% #ANOTACION AUSCENTE
+  mutate(G=if_else(G==lag(F,default = "F"),NA_character_,G)) %>% 
+  gather(row,ID,-loc) %>% #ANOTACION AUSCENTE EN TEMPLATES
+  full_join(
+    wb_Pf %>% 
+      dplyr::rename(row="X__1") %>% 
+      gather(loc,OD,-row) %>% 
+      mutate(OD=as.numeric(OD)) %>% 
+      mutate(loc=as.numeric(loc)) %>% 
+      arrange(row,loc)
+  ) %>% 
+  mutate(Plate=paste0("N",j),#j
+         Type=ifelse(row=="A" | ID=="Blank","std",
+                     ifelse(ID=="C+" | ID=="C-","ctr","unk")),
+         Ab.unit=ifelse(row=="A",stringr::str_replace(ID,"STD 1/(.+)","\\1"),
+                    ifelse(ID=="Blank","0",NA_character_))
+         ) %>% 
+  mutate(Ab.unit=as.numeric(Ab.unit)) %>% 
+  mutate(Ab.unit=ifelse(row=="A",max(Ab.unit,na.rm=T)/Ab.unit,Ab.unit)) %>% #select(-row,-loc)
+  replace_na(list(ID = "na")) %>% 
+  filter(ID!="na") %>% 
+  mutate(order=seq(1,dim(.)[1])) %>% 
+  dplyr::select(#-address,
+         -starts_with("row"),#-col,
+         -loc) %>% 
+  mutate(anti=levels(rng$anti)[i]) #i
+
+all <- union(all,all_p)
+
+  }
+}
+
+all_1 <- all %>% arrange(Plate,order)
+```
+
+```{r}
+#all_1 %>% group_by(Plate,anti) %>% dplyr::count()
+```
+
+#### one plate per sheet
+
+```{r tru_loop,message=FALSE}
+a <- "data-raw/raw/unap-tesis/MARILLY-data/0-ELISA_Saby_Marilly.xlsx"
+wb_sheet <- readxl::excel_sheets(a)
+
+
+all <- data_frame(ID=as.character(),
+                  OD=as.double(),
+                  Plate=as.character(),
+                  Type=as.character(),
+                  Ab.unit=as.double(),
+                  order=as.integer(),
+                  anti=as.character()
+                  )
+#str(all)
+
+# 2 GENERATE R DATA.FRAME
+for (j in 1:length(wb_sheet[8:length(wb_sheet)])) {#j=1#18
+  
+  wb_Pf_main <- readxl::read_xlsx(a,
+                  range = "B21:N29",
+                  sheet = 7+j)#j
+
+  wb_Pf <- readxl::read_xlsx(a,
+                  range = "B32:N40",
+                  sheet = 7+j)#j
+
+all_p <- wb_Pf_main %>% 
+  dplyr::rename(row="X__1") %>% 
+  mutate(`2`= ifelse(row == "H" & is.na(`2`), `1`, `2`), #ANOTACION AUSCENTE
+         `4`= ifelse(row == "H" & is.na(`4`), `3`, `4`),
+         `6`= ifelse(row == "H" & is.na(`6`), `5`, `6`),
+         `8`= ifelse(row == "H" & is.na(`8`), `7`, `8`)
+         ) %>% 
+  gather(loc,ID,-row) %>% 
+  mutate(loc=as.numeric(loc)) %>% 
+  arrange(row,loc) %>% 
+  #mutate(ID= ifelse(row == "H" & loc == 9, "Blank", ID)) %>% #ANOTACION AUSCENTE
+  spread(row,ID) %>% #ANOTACION AUSCENTE EN TEMPLATES
+  mutate(C=if_else(is.na(C),B,C),
+         E=if_else(is.na(E),D,E),
+         G=if_else(is.na(G) & (F!=lead(F,default = "F")),F,G)) %>% #ANOTACION AUSCENTE
+  mutate(G=if_else(G==lag(F,default = "F"),NA_character_,G)) %>% 
+  gather(row,ID,-loc) %>% #ANOTACION AUSCENTE EN TEMPLATES
+  full_join(
+    wb_Pf %>% 
+      dplyr::rename(row="X__1") %>% 
+      gather(loc,OD,-row) %>% 
+      mutate(OD=as.numeric(OD)) %>% 
+      mutate(loc=as.numeric(loc)) %>% 
+      arrange(row,loc)
+  ) %>% 
+  mutate(Plate=paste0("N",7+j),#j
+         Type=ifelse(row=="A" | ID=="Blank","std",
+                     ifelse(ID=="C+" | ID=="C-","ctr","unk")),
+         Ab.unit=ifelse(row=="A",stringr::str_replace(ID,"STD 1/(.+)","\\1"),
+                    ifelse(ID=="Blank","0",NA_character_))
+         ) %>% 
+  mutate(Ab.unit=as.numeric(Ab.unit)) %>% 
+  mutate(Ab.unit=ifelse(row=="A",max(Ab.unit,na.rm=T)/Ab.unit,Ab.unit)) %>% #select(-row,-loc)
+  replace_na(list(ID = "na")) %>% 
+  filter(ID!="na") %>% 
+  mutate(order=seq(1,dim(.)[1])) %>% 
+  dplyr::select(#-address,
+         -starts_with("row"),#-col,
+         -loc) %>% 
+  mutate(anti="msp1") #i #pv200
+
+all <- union(all,all_p)
+  
+}
+
+all_2 <- all %>% arrange(Plate,order)
+```
+
+```{r}
+#all_2 %>% group_by(Plate,anti) %>% dplyr::count()
+```
+
+#### join all observations
+
+```{r}
+all <- all_1 %>% 
+  union(all_2) %>% 
+  mutate(anti=as.factor(anti)) %>% 
+  mutate(anti=forcats::fct_relevel(anti,"gest")) %>% 
+  arrange(Plate,anti,order) %>% #%>% glimpse()
+  unite(Plate,c("Plate","anti"),sep = "_",remove = T)
+
+#all %>% group_by(Plate) %>% dplyr::count()
+```
+
+```{r}
+#all %>% dplyr::count(Type)
+#all %>% dplyr::count(Plate)
+#all %>% filter(Type=="unk") %>% dplyr::count(ID) %>% arrange(desc(n)) #with replicates
+
+#all %>% filter(Type=="unk") %>% dplyr::count(Plate)
+
+#all %>% filter(Type=="unk") %>% dplyr::count(Plate,anti,ID) %>% arrange(desc(n))
+#all %>% filter(Type=="unk") %>% dplyr::count(ID) %>% arrange(desc(n))
+#all %>% filter(Type=="unk" & Plate=="N6") %>% dplyr::count(ID) %>% arrange(desc(n))
+end <- all
+```
+
+```{r add_pheno,eval=FALSE,echo=FALSE}
+
+fin <- data_frame(Plate=as.character(),
+                  order=as.integer(),
+                  ID=as.character(),
+                  Type=as.character(),
+                  Ab.unit=as.double(),
+                  OD=as.double(),
+                  pheno=as.character(),
+                  igg=as.character()
+                  )
+#str(fin)
+
+for (j in 1:length(wb_sheet)) {
+  
+  fin_p <- full_join(phe %>% 
+            filter(Plate==levels(phe$Plate)[j]) %>% #requires j
+            mutate(order=seq(13,12+dim(.)[1])),
+          all %>% 
+            filter(Plate==levels(phe$Plate)[j]) %>% #requires j
+            filter(Type=="unk") %>% 
+            dplyr::select(-Plate,-ID),
+          by="order") %>% 
+    dplyr::select(Plate,order,ID,Type,Ab.unit,OD,pheno,igg)
+  
+  fin <- union(fin,fin_p)
+  
+}
+
+fin <- fin %>% arrange(Plate,order)
+#fin #%>% filter(ID==3053)
+
+#OJO!!!! MALA ANOTACIÓN
+#fin %>% filter(Plate=="N2") %>% dplyr::count(pheno)
+#fin %>% filter(Plate=="N2") %>% filter(pheno=="asymptomatic")
+#fin %>% dplyr::count(Plate)
+
+end <- fin %>% 
+  union(all %>% 
+          filter(Type!="unk") %>% 
+          dplyr::select(Plate,ID,Type,Ab.unit,OD,order) %>% 
+          mutate(pheno=NA_character_,
+                 igg=NA_character_)
+        ) %>% 
+  arrange(Plate,order) %>% 
+  dplyr::select(-order)
+
+#end #%>% filter(ID==2235)
+```
+
+### standarization
+
+```{r}
+# mod is mean od (plus sd and cv)
+mod <- end %>% 
+  filter(Type=="unk") %>% 
+  group_by(Plate,#anti,
+           ID) %>% 
+  summarise_at(vars(OD),c("mean","sd")) %>% 
+  ungroup() %>% 
+  dplyr::rename(mean.OD="mean",
+                sd.OD="sd") %>% 
+  mutate(cv.OD=100*sd.OD/mean.OD) %>% 
+  mutate(order=seq(1,dim(.)[1]))
+  #filter(ID=="1570")
+
+mab <- end %>% 
+  filter(Type=="unk") %>% 
+  group_by(Plate,#anti,
+           ID) %>% 
+  slice(1) %>% 
+  ungroup() %>% #filter(ID=="1570")
+  mutate(order=seq(1,dim(.)[1])) %>% 
+  full_join(mod %>% dplyr::select(order,mean.OD,sd.OD,cv.OD),
+            by="order") %>% #mutate(test.id= ID.x==ID.y) %>% dplyr::count(test.id)
+  dplyr::select(-order,-OD) %>% 
+  mutate(ord=seq(1,dim(.)[1])) %>% 
+  unite(code,ID,ord,sep="_",remove = F)
+```
+
+```{r,eval=FALSE, echo=FALSE}
+mab %>% dplyr::count(Plate)
+```
+
+#### blank issue
+
+```{r}
+#mascara
+blk <- end %>% 
+  filter(ID=="Blank") %>% 
+  group_by(Plate) %>% slice(1) %>% ungroup() %>% #
+  dplyr::select(-OD)
+#media por par de blancos por placa
+std <- end %>% 
+  filter(ID=="Blank") %>% 
+  group_by(Plate) %>% #
+  summarise_at(vars(OD),mean,na.rm=T) %>% 
+  ungroup() %>% 
+  #dplyr::rename(mean.OD="OD") %>% 
+  full_join(blk,by="Plate") %>% 
+  dplyr::select(Plate,ID,Type,Ab.unit,OD,everything()) %>% 
+  union(end %>% filter(Type=="std" & ID!="Blank")) %>% 
+  arrange(Plate,Ab.unit) %>% 
+  mutate(Plate=as.factor(Plate))
+```
+
+#### 4pll per template
+
+```{r}
+# no phe (from phenoptype)
+phe <- std
+```
+
+```{r,message=FALSE}
+
+mab_ir <- NULL
+mod_bx <- NULL
+
+#
+# new dose levels as support for the line
+#mdo$Ab.units %>% summary()
+new_x <- expand.grid(exp(seq(log(0.1),log(2048),length=100)))
+# db to add predictions of all plates
+new <- data_frame(ord=as.character(),
+                  resp=as.double(),
+                  p=as.double(),
+                  pmin=as.double(),
+                  pmax=as.double(),
+                  Plate=as.character())
+#
+
+for (j in 1:length(levels(phe$Plate))) {
+  
+#
+# 5 PARAMETER ESTIMATION 4pLL model
+#
+wb.m1 <- drm(OD ~ Ab.unit, Plate, 
+               data= std %>% filter(Plate==levels(phe$Plate)[j]),#j
+             #data= std,
+               fct = LL.4(names = c("b", "c", "d", "e")))
+#
+wb.model <- wb.m1
+# 6 BOX-COX TRANSFORMATION against RESIDUAL heterogeneity
+wb.model.BX <- boxcox(wb.model, 
+                     main=expression("Optimal " ~ lambda ~ " with confidence intervals"), 
+                     plotit = FALSE)
+#coefficients(wb.model.BX) %>% matrix(7,4)
+mab_p <- mab %>% as.data.frame()
+# 7 UNK AB.UNITS ESTIMATION by INVERSE REGRESSION
+mir <- ED(wb.model.BX, 
+                 mab_p[mab_p$Plate==levels(phe$Plate)[j],"mean.OD"],#j
+                   #wb_MEAN[1:n,5],
+                   type = "absolute",interval = "delta",
+                   #clevel = "Pfal", 
+                 display = FALSE)
+  
+mab_ir <- rbind(mab_ir,mir)
+mod_bx <- rbind(mod_bx,coefficients(wb.model.BX))
+
+#
+# predictions and confidence intervals
+pdm <- predict(wb.model.BX, newdata = new_x, interval = "confidence")
+# new data with predictions
+new_p <- bind_cols(new_x %>% 
+                     as.tibble() %>% 
+                     rownames_to_column(var = "ord")
+                   , pdm %>% 
+                     as.tibble() %>% 
+                     rownames_to_column(var = "ord")
+                   ) %>%
+  dplyr::select(-ord1) %>% 
+  mutate(Plate=levels(phe$Plate)[j]) %>% 
+  dplyr::rename(resp=Var1,p=Prediction,pmin=Lower,pmax=Upper)
+
+new <- union(new,new_p)
+#
+
+}
+
+#mab
+#mab[mab$Plate==levels(phe$Plate)[1],] #%>% duplicated() %>% sum()
+
+# 7.1 FEED UNK AB.UNITS DATA.FRAME
+mdo <- mab_ir %>% as.data.frame() %>% rownames_to_column() %>% 
+  #dplyr::rename(ord=rowname) %>% 
+  separate(rowname,c("par","Plate","mean.OD.c"),sep = ":") %>% 
+  rownames_to_column("ord") %>% 
+  #mutate(ord=seq(1,dim(.)[1])) %>% 
+  full_join(mab %>% 
+              mutate(ord=as.character(ord)) %>% 
+              mutate(mean.OD.c=as.character(mean.OD))
+            ,
+            by = c("ord","Plate","mean.OD.c")) %>% 
+  dplyr::select(Plate,ord,ID,code,Type,#pheno,igg,
+                mean.OD,sd.OD,cv.OD,Ab.units=Estimate,
+         everything(),-par,-mean.OD.c,-Ab.unit) #%>% 
+  # ANY MANUAL FILTERING of replicate on different templates could be applied HERE!!!
+  #filter(!code=="2235_137") 
+
+mod_bt <- mod_bx %>% as.data.frame() %>% rownames_to_column() %>% as.tibble() %>% 
+  full_join(std %>% 
+              dplyr::count(Plate) %>% dplyr::select(-n) %>% rownames_to_column(),
+            by="rowname") %>% 
+  dplyr::select(Plate,everything(),-rowname) %>% 
+  separate(Plate,c("Plate","anti"),sep = "_") #%>% 
+  #dplyr::rename(Plate=rowname) %>% 
+  #mutate(Plate=stringr::str_replace(Plate,"(\\d)","N\\1"))
+
+new <- new %>% mutate(ord=as.numeric(ord)) %>% arrange(Plate,ord)
+```
+
+#### outputs
+
+```{r}
+#
+#fin
+#end
+#mod
+#mab
+
+# standard curve data
+std
+
+# estimated ab unit data
+mdo
+
+# estimated parameters per standard curve
+mod_bt
+
+# predicted model per standard curve 
+new
+```
+
+```{r,eval=FALSE,echo=FALSE}
+mdo %>% arrange(ID,Plate)
+mdo %>% group_by(ID) %>%  dplyr::count() %>% arrange(desc(n)) #SIX samples with replicates in other PLATE
+mdo %>% filter(ID=="MZ160") %>% arrange(ID)
+mdo %>% filter(ID=="3053" | ID=="9165" | ID=="9801") %>% arrange(ID)
+#mdo %>% filter(ID=="2235" | ID=="1524" | ID=="1843") %>% arrange(desc(ID))
+end %>% filter(ID=="2235") %>% group_by(Plate) %>% dplyr::count(pheno,igg) #TIENE REPLICA EN OTRO TEMPLATE!!
+mdo %>% filter(ID=="2235") # data filtered
+```
+
+```{r,eval=FALSE,echo=FALSE}
+mdo %>% dplyr::count(Plate)
+mdo %>% filter(Plate=="N18_pv200")
+mdo %>% filter(Plate=="N20_pv200")
+mdo %>% filter(Plate=="N6_gest")
+mdo %>% filter(Plate=="N6_falstatin")
+#mdo %>% filter(ID=="ZG110-4") # falta pv200
+#mdo %>% filter(ID=="ZG025-1") # OVER is NA
+```
+
+### quality control plots
+
+```{r}
+#std
+ctr <- end %>% filter(Type=="ctr")
+#ctr %>% filter(Plate==levels(phe$Plate)[1] & ID=="C+") %>% .$OD
+#std %>% filter(Plate==levels(phe$Plate)[1] & ID=="Blank") %>% .$OD
+```
+
+#### cv
+
+```{r, fig.height=6.5, fig.width=7}
+mdo %>% 
+  #mutate(Plate=stringr::str_replace(Plate,"(.+)\\_(.+)","\\1 \\(\\2\\)")) %>% 
+  mutate(Plate=stringr::str_to_upper(Plate)) %>% #dplyr::count(Plate)
+  separate(Plate,c("n","a"),remove = F) %>% 
+  ggplot(aes(mean.OD,cv.OD,colour=a)) +
+  geom_point(alpha=.5) +
+  coord_cartesian(ylim = c(0,100)) +
+  geom_hline(aes(yintercept=20),linetype="dashed",size=0.3) +
+  geom_vline(aes(xintercept=0.25),linetype="dashed",size=0.3) +
+  #facet_wrap(~Plate,ncol = 5) +
+  facet_wrap(~a+n,ncol = 6) +
+  #labs(title="QC plot: Intra-plate coefficient of variation") +
+  labs(title="Control de calidad: Coeficientes de Variación en cada placa") +
+  xlab("OD promedio de duplicado") + ylab("Coeficiente de Variación (%) de duplicado") +
+  theme(legend.position = "none")
+
+ggsave("figure/unap-marilly-cv_od.png")
+```
+
+- __OBSERVACIONES:__
+    + La baja variabilidad permite descartar error de pipeteo.
+    + Todas las réplicas incluidas en las muestras del estudio tienen un CV menor a 22%.
+
+#### 4pll
+
+```{r, fig.height=6.5, fig.width=8}
+std %>% 
+  mutate(Plate=stringr::str_to_upper(Plate)) %>% #dplyr::count(Plate)
+  separate(Plate,c("n","Antigen"),remove = F) %>% 
+  mutate(Ab.unit=ifelse(Ab.unit==0,0.5,Ab.unit)) %>% 
+  ggplot(aes(Ab.unit,OD)) +
+  geom_hline(aes(yintercept=OD,linetype=ID),
+             data=ctr %>% mutate(Plate=stringr::str_to_upper(Plate)) %>%
+               separate(Plate,c("n","Antigen"),remove = F)) +
+  geom_point(aes(colour=Antigen)) +
+  geom_ribbon(data=new %>% mutate(Plate=stringr::str_to_upper(Plate)) %>% #dplyr::count(Plate)
+  separate(Plate,c("n","Antigen"),remove = F), aes(x=resp, y=p, ymin=pmin, ymax=pmax), alpha=0.2) +
+  geom_line(data=new %>% mutate(Plate=stringr::str_to_upper(Plate)) %>% #dplyr::count(Plate)
+  separate(Plate,c("n","Antigen"),remove = F), aes(x=resp, y=p, colour=Antigen)) +
+  #coord_trans(x="log") +
+  scale_x_log10() +
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~Antigen+n,ncol = 6#,scales = "free"
+             ) +
+  ylim(c(0,2)) +
+  #labs(title="QC plot: 4-parameter log-logistic model per plate") +
+  labs(title="Control de calidad: modelo log-logístico de 4-parámetros por placa") +
+  xlab("Unidades de Anticuerpos (escala log)") + ylab("Densidad Óptica (OD)")
+
+ggsave("figure/unap-marilly-ab_od.png")
+```
+
+- __OBSERVACIONES:__
+    + El cruce del control positivo y la tercera dilución de la curva estandar descartan error en el pipeteo. También indican que cualquier otra anomalía es producto a un error sistemático.
+    + Valores de curva estandar por debajo del control negativo anulan la validez de las lecturas por debajo de este valor de OD.
+    + Entre las posibles fuentes de error están:
+        1. Efecto de el uso de un buffer sustrato distinto entre el grupo de placas __N1-N7__ (__OPD__ x60min, todas placas con curva defectuosa) y __N8-N18__ (__TMB__ x60min, todas placas con curva adecuadas).
+        2. Alteraciones en la ejecución del protocolo, debido a que las ELISA son muy sensibles a los tiempos de incubación y correcto lavado entre estos.
+        3. Ruido de fondo en las placas, por deficiencias en el lavado o uso de placas recicladas.
+        4. Diferencias en el accionar entre distintos operadores por placa.
+
+```{r,eval=FALSE}
+std %>% 
+  ggplot(aes(Ab.unit,OD,colour=Plate)) +
+  geom_point() +
+  facet_wrap(~Plate)
+```
+
+```{r, fig.height=5, fig.width=6, eval=FALSE}
+std %>% 
+  ggplot(aes(log10(Ab.unit),OD,colour=Plate)) +
+  geom_hline(aes(yintercept=OD,linetype=ID),ctr,size=0.3) +
+  geom_point() +
+  facet_wrap(~Plate)
+```
+
+```{r, fig.height=8.1, fig.width=11}
+mdo %>% 
+  ggplot(aes(Ab.units,mean.OD,colour=Plate)) +
+  #coord_cartesian(ylim = c(0,1)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin=Lower,xmax=Upper), colour="black", size=.2) +
+  scale_x_log10() +
+  facet_wrap(~Plate#+pheno
+             ,ncol = 5,scales = "free"
+             ) + 
+  labs(title="Estimates of Arbitrary Antibody units (AU) per plate and phenotype") +
+  geom_hline(aes(yintercept=OD,linetype=ID),data=ctr) ## filter threshold?
+  # inverse regression method
+  #facet_wrap(igg~pheno,nrow = 2)
+```
+
+- __OBSERVACIONES:__
+    + Lecutas de muestras serán descartadas si tienen:
+        - `mean.OD` por debajo del cruce con su respectivo control negativo.
+        
+        <!--- Error estandar mayor a 100.-->
+        
+    + Ver resultado [aqui](#post-quality).
+
+```{r, fig.height=8.1, fig.width=11,eval=FALSE,echo=FALSE}
+#### se
+mdo %>% 
+  mutate(std_error=Upper-Lower) %>% 
+  ggplot2::ggplot(aes(std_error,Ab.units, colour=Plate)) +
+  geom_point(alpha=0.5) +
+  #geom_histogram(#binwidth = 100,
+                 #breaks=seq(0, 3500, by = 100)
+                 #position = "fill"
+                 #) +
+  geom_vline(xintercept = 1000, #lwd=2,#col = "red", 
+             lty=3) +
+  facet_wrap(~Plate#+pheno
+             ,ncol = 5#,scales = "free"
+             ) + 
+  #scale_x_log10() +
+  #scale_y_log10() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title="Standard errors of antibody units (AU) per plate and phenotype")
+```
+
+```{r}
+mdo <- mdo %>% 
+  separate(Plate,c("Plate","anti"),sep = "_") #%>% 
+  #mutate(subtype= ifelse(Plate=="N6","esp",#template 6 have "special" samples
+   #                      "sam"))
+```
+
+
+# MIX ALL
+
+- ADD community or special case, sex, age per antigen
+
+```{r}
+a <- readxl::read_xlsx("data-raw/raw/unap-tesis/MARILLY-data/Base general-tesis-2017.xlsx")
+mcv <- a %>% dplyr::select(1:7) %>% slice(1:91) %>% 
+  rename_all(funs(
+    stringr::str_replace_all(., '\\s', '')
+    )) %>% 
+  union(
+    a %>% dplyr::select(9:15) %>% 
+      rename_all(funs(
+        stringr::str_replace_all(., '\\s', '') %>% 
+        stringr::str_replace_all(.,"__1","")
+        ))
+  ) %>% 
+  union(
+    a %>% dplyr::select(17:21) %>% slice(1:25) %>% 
+      rename_all(funs(
+        stringr::str_replace_all(., '\\s', '') %>% 
+        stringr::str_replace_all(.,"__1","") %>% 
+        stringr::str_replace_all(.,"__2","")
+        )) %>% 
+      mutate(Sexo=NA_character_,Edad=NA_integer_) %>% 
+      dplyr::select(CODE,Sexo,Edad,everything())
+  ) %>% 
+  dplyr::select(1:3,Microscopia) %>% 
+  #dplyr::count(CODE) %>% arrange(desc(n)) #one per sample
+  rename_all(funs(stringr::str_to_lower(.))) %>% 
+  rename("ID"="code") %>% unique() %>% 
+  inner_join(mdo #%>% 
+               #filter(subtype=="sam")
+             ,by="ID") %>%
+  mutate(subtype=if_else(is.na(sexo) & is.na(edad),"esp","sam")) %>% 
+  mutate(community=if_else(subtype=="sam",
+                           stringr::str_replace(ID,"(.{2}).+","\\1"),
+                           NA_character_)) %>% 
+  mutate(sexo=as.factor(sexo),
+         microscopia=as.factor(microscopia),
+         edad=as.numeric(edad),
+         community=as.factor(community))
+
+mcv %>% 
+  dplyr::count(anti,subtype)
+
+mcv %>% 
+  dplyr::count(anti,community)
+
+mcv %>% 
+  dplyr::count(anti,microscopia)
+```
+
+```{r}
+#mcv %>% filter(subtype=="esp") %>% dplyr::count(ID)
+#mdo %>% filter(ID=="Sífilis")
+#mcv %>% filter(ID=="Sífilis")
+#mcv %>% filter(ID=="Toxo")
+```
+
+#### *CHECKPOINT
+
+- notas:
+    - n=3: tres lecturas, una para cada antígeno
+    - n<3: antígeno auscente en templates
+    - n>3: réplica para al menos un antígeno
+
+```{r}
+mcv %>% 
+  filter(subtype=="sam") %>% 
+  dplyr::count(ID) %>% arrange(n) %>% #per antigen!!
+  dplyr::count(n) #%>% .$nn
+```
+
+```{r,include=FALSE}
+#all %>% filter(ID=="MZ106") #1
+mcv %>% filter(ID=="ZG110-4") #2 # falta pv200
+#mcv %>% filter(ID=="MZ110") #4
+#mcv %>% filter(ID=="ZG025-1") #4 # duplicado en pv200
+mcv %>% filter(ID=="ZG007-2") #5 # duplicado en gest y falstatin
+#mcv %>% filter(ID=="MZ160") #5 # duplicado en gest y falstatin
+#mcv %>% filter(ID=="ZG026-4") #6 # duplicado en pv200, gest, falstatin
+```
+
+# REPLICATES
+
+### filter replicates
+
+- nota:
+    - mantener cantidad de ID,
+    - eliminar réplicas y reducir observaciones.
+
+```{r}
+rept <- mcv %>% group_by(ID,anti) %>% 
+  dplyr::count(ID) %>% arrange(desc(n)) %>% 
+  filter(n>1) %>% dplyr::select(-n) #replicates
+#rept
+
+rept_sel <- mcv %>% 
+  inner_join(rept,by = c("ID","anti")) %>% 
+  arrange(ID,anti) %>% 
+  group_by(ID,anti) %>% 
+  filter(cv.OD == min(cv.OD,na.rm = T)) # SELECT with the lowest CV
+# all in plate5 with lower CV -but- high AU uncertainty ???????
+#rept_sel
+
+length(unique(mcv$ID))
+dim(mcv)
+
+mcv <- mcv %>% 
+  anti_join(rept,by = c("ID","anti")) %>% 
+  union(rept_sel) %>% 
+  mutate(ord=as.numeric(ord)) %>% 
+  arrange(Plate,anti,ord)
+
+length(unique(mcv$ID))
+dim(mcv)
+#mcv
+#mcv %>% dplyr::count(ID,anti) %>% arrange(desc(n))
+```
+
+### *CHECKPOINT
+
+- notas:
+    - n=3: tres lecturas, una para cada antígeno
+    - n<3: antígeno auscente en templates
+    - n>3: réplica para al menos un antígeno
+    
+```{r}
+mcv %>% 
+  filter(subtype=="sam") %>% 
+  dplyr::count(ID) %>% arrange(n) %>% #per antigen!!
+  dplyr::count(n) #%>% .$nn
+```
+
+```{r,include=FALSE}
+#all %>% filter(ID=="MZ106") #1
+mcv %>% filter(ID=="ZG110-4") #2 # falta pv200
+#mcv %>% filter(ID=="MZ110") #4
+#mcv %>% filter(ID=="ZG025-1") #4 # duplicado en pv200
+mcv %>% filter(ID=="ZG007-2") #5 # duplicado en gest y falstatin
+#mcv %>% filter(ID=="MZ160") #5 # duplicado en gest y falstatin
+#mcv %>% filter(ID=="ZG026-4") #6 # duplicado en pv200, gest, falstatin
+
+mcv %>% filter(ID=="MZ324") #1
+mcv %>% filter(ID=="ZG025-1") #2
+```
+
+### filter NaN
+
+- nota:
+    - estimación de AU como `NaN`:
+    - lecturas con `mean.OD` 
+        - mayor al límite superior o 
+        - menor al límite inferior del modelo estimado por curva estandar por placa.
+
+```{r}
+### any NaN??
+
+nan <- mcv %>% 
+  filter(Ab.units=="NaN") # only 7
+
+nan %>% dplyr::select(ID,Plate,anti,mean.OD,Ab.units,community) #%>% as.matrix()
+mod_bt %>% filter(Plate %in% levels(as.factor(nan$Plate))) %>% .[,c(1,2,4,5)]
+
+mcv <- mcv %>% filter(!Ab.units=="NaN")
+```
+
+### *CHECKPOINT
+
+- notas:
+    - n=3: tres lecturas, una para cada antígeno
+    - n<3: antígeno auscente en templates (al retirar réplicas y NaN)
+    - n>3: réplica para al menos un antígeno
+    
+```{r}
+mcv %>% 
+  filter(subtype=="sam") %>% 
+  dplyr::count(ID) %>% arrange(n) %>% #per antigen!!
+  dplyr::count(n) #%>% .$nn
+```
+
+```{r,include=FALSE}
+#all %>% filter(ID=="MZ106") #1
+mcv %>% filter(ID=="MZ324") #1
+mcv %>% filter(ID=="ZG025-1") #2
+mcv %>% filter(ID=="ZG177-1") #2
+
+#mcv %>% filter(ID=="MZ186") #3
+#mcv %>% filter(ID=="ZG006-2") #4
+#mcv %>% filter(ID=="ZG178-8") #5
+```
+
+# MISSINGS
+
+- values with `OVER` means that the read was above the dynamic range of the OD reader.
+    + then, this values are consider as `NA`.
+- values above the upper limit or below the lower limit of the Standard Curve are not possible to estimate AU.
+    + then, this values results in `NaN`.
+
+```{r}
+### compartir faltantes
+
+mis <- mcv %>% 
+  filter(subtype=="sam") %>% 
+  dplyr::count(ID) %>% filter(n== "1" | n=="2")
+
+mcv %>% 
+  filter(ID %in% mis$ID) %>% # filtro missings
+  dplyr::select(ID,anti) %>% 
+  mutate(presence=1) %>% 
+  spread(anti,presence) %>% 
+  anti_join(nan, by="ID") #%>% as.matrix() # anti_join de NaN's
+
+#mcv %>% filter(ID=="ZG025-1")
+```
+
+- `ZG177-1` y `ZG025-1` con OD igual a `OVER`.
+- `ZG110-4` con lectura para MSP1 auscente.
+
+```{r, include=FALSE}
+all %>% filter(ID=="ZG177-1")
+all %>% filter(ID=="ZG110-4")
+all %>% filter(ID=="ZG025-1")
+```
+
+
+# PRE QUALITY
+
+### plot {#pre-quality}
+
+```{r, fig.height=8.1, fig.width=11}
+mcv %>% 
+  unite(Plate,c("Plate","anti")) %>% #dplyr::count(Plate)
+  ggplot(aes(Ab.units,mean.OD,colour=Plate)) +
+  #coord_cartesian(ylim = c(0,1)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin=Lower,xmax=Upper), colour="black", size=.2) +
+  scale_x_log10() +
+  facet_wrap(~Plate#+pheno
+             ,ncol = 5,scales = "free"
+             ) + 
+  labs(title="Estimates of Arbitrary Antibody units (AU) per plate and phenotype") +
+  geom_hline(aes(yintercept=OD,linetype=ID),data=ctr) ## filter threshold?
+  # inverse regression method
+  #facet_wrap(igg~pheno,nrow = 2)
+```
+
+# LOW QUALITY FILTER
+
+- Keep only the observations with a mean.OD higher than the negative control
+
+## PRE DATA FRAME
+
+```{r}
+#length(unique(mcv$ID))
+mcv %>% dplyr::count(ID,community) %>% dplyr::count(community)
+```
+
+## FILTER CV SE NEG.CTR
+
+```{r}
+mcv_sam <- mcv %>% 
+  filter(!cv.OD>21) %>% # CV threshold
+  filter(subtype=="sam") %>% 
+  #filter(!`Std. Error`>100) %>% #filter(Lower<0) # high SE low precision in AU estimates
+  unite(Plate,c("Plate","anti")) %>% #dplyr::count(Plate)
+  inner_join(ctr %>% filter(ID=="C-") %>% 
+               dplyr::select(Plate,OD_Cneg=OD) %>% 
+               group_by(Plate) %>% 
+               summarise(mean_OD_Cneg=mean(OD_Cneg)) %>% ungroup()
+            ,by="Plate") %>% 
+  #filter(mean.OD>mean_OD_Cneg) %>% 
+  separate(Plate,c("Plate","anti"),sep = "_")
+```
+
+## POS DATA FRAME
+
+```{r}
+#length(unique(mcv$ID))
+mcv_sam %>% dplyr::count(ID,community) %>% dplyr::count(community)
+```
+
+## especial samples for all
+
+```{r}
+neg <- a %>% dplyr::select(17:21) %>% slice(1:25) %>% 
+      rename_all(funs(
+        stringr::str_replace_all(., '\\s', '') %>% 
+        stringr::str_replace_all(.,"__1","") %>% 
+        stringr::str_replace_all(.,"__2","")
+        )) %>% 
+  mutate(num=seq(1:dim(.)[1])) %>% 
+  mutate(qual=if_else(num>=15,"neg","esp")) %>% filter(qual=="neg") %>% .$CODE
+
+mcv_esp <- mcv %>% filter(subtype=="esp") %>%
+  mutate(subtype=if_else(ID %in% neg,"neg",subtype))
+
+mcv_esp %>% 
+  dplyr::select(ID,anti) %>% 
+  mutate(presence=1) %>% 
+  spread(anti,presence)
+```
+
+```{r}
+mcv <- mcv_sam %>% 
+  dplyr::select(-mean_OD_Cneg) %>% 
+  union(mcv_esp)
+```
+
+### plot {#post-quality}
+
+```{r, fig.height=8.1, fig.width=11}
+mcv %>% 
+  unite(Plate,c("Plate","anti")) %>% #dplyr::count(Plate)
+  ggplot(aes(Ab.units,mean.OD,colour=Plate)) +
+  #coord_cartesian(ylim = c(0,1)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin=Lower,xmax=Upper), colour="black", size=.2) +
+  scale_x_log10() +
+  facet_wrap(~Plate#+pheno
+             ,ncol = 5,scales = "free"
+             ) + 
+  labs(title="Estimates of Arbitrary Antibody units (AU) per plate and phenotype") +
+  geom_hline(aes(yintercept=OD,linetype=ID),data=ctr) ## filter threshold?
+  # inverse regression method
+  #facet_wrap(igg~pheno,nrow = 2)
+```
+
+
+# DISTRIBUTIONS
+
+- __CONSULTAR__:
+    + muestras con código dentro de especiales?
+
+### distribution plots
+
+#### linear
+
+```{r,fig.width=10,fig.height=4,eval=FALSE,echo=FALSE}
+##### scale fix
+##### ab units
+mcv %>% 
+  filter(subtype=="sam") %>% 
+  ggplot(aes(x=Ab.units#,fill=pheno
+             ))+
+  geom_histogram(aes(x=Ab.units,..density..),
+                 alpha=.5,position = "identity") +
+  geom_density(alpha=.5,position = "identity") +
+  facet_wrap(~anti)
+
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_dens.png")
+#Rmisc::multiplot(b,c,cols = 1)
+```
+
+
+##### scale free
+
+```{r,fig.width=10,fig.height=2.2}
+##### ab units
+mcv %>% 
+  #filter(subtype=="sam") %>% 
+  ggplot(aes(x=Ab.units,fill=subtype
+             ))+
+  geom_histogram(aes(x=Ab.units,..density..),
+                 alpha=.5,position = "identity") +
+  geom_density(alpha=.5,position = "identity") +
+  facet_wrap(~anti,scales = "free")
+
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_dens.png")
+#Rmisc::multiplot(b,c,cols = 1)
+```
+
+
+```{r,fig.width=10,fig.height=4,eval=FALSE}
+##### od
+a <- mdo %>% 
+  ggplot(aes(x=mean.OD,fill=pheno)) + theme_bw() #+
+  #scale_x_log10()
+
+b <- a +
+  geom_histogram(alpha=.5,position = "identity") + facet_grid(~igg)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/od_hist.png")
+
+c <- a + 
+  geom_density(alpha=.5,position = "identity") + facet_grid(~igg)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/od_dens.png")
+  #facet_wrap(transform~measure,scales = "free")
+
+Rmisc::multiplot(b,c,cols = 1)
+```
+
+#### log
+
+```{r,fig.width=10,fig.height=4,eval=FALSE,echo=FALSE}
+##### scale fix
+##### ab units
+mdo %>% 
+  filter(subtype=="sam") %>% 
+  ggplot(aes(x=Ab.units#,fill=pheno
+             ))+
+  scale_x_log10() +
+  geom_histogram(aes(x=Ab.units,..density..),
+                 alpha=.5,position = "identity") +
+  geom_density(alpha=.5,position = "identity") +
+  facet_wrap(~anti)
+
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_dens.png")
+#Rmisc::multiplot(b,c,cols = 1)
+```
+
+##### scale free
+
+```{r,fig.width=10,fig.height=2.2}
+##### ab units
+mcv %>% 
+  filter(subtype!="esp") %>% 
+  ggplot(aes(x=Ab.units,fill=subtype
+             ))+
+  scale_x_log10() +
+  geom_histogram(aes(x=Ab.units,..density..),
+                 alpha=.5,position = "identity") +
+  geom_density(alpha=.5,position = "identity") +
+  facet_wrap(~anti,scales = "free")
+
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_dens.png")
+#Rmisc::multiplot(b,c,cols = 1)
+```
+
+```{r,fig.width=10,fig.height=4,eval=FALSE}
+##### od
+a <- mdo %>% 
+  ggplot(aes(x=mean.OD,fill=pheno)) + theme_bw() +
+  scale_x_log10()
+
+b <- a +
+  geom_histogram(alpha=.5,position = "identity") + facet_grid(~igg)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/od_hist.png")
+
+c <- a + 
+  geom_density(alpha=.5,position = "identity") + facet_grid(~igg)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/od_dens.png")
+  #facet_wrap(transform~measure,scales = "free")
+
+Rmisc::multiplot(b,c,cols = 1)
+```
+
+# DATA FRAME
+
+```{r}
+#length(unique(mcv$ID))
+mcv %>% dplyr::count(ID,community) %>% dplyr::count(community) %>% as.matrix()
+mcv %>% arrange(ID) %>% dplyr::count(ID,subtype) %>% arrange(desc(n)) %>% dplyr::count(subtype) %>% as.matrix()
+```
+
+```{r}
+#glimpse(mcv)
+#summary(mdo)
+readr::write_csv(mcv,"data/unap-marilly.csv")
+readr::write_rds(mcv, "data/unap-marilly.rds")
+
+mco <- mcv
+```
+
+# SEROLOGICAL CLASSIFICATION
+
+## To Do
+
+- Implement the mean or ROC using __negative controls__.
+
+## mean+3sd
+
+```{r}
+mcv_cut <- mcv_esp %>% 
+  filter(subtype=="neg") %>% 
+  group_by(anti) %>% 
+  summarise(mean.ab=mean(Ab.units),
+            sd.ab=sd(Ab.units)) %>% 
+  ungroup() %>% 
+  mutate(cut=mean.ab+3*sd.ab)
+
+mcv_cut
+
+mcv_srp <- mcv_sam %>% 
+  full_join(mcv_cut %>% dplyr::select(anti,cut),by="anti") %>% 
+  mutate(sero=if_else(Ab.units>=cut,"pos","neg"),
+         label=if_else(Ab.units>=cut,"s+","s-")
+         )
+```
+
+```{r,fig.width=10,fig.height=2.2}
+mcv_srp %>% 
+  ggplot(aes(x=Ab.units,fill=sero))+
+  scale_x_log10() +
+  geom_histogram(aes(x=Ab.units,..density..),
+                 alpha=.5,position = "identity") +
+  geom_vline(aes(xintercept = cut)) +
+  geom_density(alpha=.5,position = "identity") +
+  facet_wrap(~anti,scales = "free")
+
+ggsave("figure/unap-marilly-ab_sero.png")
+```
+
+# DATA FRAME
+
+```{r}
+msr <- mcv_srp
+```
+
+```{r}
+msr_write <- msr %>% #dplyr::count(community)
+  mutate(ord=as.numeric(ord)) %>%  arrange(ord) %>% 
+  rename_all(funs(stringr::str_to_lower(.))) %>% 
+  dplyr::select(-mean_od_cneg, -label) %>%
+  mutate(sero=forcats::fct_recode(sero,"posit"="pos","negat"="neg"),
+         community=forcats::fct_recode(community,"mazan"="MZ","zungaro"="ZG")) %>% 
+  dplyr::rename(serology=sero,
+                #parasite_d=par, 
+                n=ord,
+                id_n=code,antigeno=anti,
+                od.mean=mean.od,od.sd=sd.od,od.cv=cv.od,
+                ab=ab.units,ab.se=`std. error`,ab.lci=lower,ab.uci=upper#,
+                ) %>% #filter(id=="9165") %>% arrange(igg)
+  #dplyr::count(id) %>% arrange(desc(nn))
+  dplyr::select(-type,-n,-id_n,-ends_with("ci"), -subtype, -cut, -microscopia
+                ) %>% arrange(id) %>% 
+  glimpse()
+```
+
+
+```{r}
+summary(msr_write)
+readr::write_csv(msr_write,"data/unap-marilly.csv")
+readr::write_rds(msr_write, "data/unap-marilly.rds")
+```
+
+# STATISTICAL ANALYSIS PLAN
+
+## Descriptive
+
+### Test covariates
+
+#### all
+
+```{r}
+mcv_unique <- mcv %>% 
+  dplyr::select(ID,sexo,edad,microscopia,community) %>% 
+  filter(!(is.na(sexo) & is.na(edad))) %>% unique()
+#Hmisc::html(Hmisc::contents(mcv_unique), 
+#            maxlevels=10, levelType='table')
+```
+
+```{r}
+s1 <- Hmisc::summaryM(sexo + edad #+ microscopia
+                      ~ community,
+               data=mcv_unique,
+               overall=FALSE, test=TRUE)
+
+Hmisc::latex(s1, caption='Sample covariates',
+      exclude1=TRUE, #npct='both', 
+      digits=3, prtest="P",file="",#prn=TRUE,
+      #prmsd=TRUE, brmsd=TRUE, #msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = FALSE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%", html = TRUE, width="100%"
+      ) #change here for LaTeX PDF
+```
+
+#### sero+ vs sero-
+
+```{r}
+mcv_unique <- msr %>%
+  dplyr::select(ID,sexo,edad,microscopia,anti,community,sero) %>% 
+  filter(!(is.na(sexo) & is.na(edad))) #%>% unique()
+#Hmisc::html(Hmisc::contents(mcv_unique), 
+#            maxlevels=10, levelType='table')
+```
+
+```{r}
+mcv_u <- mcv_unique %>%  #%>% dplyr::select(-ID),
+  #rename("Edad (años)"="edad","Sexo"="sexo") %>% 
+  mutate(sero=forcats::fct_recode(sero,"Seronegative"="neg",
+                                  "Seropositive"="pos"),
+         sexo=forcats::fct_recode(sexo,"Mujer"="F","Hombre"="M"),
+         anti=forcats::fct_recode(anti,"Falstatin"="falstatin",
+                                  "GEST"="gest","MSP1"="msp1")) #%>% 
+  #rename("Edad (años)"="edad","Sexo"="sexo")
+
+Hmisc::html(Hmisc::contents(mcv_u), maxlevels=10, levelType='table')
+```
+
+```{r}
+s1 <- Hmisc::summaryM(sexo + edad #+ microscopia
+                      ~ sero + anti,
+               data=mcv_u,
+               overall=FALSE, test=TRUE)
+
+Hmisc::latex(s1, caption='Sample covariates',
+      exclude1=TRUE, #npct='both', 
+      digits=3, prtest="P",file="",#prn=TRUE,
+      #prmsd=TRUE, brmsd=TRUE, #msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = FALSE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%", html = TRUE, width="100%"
+      ) #change here for LaTeX PDF
+```
+
+```{r,fig.width=4,fig.height=2.5}
+mcv_unique %>% #dplyr::count(sero)
+  #mutate(anti=as.factor(sero)) %>% 
+  ggplot(aes(x=edad,fill=sero)) +
+  #scale_x_log10() +
+  geom_histogram(aes(x=edad,..density..),
+                 alpha=.5,position = "identity") +
+  #geom_bar(position = "fill") +
+  geom_density(alpha=.5,position = "identity") #+
+```
+
+```{r}
+mcv_unique %>% #dplyr::count(sero)
+  mutate(anti=as.factor(sero)) %>% 
+  #filter(anti==levels(f)[l]) %>% 
+  #t.test(Ab.units_log ~ pheno, data = ., var.equal= i$p.value>0.05) %>%
+  wilcox.test(edad ~ sero, data = .) %>%#, 
+  #kruskal.test(Ab.units ~ anti, data = .) %>%#, 
+              #conf.int=TRUE) %>% 
+  broom::tidy()
+```
+
+### Proportion sero+
+
+#### ab
+
+```{r}
+msr %>% dplyr::count(anti,label) %>% 
+  group_by(anti) %>% mutate(tot=sum(n),prop= (n*100)/(sum(n))) %>% 
+  filter(label=="s+") %>% as.matrix()
+
+msr %>% dplyr::count(anti,community,label) %>% 
+  group_by(anti,community) %>% mutate(tot=sum(n),prop= (n*100)/(sum(n))) %>% 
+  filter(label=="s+") %>% arrange(anti) %>% as.matrix()
+
+#msr %>% dplyr::count(anti,microscopia,label) %>% 
+#  group_by(anti,microscopia) %>% mutate(tot=sum(n),prop= (n*100)/(sum(n))) %>% 
+#  filter(label=="s+")
+```
+
+```{r,fig.width=3.5,fig.height=2.5}
+msr %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  mutate(label=forcats::fct_recode(label,"Negativo"="s-","Positivo"="s+")) %>% 
+  rename(Serología="label") %>% 
+  ggplot(aes(x=anti,fill=Serología)) +
+  geom_bar(position = "fill") +
+  #facet_grid(~igg) +
+  #labs(title="Proportion of seropositives") +
+  labs(title="Proporción de seropositivos") +
+  xlab("Antígenos") + ylab("Proporción")
+
+ggsave("figure/unap-marilly-seroposi_all.png")
+```
+
+```{r,fig.width=5.25,fig.height=2.5}
+msr %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  mutate(label=forcats::fct_recode(label,"Negativo"="s-","Positivo"="s+")) %>% 
+  rename(Serología="label") %>% 
+  ggplot(aes(x=community,fill=Serología)) +
+  geom_bar(position = "fill") +
+  facet_grid(~anti) +
+  #labs(title="Proportion of seropositives")
+  labs(title="Proporción de seropositivos") +
+  xlab("Antígenos") + ylab("Proporción")
+
+ggsave("figure/unap-marilly-seroposi_strat.png")
+```
+
+##### stat
+
+```{r,eval=FALSE}
+msr %>% dplyr::count(anti,community,label) %>% 
+  group_by(anti) %>% mutate(tot=sum(n),prop= (n*100)/(sum(n))) %>% 
+  filter(label=="s+") #%>% 
+  #ungroup() %>% 
+  #dplyr::select(-n,-label, -tot) %>% 
+  #spread(pheno,prop)
+```
+
+```{r,eval=FALSE}
+msr %>% 
+  dplyr::select(anti,label) %>% 
+  #filter(igg==levels(f)[i]) %>% 
+  #dplyr::select(-igg) %>% 
+  group_by(anti,label) %>% dplyr::summarise(n=n()) %>% ungroup() %>% 
+  spread(label,n)
+```
+
+```{r}
+fst <- msr %>% 
+  filter(!label=="s0") %>% 
+  dplyr::select(anti,label) %>% 
+  #filter(igg==levels(f)[i]) %>% 
+  #dplyr::select(-igg) %>% 
+  group_by(anti,label) %>% dplyr::summarise(n=n()) %>% ungroup() %>% 
+  #spread(label,n) %>% as.matrix() %>% 
+  reshape2::acast(anti ~ label,
+                  value.var = "n") #%>% #class()
+
+chisq.test(fst)$p.value %>% format(digits=2,scientific=F)
+#chisq.test(fst[c(1,2),])$p.value %>% format(digits=2,scientific=F)
+#chisq.test(fst[c(1,3),])$p.value %>% format(digits=2,scientific=F)
+#chisq.test(fst[c(2,3),])$p.value %>% format(digits=2,scientific=F)
+
+FUN = function(i,j){    
+      chisq.test(matrix(c(fst[i,1], fst[i,2],
+                          fst[j,1], fst[j,2]),
+                 nrow=2,
+                 byrow=TRUE))$ p.value
+                }
+     
+pairwise.table(FUN,
+               rownames(fst),
+               p.adjust.method="none") %>% #?p.adjust
+  format(digits=2,scientific=F)
+```
+
+```{r}
+ftt <- data_frame(anti=as.character(), comp=as.character(),
+                  statistic=as.double(),
+                  p.value=as.double(),
+                  parameter=as.integer(),
+                  #estimate=as.double(),
+                  method=as.character()#,
+                  #alternative=as.factor()
+                  )
+
+f <- as.factor(msr$anti)
+
+for (i in 1:length(levels(f))) {
+  
+fst <- msr %>% 
+  filter(!label=="s0") %>% 
+  dplyr::select(anti,community,label) %>% 
+  filter(anti==levels(f)[i]) %>% 
+  dplyr::select(-anti) %>% 
+  group_by(community,label) %>% dplyr::summarise(n=n()) %>% ungroup() %>% 
+  #spread(label,n) %>% as.matrix() %>% 
+  reshape2::acast(community ~ label,
+                  value.var = "n") #%>% #class()
+
+fst[is.na(fst)] <- 0
+
+ftt <- ftt %>% 
+  union(
+  #fisher.test(fst) %>% broom::tidy() %>%
+  chisq.test(fst) %>% broom::tidy() %>% 
+    mutate(anti=levels(f)[i],
+           comp=paste0(rownames(fst)[1]," vs ",rownames(fst)[2])) %>% 
+    dplyr::select(anti, comp,
+                  statistic,
+                  p.value,
+                  parameter,
+                  #estimate,
+                  method#,alternative
+                  )
+)
+
+
+  
+}
+
+ftt %>% arrange(anti) %>% 
+  mutate(sig=ifelse(p.value<0.05,"signif","not-signif")) %>% as.matrix()
+```
+
+#### sex
+
+##### wrt community
+
+```{r,fig.width=3.5,fig.height=2.5}
+msr %>% 
+  #filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=community,fill=sexo)) +
+  geom_bar(position = "fill") +
+  #facet_grid(~igg) +
+  labs(title="Proportion of gender")
+```
+
+##### wrt sero+
+
+##### wrt antigen
+
+```{r,fig.width=3.5,fig.height=2.5}
+msr %>% 
+  filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=anti,fill=sexo)) +
+  geom_bar(position = "fill") +
+  #facet_grid(~igg) +
+  labs(title="Proportion of gender")
+```
+
+```{r,fig.width=5.25,fig.height=2.5}
+msr %>% 
+  filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=community,fill=sexo)) +
+  geom_bar(position = "fill") +
+  facet_grid(~anti) +
+  labs(title="Proportion of gender")
+```
+
+#### micro+
+
+#### wrt community
+
+```{r,fig.width=3.5,fig.height=2.5}
+msr %>% 
+  #filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=community,fill=microscopia)) +
+  geom_bar(position = "fill") +
+  #facet_grid(~igg) +
+  labs(title="Proportion of microscopy +")
+```
+
+#### wrt sero+
+
+##### wrt antigen
+
+```{r,fig.width=3.5,fig.height=2.5}
+msr %>% 
+  filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=anti,fill=microscopia)) +
+  geom_bar(position = "fill") +
+  #facet_grid(~igg) +
+  labs(title="Proportion of microscopy +")
+```
+
+```{r,fig.width=5.25,fig.height=2.5}
+msr %>% 
+  filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=community,fill=microscopia)) +
+  geom_bar(position = "fill") +
+  facet_grid(~anti) +
+  labs(title="Proportion of microscopy +")
+```
+
+#### more
+
+```{r}
+msr %>% 
+  dplyr::select(anti,label) %>% 
+  #filter(igg==levels(f)[i]) %>% 
+  #dplyr::select(-igg) %>% 
+  group_by(anti,label) %>% summarise(n=n()) %>% ungroup() %>% 
+  spread(label,n)
+```
+
+```{r,eval=FALSE,echo=FALSE}
+fst <- msr %>% 
+  dplyr::select(anti,label) %>% 
+  #filter(igg==levels(f)[i]) %>% 
+  #dplyr::select(-igg) %>% 
+  group_by(anti,label) %>% summarise(n=n()) %>% ungroup() %>% 
+  #spread(label,n) %>% as.matrix() %>% 
+  reshape2::acast(anti ~ label,
+                  value.var = "n") #%>% #class()
+
+fst[is.na(fst)] <- 0
+
+fisher.test(fst) %>% broom::tidy()
+```
+
+
+### Distribution
+
+#### ab
+
+```{r,fig.width=4,fig.height=2.5}
+msr %>% 
+  filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=Ab.units,fill=anti)) +
+  scale_x_log10() +
+  geom_histogram(aes(x=Ab.units,..density..),
+                 alpha=.5,position = "identity") +
+  #geom_bar(position = "fill") +
+  geom_density(alpha=.5,position = "identity") +
+  #geom_histogram(position = "identity") +
+  #facet_wrap(~anti,scales = "free",ncol = 3) +
+  labs(title="Distribution of seropositive reactivity")
+
+ggsave("figure/unap-marilly-reactiv_all.png")
+```
+
+```{r,fig.width=4,fig.height=2.5}
+msr %>% 
+  filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(y=Ab.units,x=anti)) +
+  scale_y_log10() +
+  geom_boxplot(#alpha=0
+               aes(fill=anti)#, #position=position_dodge(0.8)
+  ) +
+  #geom_violin(aes(fill=anti),alpha=.3#draw_quantiles = c(0.25, 0.5, 0.75) 
+  ##position=position_dodge(0.8)
+  #) +
+  geom_dotplot(aes(fill=anti), 
+    binaxis='y', stackdir='center', alpha=.3, 
+    dotsize=.75#, position=position_dodge(0.8)
+  ) +
+  #geom_boxplot(alpha=0#aes(fill=anti)#, #position=position_dodge(0.8)
+  #) +
+  #geom_histogram(aes(x=Ab.units,..density..),
+  #               alpha=.5,position = "identity") +
+  #geom_bar(position = "fill") +
+  #geom_density(alpha=.5,position = "identity") +
+  #geom_histogram(position = "identity") +
+  #facet_wrap(~anti,scales = "free",ncol = 3) +
+  labs(title="Distribution of seropositive reactivity") #+
+  #theme(legend.position="none")
+```
+
+```{r,fig.width=4,fig.height=4}
+png("figure/unap-marilly-reactiv_all_bp.png",, width = 400, height = 400)
+boxplot(Ab.units~anti,data=msr %>% mutate(anti=if_else(anti=="falstatin","FALSTATIN",
+                                                       if_else(anti=="gest","GEST",
+                                                               if_else(anti=="msp1","MSP1",NA_character_))))
+        ,log="y",yaxt='n',main="Seropositive reactivity",
+        ylab="Unidades de Anticuerpos (escala log)",xlab="Antígenos")
+ylim <- par("usr")[3:4]
+log10AtY <- seq(ceiling(ylim[1]), floor(ylim[2]))
+axis(side=2, at=10^log10AtY, lab=as.expression(lapply(log10AtY, function(y)bquote(10^.(y))))) 
+dev.off()
+#ggsave("figure/unap-marilly-reactiv_all_bp.png")
+```
+
+```{r,fig.width=8,fig.height=2.5}
+msr %>% 
+  filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=Ab.units,fill=community)) +
+  scale_x_log10() +
+  geom_histogram(aes(x=Ab.units,..density..),
+                 alpha=.5,position = "identity") +
+  #geom_bar(position = "fill") +
+  geom_density(alpha=.5,position = "identity") +
+  #geom_histogram(position = "identity") +
+  facet_wrap(~anti,scales = "free",ncol = 3) +
+  labs(title="Distribution of seropositive reactivity")
+```
+
+```{r,fig.width=8,fig.height=2.5}
+msr %>% 
+  filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  mutate(Ab_log=log10(Ab.units)) %>% 
+  ggplot(aes(y=Ab.units,x=community)) +
+  scale_y_log10() +
+  geom_boxplot(aes(fill=community)) +
+  geom_violin(aes(fill=community),alpha=.3,draw_quantiles = c(0.25, 0.5, 0.75) 
+  #position=position_dodge(0.8)
+  ) +
+  geom_dotplot(aes(fill=community), 
+    binaxis='y', stackdir='center', alpha=.5, 
+    dotsize=1#, position=position_dodge(0.8)
+  ) +
+  #geom_histogram(aes(x=Ab.units,..density..),
+  #               alpha=.5,position = "identity") +
+  ##geom_bar(position = "fill") +
+  #geom_density(alpha=.5,position = "identity") +
+  ##geom_histogram(position = "identity") +
+  facet_wrap(~anti,scales = "free",ncol = 3) +#
+  labs(title="Distribution of seropositive reactivity")
+```
+
+##### stat
+
+```{r}
+msr %>% mutate(anti=as.factor(anti)) %>% 
+  #filter(anti==levels(f)[l]) %>% 
+  #t.test(Ab.units_log ~ pheno, data = ., var.equal= i$p.value>0.05) %>%
+  #wilcox.test(Ab.units_log ~ pheno, data = .) %>%#, 
+  kruskal.test(Ab.units ~ anti, data = .) %>%#, 
+              #conf.int=TRUE) %>% 
+  broom::tidy() %>% as.matrix()
+
+msr %>% mutate(anti=as.factor(anti)) %>% 
+  FSA::dunnTest(Ab.units ~ anti, data = .,method="none"
+                )
+
+
+#msr %>% mutate(anti=as.factor(anti)) %>% 
+#  filter(anti!="msp1") %>% 
+#  t.test(Ab.units ~ anti, data = .)
+```
+
+```{r}
+model <- msr %>% mutate(anti=as.factor(anti)) %>% 
+  lm(Ab.units ~ anti,
+           data=.)
+library(multcomp)
+
+mc = glht(model,
+          mcp(anti = "Tukey"))
+
+mcs = summary(mc, test=adjusted("single-step"))
+
+mcs
+```
+
+```{r}
+f <- msr %>% mutate(anti=as.factor(anti)) %>% .$anti
+
+#mco <- mco %>% 
+#  #dplyr::select(Ab.units,par) %>% 
+#  mutate(Ab.units=log10(Ab.units),par=log10(par)) %>% 
+#  filter(par!=-Inf) #%>% 
+
+stt <- data_frame(##estimate=as.double(),
+                  ##estimate1=as.double(),
+                  ##estimate2=as.double(),
+                  statistic=as.double(),
+                  p.value=as.double(),
+                  #parameter=as.double(),#
+                  #conf.low=as.double(),#
+                  #conf.high=as.double(),#
+                  method=as.factor(NULL),
+                  alternative=as.factor(NULL),
+                  anti=as.character(),
+                  comp=as.character(),
+                  lab=as.character())
+
+for (l in 1:length(levels(f))) {#l=2
+  
+## Primero, Prueba de Hipótesis para comparar varianzas:
+#i <- mco %>% filter(anti==levels(f)[l]) %>% 
+#  var.test(Ab.units_log ~ pheno, data = .) %>% broom::tidy()
+## Rpta: Bajo n.s. 0.05, F cae en Región de no-Rechazo de Hipótesis Nula (RnoRHo)
+## Conclusión: Supuesto de igualdad de varianzas poblacionales SÍ es válido
+## Segundo, Prueba de Hipótesis para comparar medias:
+j <- msr %>% filter(anti==levels(f)[l]) %>% 
+  #t.test(Ab.units_log ~ pheno, data = ., var.equal= i$p.value>0.05) %>%
+  #wilcox.test(Ab.units_log ~ pheno, data = .) %>%#, 
+  wilcox.test(Ab.units ~ community, data = .) %>%#, 
+              #conf.int=TRUE) %>% 
+  broom::tidy() %>%  #%>% format(digits=2)
+  dplyr::select(-starts_with("estimate")) %>% 
+  mutate(anti=levels(f)[l],
+         comp=paste0(levels(msr$community)[1]," vs ",levels(msr$community)[2]),
+         lab= paste0(#"t=",#should be done -> mix variance equality test
+                     #"W=",#non-parametric used in literature
+                     #statistic %>% format(digits=2),
+                     #", df=",parameter %>% format(digits=2),
+                     #", P",ifelse(p.value<0.001,"<0.001",
+                     "italic('P')",ifelse(p.value<0.001,"<0.001",
+                                  paste0("==",p.value %>% format(digits=2))
+                                  )
+                     )
+         )
+
+stt <- stt %>% union(j)
+
+}
+
+stt <- stt %>% arrange(anti) %>% dplyr::select(anti,comp,everything())
+stt %>% as.matrix()
+```
+
+```{r}
+msr %>% group_by(anti,community
+                 ) %>% summarise(mean=mean(Ab.units, na.rm=T),
+                                               #min=min(Ab.units),
+                                          median=quantile(Ab.units,.5),
+                                     q25=quantile(Ab.units,.25),
+                                          q75=quantile(Ab.units,.75)#,
+                                          #max=max(Ab.units)
+                                          ) %>% as.matrix()
+```
+
+```{r,fig.width=7,fig.height=2.8}
+#msr %>% mutate(grp=group_indices(.,anti,community)) %>% filter(grp==2) %>% .$Ab.units %>% summary()
+#msr %>% mutate(grp=group_indices(.,anti,community)) %>% filter(grp==2) %>% .$Ab.units %>% boxplot()
+
+png("figure/unap-marilly-reactiv_strat_bp.png", width = 700, height = 280)
+par(mfrow=c(1,3),mai = c(1, 0.52, 0.3, 0.01))
+boxplot(Ab.units~community,data=msr %>% filter(anti=="falstatin") %>%
+          mutate(community=if_else(community=="MZ","Mazán",
+                              if_else(community=="ZG","Zungarococha",NA_character_)))
+        ,main="FALSTATIN"
+        ,log="y",yaxt='n',main="Seropositive reactivity"
+        ,ylab="Unidades de Anticuerpos (escala log)"
+        #,xlab="Comunidades"
+        )
+ylim <- par("usr")[3:4]
+log10AtY <- seq(ceiling(ylim[1]), floor(ylim[2]))
+axis(side=2, at=10^log10AtY, lab=as.expression(lapply(log10AtY, function(y)bquote(10^.(y))))) 
+
+boxplot(Ab.units~community,data=msr %>% filter(anti=="gest") %>%
+          mutate(community=if_else(community=="MZ","Mazán",
+                              if_else(community=="ZG","Zungarococha",NA_character_)))
+        ,main="GEST"
+        ,log="y",yaxt='n',main="Seropositive reactivity"
+        #,ylab="Unidades de Anticuerpos (escala log)"
+        ,xlab="Comunidades")
+ylim <- par("usr")[3:4]
+log10AtY <- seq(ceiling(ylim[1]), floor(ylim[2]))
+axis(side=2, at=10^log10AtY, lab=as.expression(lapply(log10AtY, function(y)bquote(10^.(y))))) 
+
+boxplot(Ab.units~community,data=msr %>% filter(anti=="msp1") %>%
+          mutate(community=if_else(community=="MZ","Mazán",
+                              if_else(community=="ZG","Zungarococha",NA_character_)))
+        ,main="MSP1"
+        ,log="y",yaxt='n',main="Seropositive reactivity"
+        #,ylab="Unidades de Anticuerpos (escala log)"
+        #,xlab="Comunidades"
+        )
+ylim <- par("usr")[3:4]
+log10AtY <- seq(ceiling(ylim[1]), floor(ylim[2]))
+axis(side=2, at=10^log10AtY, lab=as.expression(lapply(log10AtY, function(y)bquote(10^.(y))))) 
+
+par(mfrow=c(1,1))
+
+dev.off()
+#ggsave("figure/unap-marilly-reactiv_strat_bp.png")
+```
+
+
+#### age
+
+##### wrt community
+
+```{r,fig.width=4,fig.height=2.5}
+msr %>% 
+  #filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=edad,fill=community)) +
+  #scale_x_log10() +
+  geom_histogram(aes(x=edad,..density..),
+                 alpha=.5,position = "identity") +
+  #geom_bar(position = "fill") +
+  geom_density(alpha=.5,position = "identity") +
+  #geom_histogram(position = "identity") +
+  #facet_wrap(~anti,scales = "free",ncol = 3) +
+  labs(title="Distribution of age")
+```
+
+```{r,fig.width=3.9,fig.height=1.2}
+msr %>% 
+  #filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=community,y=edad,fill=community)) +
+  geom_boxplot() +
+  coord_flip() #+
+  #scale_x_log10() +
+  #geom_histogram(aes(x=edad,..density..),
+  #               alpha=.5,position = "identity") +
+  #geom_bar(position = "fill") +
+  #geom_density(alpha=.5,position = "identity") +
+  #geom_histogram(position = "identity") +
+  #facet_wrap(~anti,scales = "free",ncol = 3) +
+  #labs(title="Distribution of age")
+```
+
+##### wrt sero+
+
+```{r,fig.width=4,fig.height=2.5}
+msr %>% 
+  #filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=edad,fill=sero)) +
+  #scale_x_log10() +
+  geom_histogram(aes(x=edad,..density..),
+                 alpha=.5,position = "identity") +
+  #geom_bar(position = "fill") +
+  geom_density(alpha=.5,position = "identity") +
+  #geom_histogram(position = "identity") +
+  #facet_wrap(~anti,scales = "free",ncol = 3) +
+  labs(title="Distribution of age")
+```
+
+```{r,fig.width=3.9,fig.height=1.2}
+msr %>% 
+  #filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=sero,y=edad,fill=sero)) +
+  geom_boxplot() +
+  coord_flip() #+
+  #scale_x_log10() +
+  #geom_histogram(aes(x=edad,..density..),
+  #               alpha=.5,position = "identity") +
+  #geom_bar(position = "fill") +
+  #geom_density(alpha=.5,position = "identity") +
+  #geom_histogram(position = "identity") +
+  #facet_wrap(~anti,scales = "free",ncol = 3) +
+  #labs(title="Distribution of age")
+```
+
+##### wrt antigen
+
+```{r,fig.width=4,fig.height=2.5}
+msr %>% 
+  filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=edad,fill=anti)) +
+  #scale_x_log10() +
+  geom_histogram(aes(x=edad,..density..),
+                 alpha=.5,position = "identity") +
+  #geom_bar(position = "fill") +
+  geom_density(alpha=.5,position = "identity") +
+  #geom_histogram(position = "identity") +
+  #facet_wrap(~anti,scales = "free",ncol = 3) +
+  labs(title="Distribution of age")
+```
+
+```{r,fig.width=8,fig.height=2.5}
+msr %>% 
+  filter(sero=="pos") %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=edad,fill=community)) +
+  #scale_x_log10() +
+  geom_histogram(aes(x=edad,..density..),
+                 alpha=.5,position = "identity") +
+  #geom_bar(position = "fill") +
+  geom_density(alpha=.5,position = "identity") +
+  #geom_histogram(position = "identity") +
+  facet_wrap(~anti,scales = "free",ncol = 3) +
+  labs(title="Distribution of age")
+```
+
+#### more
+
+```{r}
+msr %>% 
+  filter(label=="s+") %>% 
+  group_by(anti) %>% summarise(min=min(Ab.units),
+                                          q25=quantile(Ab.units) %>% .[2],
+                                          mean=mean(Ab.units),
+                                          q50=quantile(Ab.units) %>% .[3],
+                                          q75=quantile(Ab.units) %>% .[4],
+                                          max=max(Ab.units))
+```
+
+```{r,eval=FALSE,echo=FALSE}
+mco <- mco %>% 
+  mutate(Ab.units_log=log10(Ab.units),
+         anti=as.factor(anti))
+mco %>% glimpse()
+```
+
+
+```{r,message=FALSE,fig.width=4,fig.height=2.5,eval=FALSE,echo=FALSE}
+## Primero, Prueba de Hipótesis para comparar varianzas:
+i <- mco %>% #filter(anti==levels(f)[l]) %>% 
+  var.test(Ab.units_log ~ anti, data = .) %>% broom::tidy()
+## Rpta: Bajo n.s. 0.05, F cae en Región de no-Rechazo de Hipótesis Nula (RnoRHo)
+## Conclusión: Supuesto de igualdad de varianzas poblacionales SÍ es válido
+## Segundo, Prueba de Hipótesis para comparar medias:
+j <- mco %>% #filter(anti==levels(f)[l]) %>% 
+  #t.test(Ab.units_log ~ pheno, data = ., var.equal= i$p.value>0.05) %>%
+  wilcox.test(Ab.units_log ~ anti, data = .) %>%#, 
+              #conf.int=TRUE) %>% 
+  broom::tidy() %>%  #%>% format(digits=2)
+  dplyr::select(-starts_with("estimate")) %>% 
+  mutate(#anti=levels(f)[l],
+         lab= paste0(#"t=",#should be done -> mix variance equality test
+                     "W=",#non-parametric used in literature
+                     statistic %>% format(digits=2),
+                     #", df=",parameter %>% format(digits=2),
+                     ", P",ifelse(p.value<0.001,"<0.001",
+                                  paste0("=",p.value %>% format(digits=2))
+                                  )
+                     )
+         )
+
+stt <- j %>% #arrange(anti) %>% 
+  #dplyr::select(anti,everything()) %>% 
+  mutate(x=.5,
+         y=.15)
+
+# plot
+mco %>% #filter(igg==levels(f)[1]) %>% 
+  ggplot(aes(anti,Ab.units)) +
+  geom_boxplot(#position=position_dodge(0.8)
+  ) +
+  geom_dotplot(#aes(fill=sev_WHO), 
+    binaxis='y', stackdir='center', alpha=.3, 
+    dotsize=1#, position=position_dodge(0.8)
+  ) +
+  #coord_cartesian(ylim = c(0,100)) +
+  
+  geom_text(aes(x,y,label=lab),data = stt,
+            vjust=.5,hjust=0.05,size=3.5) +
+  
+  #facet_wrap(~anti,ncol = 5) + 
+  scale_y_log10() +
+  labs(title="Test AU mean equality")
+```
+
+## Correlation
+
+### ab x age
+
+```{r,fig.width=4,fig.height=2.5}
+msr %>% 
+  ggplot(aes(edad,Ab.units,colour=anti)) +
+  scale_y_log10() +
+  geom_point() +
+  geom_smooth() #+facet_grid(~anti)
+```
+
+```{r,fig.width=6,fig.height=3.5}
+msr %>% 
+  ggplot(aes(edad,Ab.units)) +
+  scale_y_log10() +
+  geom_point() +
+  geom_smooth() +facet_grid(community~anti) +
+  labs(title="Antibody acquisition plot per antigen and community")
+```
+
+```{r,fig.width=8,fig.height=2.5}
+msr %>% 
+  ggplot(aes(edad,Ab.units,colour=community)) +
+  scale_y_log10() +
+  geom_point() +
+  geom_smooth() +facet_grid(~anti)
+```
+
+## Inferential
+
+- __OBJETIVOS__:
+    
+    + General:
+        - Evaluar la inmunogenicidad de dos proteínas recombinantes de Plasmodium vivax en plasma de pobladores de Mazán y ZUGAROCOCHA, Iquitos, 2015.
+    
+    + Específico:
+        - Identificar y cuantificar los anticuerpos contra las proteínas GEST y  Falstatin.
+        - Comparar la respuesta inmunitaria de las proteínas GEST y  Falstatin.
+        - Determinar la comunidad que presente mayor respuesta inmune a las proteínas GEST y  Falstatin.
+    
+    + Sugerencia:
+        - correlación de la edad y género para cada proteína (De acuerdo al umbral de reactividad)
+        - edad mínima, máxima y la edad promedio en la que hay mayor seropositividad.
+        - Hacer los gráficos por cajas y bigotes.
+        - Hacer la comparación  de seropositividad en un gráfico las dos proteínas
+        - Correlación de Pearson una población simétrica o asimétrica.
+
+- __PLAN DE ANALISIS__:
+    
+    + Específicos:
+        + Describir la respuesta de seropositivos para los 3 antígenos, sin y con estratificación por comunidad.
+        + Comparar medias de respuesta de seropositivos entre los 3 antígenos, sin y con estratificación por comunidad.
+        + Comparar proporciones de seropositivos entre los 3 antígenos, sin y con estratificación por comunidad.
+    
+    + Sugerencias:
+        
+        + Comparar medias de edad para individuos seropositivos de los 3 antígenos, sin y con estratificación por comunidad.
+        + Correlacionar edad con respuesta de seropositivos, sin y con estratificación por comunidad.
+        
+        + Comparar proporciones de género para individuos seropositivos de los 3 antígenos, sin y con estratificación por comunidad.
+
+# References

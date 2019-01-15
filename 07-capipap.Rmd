@@ -1,0 +1,403 @@
+---
+title: "CAPI vs PAPI"
+author: "Andree Valle Campos"
+date: '`r Sys.Date()`'
+output:
+  html_notebook:
+  #html_document:
+    fig_caption: yes
+    toc: yes
+    toc_depth: 5
+    toc_float:
+      collapsed: yes
+    code_folding: "hide"
+    #df_print: paged
+#bibliography: malaria.bib
+biblio-style: apalike
+link-citations: yes
+#csl: american-medical-association.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, #fig.path = "01-",
+                      warning = FALSE)
+#knitr::opts_knit$set(root.dir = '../.')
+
+options(width = 90) # expand limits of CONSOLE output
+
+#require(Hmisc)
+#mu <- markupSpecs$html   # markupSpecs is in Hmisc
+# hidden command (<code>r mu$widescreen()</code>) to use an entire wide screen. # mu$widescreen()
+#`r mu$widescreen()`
+```
+
+# CAPI vs PAPI {#capipapi}
+
+## Aim
+
+- Error rate between data input methods.
+
+## Results
+
+## To Do
+
+## Dependencies
+
+```{r, results='hide', message=FALSE}
+library(tidyverse)
+```
+
+## Input
+
+### Dictionary
+
+```{r}
+dic <- readxl::read_xlsx("data-raw/UNAP_CAPIvPAPI_barridoI_2017.xlsx",sheet = 3,col_names = FALSE) %>% 
+  select("var"=X__1,"code"=X__3) %>% 
+  mutate_all(funs(stringr::str_to_lower(.)))
+dic
+```
+
+### Data
+
+```{r}
+capi <- readxl::read_xlsx("data-raw/UNAP_CAPIvPAPI_barridoI_2017.xlsx",sheet = 1) %>% 
+  mutate(B001= stringr::str_replace_all(B001, "_","-")) %>% 
+  rename_all(funs(stringr::str_to_lower(.))) %>% 
+  mutate_all(funs(stringr::str_to_lower(.))) %>% 
+  mutate(b003=stringr::str_replace(b003,"ni.+","nina rumi")) %>% 
+  mutate(b002=stringr::str_replace(b002,"(\\d+)/(\\d+)/(\\d+)(.+)","\\3-\\2-\\1"),
+         b010=stringr::str_replace(b010,"(\\d+)/(\\d+)/(\\d+)","\\3-\\2-\\1")) %>% #dplyr::count(b100,b095)
+  mutate_at(vars(b012:b102),funs(stringr::str_replace(.,"(\\d+)(.+)","\\1"))) #%>% dplyr::count(b100,b095)
+papi <- readxl::read_xlsx("data-raw/UNAP_CAPIvPAPI_barridoI_2017.xlsx",sheet = 2) %>% 
+  rename_all(funs(stringr::str_to_lower(.))) %>% 
+  mutate_all(funs(stringr::str_to_lower(.))) %>% #dplyr::count(b073)
+  mutate_at(vars(b012:b102),funs(stringr::str_replace(.,"(\\d+)(.+)","\\1"))) %>% #dplyr::count(b003) #dplyr::count(b073)
+  mutate(b003=stringr::str_replace(b003,"ni.+","nina rumi"),
+         b003=stringr::str_replace(b003,"lla.+","llanchama"),
+         b003=stringr::str_replace(b003,"zu.+","zungarococha")) #%>% dplyr::count(b003)
+
+mix <- capi %>%
+  full_join(papi,
+            by="b001", suffix=c(".c",".p"))
+
+#mix %>% glimpse()
+```
+
+```{r, eval=FALSE}
+# ¿HOW TO DO IT PROGRAMMATICALLY?
+mix %>%
+  select(b003.c,b003.p) %>% 
+  mutate(test= b003.c==b003.p) %>% 
+  count(test) %>%
+  spread(test,n)
+```
+
+## Results
+
+### Error in percentage
+
+- __A.all:__ total number of values
+- __N.cap__: non-missing values in CAPI
+- __N.pap:__ non-missing values in PAPI
+- __T.cvp:__ number of TRUE values to test of equality between CAPI vs PAPI data
+- __F.cvp:__ number of FALSE to test of equality between CAPI vs PAPI data
+- __na:__ non-available data in either or both datasets to perform a test comparison
+- __(T/N)%:__ percentage of TRUE among non-missing values
+- __(F/N)%:__ percentage of FALSE among non-missing values
+- __(na/A)%:__ percentage of NA among all values
+- __high.N:__ higher number of non-missing values in either CAPI (1) or PAPI (0)
+
+```{r}
+var <- NULL
+
+for(i in 2:dim(capi)[2]){
+  test <- capi[,i] == papi[,i] #TEST equality
+  a <- length(test)
+  a.c <- length(which(capi[,i] != "NA")) #NON-MISSING VALUES in CAPI
+  a.p <- length(which(papi[,i] != "NA")) #NON-MISSING VALUES in PAPI
+  b <- length(which(test == TRUE))
+  c <- length(which(test == FALSE))
+  d <- a - (b + c)
+  e <- as.numeric(format((b/(b + c))*100,digits = 3)) #proportion among NON-MISSING VALUES
+  f <- as.numeric(format((c/(b + c))*100,digits = 1)) #proportion among NON-MISSING VALUES
+  g <- as.numeric(format((d/(a))*100,digits = 1)) #proportion of NA among ALL
+  h <- ifelse(a.c>a.p,1,0)
+  var <- rbind(var,cbind(a,a.c,a.p,b,c,d,e,f,g,h))
+  rownames(var)[i-1] <- colnames(capi[,i])
+}
+
+colnames(var) <- c("A.all","N.cap","N.pap","T.cvp","F.cvp","na","(T/N)%","(F/N)%","(na/A)%","high.N")
+
+dim(var)
+var
+```
+
+## Tidy requirement
+
+### 100% NaN values
+
+- retired due to non-equality between variable data as a consequence of _NA_ missing values.
+- involved variables: "email" and "otros_"
+
+```{r}
+var[var[, "(F/N)%"] == "NaN",] #5
+
+x <- rownames(var[var[, "(F/N)%"] == "NaN",])
+length(x)
+
+m <- NULL
+for(i in 1:length(x)){
+  n <- dic %>% filter(code==x[i]) %>% as.matrix()
+  m <- rbind(m,n)
+}
+m
+
+capi %>% select(1,x) %>% 
+  full_join(
+    papi %>% select(1,x),
+    by="b001",suffix=c(".c",".p")
+    ) %>% 
+  select(noquote(order(colnames(.))))
+#https://stackoverflow.com/questions/29873293/dply-order-columns-alphabetically-in-r
+```
+
+
+### 100% false among non-missing
+
+- lower amount of non-missing values
+- involved variables: "telefono", "donde_", "otro_", "especifique_"
+
+```{r}
+var[var[, "(F/N)%"] == "100",] #4
+
+x <- rownames(var[var[, "(F/N)%"] == "100",])
+length(x)
+
+m <- NULL
+for(i in 1:length(x)){
+  n <- dic %>% filter(code==x[i]) %>% as.matrix()
+  m <- rbind(m,n)
+}
+m
+
+capi %>% select(1,x) %>% 
+  full_join(
+    papi %>% select(1,x),
+    by="b001",suffix=c(".c",".p")
+    ) %>% 
+  select(noquote(order(colnames(.))))
+#https://stackoverflow.com/questions/29873293/dply-order-columns-alphabetically-in-r
+```
+
+- b007: cadenas separadas
+- b041: orden de cadenas aditivas
+- b068: mismo significado, diferente significante
+- b078: mismo significado, diferente significante
+
+### 0% false among non-missing
+
+- AQUI: rescatar variables con data relevante
+
+```{r}
+var[var[, "(F/N)%"] == "0",] #13
+var[var[, "(F/N)%"] == "0" & var[, "na"] != "395" & var[, "(na/A)%"] != "99"  & var[, "(na/A)%"] != "96",] #8
+var[var[, "(F/N)%"] == "0" & var[, "(na/A)%"] != "0" & var[, "(na/A)%"] != "100",] #8
+var[var[, "(F/N)%"] == "0" & var[, "(na/A)%"] != "0" & var[, "(na/A)%"] == "100",] #4
+
+x <- rownames(var[var[, "(F/N)%"] == "0",])
+length(x)
+
+m <- NULL
+for(i in 1:length(x)){
+  n <- dic %>% filter(code==x[i]) %>% as.matrix()
+  m <- rbind(m,n)
+}
+m
+
+capi %>% select(1,x) %>% 
+  full_join(
+    papi %>% select(1,x),
+    by="b001",suffix=c(".c",".p")
+    ) %>% 
+  select(noquote(order(colnames(.))))
+#https://stackoverflow.com/questions/29873293/dply-order-columns-alphabetically-in-r
+```
+
+### at least one false
+
+- AIM:
+    + Check the degree of error
+    + If it is due to format, then tidy-it-up and re-run
+
+```{r}
+var[var[, "(F/N)%"] != "100" & var[, "(F/N)%"] != "NaN" & var[, "(F/N)%"] != "0",] #79
+
+x <- rownames(var[var[, "(F/N)%"] != "100" & var[, "(F/N)%"] != "NaN" & var[, "(F/N)%"] != "0",])
+length(x)
+
+m <- NULL
+for(i in 1:length(x)){
+  n <- dic %>% filter(code==x[i]) %>% as.matrix()
+  m <- rbind(m,n)
+}
+m
+
+capi %>% select(1,x) %>% 
+  full_join(
+    papi %>% select(1,x),
+    by="b001",suffix=c(".c",".p")
+    ) %>% 
+  select(noquote(order(colnames(.))))
+#https://stackoverflow.com/questions/29873293/dply-order-columns-alphabetically-in-r
+```
+
+### explicit categories
+
+```{r}
+dic %>% filter(code=="b003"|code=="b004"|code=="b005"|code=="b006")
+
+expl <- capi %>% select(1,x) %>% 
+  full_join(
+    papi %>% select(1,x),
+    by="b001",suffix=c(".c",".p")
+    ) %>% 
+  select(noquote(order(colnames(.)))) %>% 
+  select(2:15) 
+expl #mutate_all(funs(as.factor(.))) %>% summary()
+
+expl %>% dplyr::count(b003.c,b003.p) %>% mutate(test= b003.c==b003.p)
+expl %>% dplyr::count(b004.c,b004.p) %>% mutate(test= b004.c==b004.p)
+expl %>% dplyr::count(b005.c,b005.p) %>% mutate(test= b005.c==b005.p)
+expl %>% dplyr::count(b006.c,b006.p) %>% mutate(test= b006.c==b006.p)
+```
+
+```{r}
+cat <- expl %>% select(-starts_with("b003"),-starts_with("b004"),-starts_with("b005"),-starts_with("b006"))
+
+z <- cat %>% 
+  select(ends_with(".c")) %>% 
+  rename_all(funs(stringr::str_replace_all(.,".c",""))) %>% colnames()
+
+var[z,]
+
+var[z,7:10] %>% summary()
+#w <- var[y,] %>% rownames()
+#var[y,] %>% as.tibble() %>% mutate(var= w) %>% select(var,everything())
+```
+
+### coded categories
+
+```{r}
+num <- capi %>% select(1,x) %>% 
+  full_join(
+    papi %>% select(1,x),
+    by="b001",suffix=c(".c",".p")
+    ) %>% 
+  select(noquote(order(colnames(.)))) %>% 
+  select(16:159,-starts_with("b016"),-starts_with("b044"),-starts_with("b057"))
+
+num
+```
+
+```{r}
+y <- num %>% 
+  select(ends_with(".c")) %>% 
+  rename_all(funs(stringr::str_replace_all(.,".c",""))) %>% colnames()
+
+var[y,]
+
+var[y,7:10] %>% summary()
+#w <- var[y,] %>% rownames()
+#var[y,] %>% as.tibble() %>% mutate(var= w) %>% select(var,everything())
+```
+
+
+#### special
+
+```{r}
+dic %>% filter(code=="b016"|code=="b044"|code=="b057")
+
+capi %>% select(1,x) %>% 
+  full_join(
+    papi %>% select(1,x),
+    by="b001",suffix=c(".c",".p")
+    ) %>% 
+  select(noquote(order(colnames(.)))) %>% 
+  select(starts_with("b016"),starts_with("b044"),starts_with("b057"))
+```
+
+### final
+
+- add 0% false (done in `k`) + low  NA
+
+```{r}
+k <- rownames(var[var[, "(F/N)%"] == "0" & var[, "na"] != "395" & var[, "(na/A)%"] != "99"  & var[, "(na/A)%"] != "96",])
+```
+
+- bind all
+
+```{r}
+x <- c(z,y,k)
+
+m <- NULL
+for(i in 1:length(x)){
+  n <- dic %>% filter(code==x[i]) %>% as.matrix()
+  m <- rbind(m,n)
+}
+m
+
+fin <- var[c(z,y,k),]
+fin
+fin %>% as.tibble() %>% mutate(high.N=as.factor(high.N)) %>% select(7:10) %>% summary()
+```
+
+#### error higher than 20%
+
+```{r}
+fin[fin[, "(F/N)%"] >= 10,] #5
+#fin[fin[, "(F/N)%"] >= 20,] #5
+
+x <- rownames(fin[fin[, "(F/N)%"] >= 20,])
+length(x)
+
+m <- NULL
+for(i in 1:length(x)){
+  n <- dic %>% filter(code==x[i]) %>% as.matrix()
+  m <- rbind(m,n)
+}
+m
+
+capi %>% select(1,x) %>% 
+  full_join(
+    papi %>% select(1,x),
+    by="b001",suffix=c(".c",".p")
+    ) %>% 
+  select(noquote(order(colnames(.))))
+#https://stackoverflow.com/questions/29873293/dply-order-columns-alphabetically-in-r
+```
+
+#### na higher than 20%
+
+```{r}
+fin[fin[, "(na/A)%"] >= 10,] #5
+#fin[fin[, "(F/N)%"] >= 20,] #5
+
+x <- rownames(fin[fin[, "(na/A)%"] >= 20,])
+length(x)
+
+m <- NULL
+for(i in 1:length(x)){
+  n <- dic %>% filter(code==x[i]) %>% as.matrix()
+  m <- rbind(m,n)
+}
+m
+
+capi %>% select(1,x) %>% 
+  full_join(
+    papi %>% select(1,x),
+    by="b001",suffix=c(".c",".p")
+    ) %>% 
+  select(noquote(order(colnames(.))))
+#https://stackoverflow.com/questions/29873293/dply-order-columns-alphabetically-in-r
+```

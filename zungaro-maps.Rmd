@@ -1,0 +1,242 @@
+---
+title: "Zungarococha maps"
+author: "avallecam"
+date: "February 19, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE,error=FALSE}
+library(tidyverse)
+library(ggmap)
+register_google(key = "AIzaSyAvGB5P3z9Y7ATJa1GUzYaYNwX7SaM0Vk4")
+ggmap_credentials()
+ggmap(get_googlemap()) #works
+```
+
+# Data
+
+```{r}
+data <- readr::read_csv("data/vivienda_zungarococha.csv") %>% 
+  mutate(latitud=as.numeric(latitud),
+         longitud=as.numeric(longitud))
+```
+
+```{r}
+#select a community
+i <- c("Llanchama","Ninarumi","Puerto Almendra","Zungarococha")
+# x1 x2 y1 y2
+ll <- c(-73.41,-73.3935,-3.860,-3.845)
+nn <- c(-73.40,-73.3735,-3.860,-3.835)
+pa <- c(-73.40,-73.3690,-3.860,-3.825)
+zg <- c(-73.365,-73.340,-3.840,-3.820)
+
+ii <- matrix(c(ll,nn,pa,zg),nrow = 4,ncol = 4)
+ii
+
+p <- 4
+ii[,p]
+
+data_s <- data %>% filter(poblado == i[p] )
+#data_s <- data %>% filter(poblado=="Ninarumi")
+data_s %>% count(poblado)
+```
+
+
+## only terrain
+
+```{r,fig.height=15,fig.width=15,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = data_s, 
+       
+       source="google", #stamen ########################### change here
+       maptype = "satellite",#"terrain",#"roadmap", ####### change here
+       zoom = 15,
+       #zoom = 13,
+       
+       alpha = I(0),
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  #geom_point(color="red") +
+  #geom_point(color="white",alpha=0) +
+  #viridis::scale_color_viridis("median Ab\nresponse",#trans="log10",
+  #                             direction = -1) +
+  #scale_size_continuous("median Ab\nresponse") +
+  labs(title=i[p]) +
+  ggsn::scalebar(dist = 0.5, st.size=5, height=0.01, dd2km = TRUE, model = 'WGS84',
+                 x.min=ii[1,p],x.max=ii[2,p],y.min=ii[3,p],y.max=ii[4,p], #NN
+  #               facet.var = c('group'), facet.lev = c('Symptomatic', "Asymptomatic","Negative"),
+                 location = "topright")
+
+ggsave(paste0("figure/mapa_",i[p],"_t.png"))
+```
+
+## just points
+
+```{r,fig.height=15,fig.width=15,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = data_s, 
+       
+       #source="google", #stamen ########################### change here
+       #maptype = "satellite",#"terrain",#"roadmap", ####### change here
+       #zoom = 15,
+       zoom = 13,
+       
+       alpha = I(.5),
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  geom_point(color="red") +
+  #viridis::scale_color_viridis("median Ab\nresponse",#trans="log10",
+  #                             direction = -1) +
+  #scale_size_continuous("median Ab\nresponse") +
+  labs(title=i) +
+  ggrepel::geom_text_repel(data = data_s
+                           ,aes(label=hh),#color="white",segment.color = "white",fontface = 'bold',
+                           size=3.5,
+                           #box.padding = unit(.65, "lines"),
+                           segment.size =.5,
+                           #direction = "x",#nudge_x = 45,
+                           #point.padding = unit(.5, "lines")#,
+                           )
+
+ggsave(paste0("figure/mapa_",i,"_p.png"))
+```
+
+## raw + points
+
+```{r,fig.height=15,fig.width=15,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = data_s, 
+       
+       source="google", #stamen ########################### change here
+       maptype = "satellite",#"terrain",#"roadmap", ####### change here
+       zoom = 15,
+       #zoom = 13,
+       
+       alpha = I(.5),
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  geom_point(color="red") +
+  #viridis::scale_color_viridis("median Ab\nresponse",#trans="log10",
+  #                             direction = -1) +
+  #scale_size_continuous("median Ab\nresponse") +
+  labs(title=i) +
+  ggrepel::geom_text_repel(data = data_s
+                           ,aes(label=hh),color="white",segment.color = "white",fontface = 'bold',
+                           size=3.5,
+                           #box.padding = unit(.65, "lines"),
+                           segment.size =.5,
+                           #direction = "x",#nudge_x = 45,
+                           #point.padding = unit(.5, "lines")#,
+                           )
+ggsave(paste0("figure/mapa_",i,"_rp.png"))
+```
+
+## raw
+
+```{r,fig.height=15,fig.width=15,message=FALSE,error=TRUE}
+ggmap::qmplot(longitud, latitud, 
+       data = data_s, 
+       
+       source="google", #stamen ########################### change here
+       maptype = "satellite",#"terrain",#"roadmap", ####### change here
+       zoom = 15,
+       #zoom = 13,
+       
+       alpha = I(.5),
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  geom_point(color="red") +
+  #viridis::scale_color_viridis("median Ab\nresponse",#trans="log10",
+  #                             direction = -1) +
+  #scale_size_continuous("median Ab\nresponse") +
+  labs(title=i)
+
+ggsave(paste0("figure/mapa_",i,"_r.png"))
+```
+
+#### test
+
+```{r,eval=FALSE}
+per <- ggmap::get_googlemap("puerto almendra",zoom = 13,#color = "bw" ,
+                            #maptype = "terrain" #"satellite"
+                            maptype = "satellite"
+                      )
+ggmap::ggmap(per)
+```
+
+```{r}
+atw<- get_map(location=c(-88.68,42.14), zoom=10, scale=2)
+atw<-ggmap(atw)
+```
+
+```{r}
+
+#register_google(key = "my_google_key_here")
+#geocode("waco texas")
+```
+
+
+
+## map as function
+
+```{r}
+
+epi_map <- function(data) {
+  
+  communities <- c("Ninarumi","Puerto Almendra","Zungarococha","Llanchama")
+  
+  for (i in communities) {
+    data_s <- data %>% filter(poblado==i)
+  
+  ggmap::qmplot(longitud, latitud, 
+       data = data_s, 
+       
+       source="google", #stamen ########################### change here
+       maptype = "satellite",#"terrain",#"roadmap", ####### change here
+       zoom = 15,
+       #zoom = 13,
+       
+       alpha = I(.5),
+       extent = "panel") +#facet_wrap(~community_1)
+  theme(#legend.position=c(0.895,0.2),#"stamen" ############ change here
+        legend.margin = margin(0,0,0,0)#,axis.title.y=element_blank()
+        ) + 
+  #geom_point(color="red") +
+  #viridis::scale_color_viridis("median Ab\nresponse",#trans="log10",
+  #                             direction = -1) +
+  #scale_size_continuous("median Ab\nresponse") +
+  labs(title=i)
+
+
+  ggsave(paste0("figure/mapa_",i,"_r.png"))
+  }
+
+  
+}
+
+data %>% epi_map()
+
+```
+
+```{r,eval=FALSE}
+library(osmplotr)
+bbox <- get_bbox (c(-0.15, 51.5, -0.10, 51.52))
+bbox <- get_bbox (c(-0.15, 51.5, -0.10, 51.52))
+dat_B <- extract_osm_objects (key = 'building', bbox = bbox)
+map <- osm_basemap (bbox = bbox, bg = 'gray20')
+map <- add_osm_objects (map, dat_B, col = 'gray40')
+print_osm_map (map)
+```
+

@@ -1,0 +1,3257 @@
+---
+title: "unap-rafael"
+author: "Andree Valle Campos"
+date: '`r Sys.Date()`'
+output:
+  html_notebook:
+  #html_document:#pdf_document -> keep_tex: yes
+    fig_caption: yes
+    toc: yes
+    number_sections: true
+    toc_depth: 5
+    toc_float:
+      collapsed: yes
+    code_folding: "hide"
+    #df_print: paged
+bibliography: analysis/SeroMarker.bib
+biblio-style: apalike
+link-citations: yes
+csl: analysis/american-medical-association.csl
+---
+
+<!--
+
+HIGHLIGTHS
+- Niveles de anticuerpos de IgG total están asociados a una protección contra a la malaria sintomática.
+- Niveles de anticuerpos de la subclase IgG3 presentan la mayor asociación a la presencia de malaria sintomática.
+- Asintomáticos y sintomáticos presentan diferencias en el niveles y proporción de seropositivos para las subclases IgG1 e IgG3.
+
+ y debilmente asociada con la presencia de síntomas (IQR-AOR= 0.58, 95% CI= 0.29 – 1.17)
+
+ Sin embargo, se identificó que la subclase IgG3 estuvo una mayor asociación con la presencia de síntomas (IQR-AOR=1.61, 95% CI= 0.61 – 4.21)
+
+MANUSCRIPT NOTES:
+
+ Obtuvimos que pacientes asintomáticos presentan una mayor respuesta de anticuerpos IgG que pacientes sintomáticos (W= 539, p<0.05), inversamente correlacionada a la densidad de parásitos (rho= -0.42, p<0.01) y debilmente asociada con la presencia de síntomas (IQR-OR= 0.48, 95% CI= 0.19 – 1.21). Con respecto a las subclases, se observó un mayor nivel de respuesta y proporción de seropositivos en IgG1 e IgG3 sin diferencias entre sintomáticos y asintomáticos (P>0.05). Sin embargo, se identificó que la subclase IgG3 estuvo altamente asociada a la presencia de síntomas (IQR-OR=2.35, 95% CI= 0.80 – 6.89).
+
+- We used a multiple logistic regression and estimated odd ratios (OR) for each IgG subclass to determined the association between the symptomatic profile and intensity of antibody response
+
+We verified the association between the presence of symptomatic malaria, as a binary response, and the set of total IgG and subclasses as continuos predictors, using age and sex as adjustment covariates in the multivariate analysis. We performed a logistic regression with penalized maximum likelihood estimation
+
+3.4. Asociación de AU y asintomatología
+
+-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.path = "figure/unap-rafael-",
+                      warning = FALSE)
+#knitr::opts_knit$set(root.dir = '../.')
+
+options(width = 60) # expand limits of CONSOLE output
+
+#require(Hmisc)
+#mu <- markupSpecs$html   # markupSpecs is in Hmisc
+# hidden command (<code>r mu$widescreen()</code>) to use an entire wide screen. # mu$widescreen()
+#`r mu$widescreen()`
+```
+
+# ELISA STANDARDIZATION {#stdrad}
+
+## Aim
+
+* Principal: 
+    - Implement a reproducible standardization of OD values across ELISA plates following 
+    **Miura et.al., 2008**[@Miura2008].
+
+* Secondary: 
+    - Generate useful outputs to compare standardization quality.
+
+
+## To Do
+
+- Write methods for the manuscript.
+
+## Dependencies
+
+The required R packages for this analysis are:
+
++ `plater` [@plater]
++ `readxl` [@readxl]
++ `tidyxl` [@tidyxl]
++ `drc` [@Ritz2015]
+
+```{r, results='hide', message=FALSE}
+##essential
+library(tidyverse)    # set of tidy packages (readr, tibble, dplyr, tidyr, ggplot2, ¿purr?)
+library(tidyxl)       # read untidy excel formats
+library(readxl)       # read excel files as tidy tables
+library(drc)          # fit dose-response models
+library(mixtools)     # analyze finete mixture models
+##accesory
+library(DiagrammeR)   # create flowchart
+```
+
+```{r}
+theme_set(theme_bw())
+```
+
+
+## Method
+
+- using `DiagrammeR` [@DiagrammeR]
+
+```{r, fig.align='center', fig.width=9}
+#install.packages("DiagrammeR")
+#library(DiagrammeR)
+
+DiagrammeR("
+  graph LR
+    A[XLS data] -.-> |readxl+tidyxl| B{R data}
+    Z[CSV data] -.-> |plater| B{R data}
+    B --> C1[STD]
+    B --> E[ctr +/-]
+    B --> D1[UNK]
+    
+    C1 -.-> |drc| C2[4pLL model]
+    C2 --> C3[Box-Cox]
+    C3 --> F{UNK Ab.units}
+
+    D1 --> D2[mean.OD]
+    D2 --> D3[OD %CV]
+    D3 --> F
+    
+    F --> G1[Histogram]
+    F --> G2[Density]
+    F --> G3[QQPlot]
+
+    style Z fill:#ffffff, stroke:#000000, stroke-width:2px    
+    style A fill:#ffffff, stroke:#000000, stroke-width:2px
+    style B fill:#ffffff, stroke:#000000, stroke-width:2px
+    style C1 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style C2 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style C3 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style D1 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style D2 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style D3 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style E fill:#ffffff, stroke:#000000, stroke-width:2px
+    style F fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G1 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G2 fill:#ffffff, stroke:#000000, stroke-width:2px
+    style G3 fill:#ffffff, stroke:#000000, stroke-width:2px
+")
+```
+
+### Log-Logistic (4pLL) model
+
+The curve of the **log-logistic symetric** model describe the *response* `f(x)` dependent of the *dose* `x` 
+and **04 parameters**: $$ f(x)=f(x;b,c,d,e)=c+\frac{d-c}{1+\exp[b(log(x)-log(e))]}\ $$ where: 
+  
+- `c` is the **lower limit** of the response when the *dose* `x` approaches infinity, 
+- `d` is the **upper limit** when the *dose* `x` approaches zero,
+- `b` is the **slope** around the **point of inflection**, represented by 
+- `e` defined as **effective dose** and commmonly denoted as [@Ritz2015]:
+    + `ED50`, `EC50` or `IC50` for continuous responses,
+    + `LD50` or `LC50` for binomial responses, and
+    + $T_{50}$ for event-time responses.
+
+## Procedure
+
+**12 summary plots** per ELISA Template:
+
+- **3x3 plots** of STD and UNK distribution, residual variance distribution, and model transformation.
+- **1x3 plots** of OD~450nm~, mean.OD and Ab.units distributions by Density plots.
+
+```{r}
+getwd()
+```
+
+### phenotypes
+
+```{r}
+#x <- tidyxl::tidy_xlsx("data-raw/raw/unap-tesis/RAFAEL-data/TEMPLATES Rafael.xlsx")$data$`TEMPLATE ELISA N°1`
+x <- tidyxl::tidy_xlsx("data-raw/raw/unap-tesis/RAFAEL-data/TEMPLATES Rafael.xlsx")$data
+#str(x)
+
+y <- x[[3]] %>% #i
+  filter(row %in% 23:29,
+         col %in% 2:13) %>% 
+  dplyr::select(address,row,col,numeric,character,local_format_id) %>% 
+  unite(ID,c("numeric","character")) %>% 
+  mutate(ID= stringr::str_replace(ID,"_NA|NA_", ""),
+         Plate= paste0("N",3)) %>% #i
+  dplyr::select(Plate,everything()) %>% 
+  filter(!ID %in% c("C+","C-","NA","Blank")) #%>% group_by(ID) %>% slice(1) %>% ungroup()
+
+y <- y[FALSE,]
+#str(y)
+
+for(i in 1:length(x)){
+  
+  a <- x[[i]] %>% #i
+  filter(row %in% 23:29,
+         col %in% 2:13) %>% 
+  dplyr::select(address,row,col,numeric,character,local_format_id) %>% 
+  unite(ID,c("numeric","character")) %>% 
+  mutate(ID= stringr::str_replace(ID,"_NA|NA_", ""),
+         Plate= paste0("N",i)) %>% #i
+  dplyr::select(Plate,everything()) %>% 
+  filter(!ID %in% c("C+","C-","NA","Blank")) #%>% group_by(ID) %>% slice(1) %>% ungroup()
+  
+  y <- union(y,a)
+  
+}
+
+y <- y %>% arrange(Plate,row,col)
+#y %>% dplyr::count(Plate)
+#std.raw
+```
+
+```{r}
+y <- y %>%
+  #dplyr::count(ID) %>% dplyr::arrange(desc(n))
+  #filter(ID==2235)
+  #filter(ID==1856)
+  #filter(ID==3942)
+  mutate(pheno=ifelse(local_format_id %in% c(23,17,20,18,21,19,22),"asymptomatic",
+                      ifelse(local_format_id %in% c(68,69,70,71,72,73,24),"symptomatic",
+                             NA_character_)
+                      )
+         ) #%>% 
+  #filter(ID==2235)
+  #filter(pheno=="asymptomatic") #%>% dplyr::select(ID)
+  #mutate(pheno=ifelse(ID %in% . %>% filter(pheno=="asymptomatic") %>% dplyr::select(ID),"asym","sym"))
+
+w <- y %>% filter(pheno=="asymptomatic") %>% dplyr::select(ID)
+
+phe <- y %>% 
+  mutate(pheno= ifelse(ID %in% w$ID,"asymptomatic","symptomatic")) %>% # RESPETA pheno de PLACA 1 y 2 !
+  mutate(igg=ifelse(local_format_id %in% c(85),"igg1",
+                    ifelse(local_format_id %in% c(87),"igg2",
+                           ifelse(local_format_id %in% c(88,25),"igg3",
+                                  ifelse(local_format_id %in% c(90),"igg4",
+                                         "igg")
+                                  )
+                           )
+                    )
+         ) %>% #group_by(ID,igg) %>% slice(1) %>% ungroup() %>% 
+  dplyr::select(-local_format_id#,-address,-row,-col
+         ) %>% 
+  arrange(Plate,row,col) %>% 
+  mutate(Plate= as.factor(Plate)) %>% 
+  dplyr::select(-address,-starts_with("row"),-col#,-loc
+         ) %>% 
+  mutate(pheno=ifelse(Plate=="N2" | 
+                        Plate=="N6" | 
+                        Plate=="N7",
+                      "symptomatic",pheno)) # RESPETAR pheno POR PLACA (OJO: más de un pheno por paciente)
+  
+#filter(ID=="3053") # asympt in template 6 y 7
+  #dplyr::count(pheno,igg)
+  #dplyr::count(igg)
+  
+
+#phe# %>% dplyr::count(Plate)
+#phe %>% group_by(Plate) %>% slice(1)
+
+#phe %>% dplyr::count(Plate,pheno,igg) %>% arrange(Plate)
+```
+
+### data
+
+```{r,message=FALSE}
+wb_sheet <- readxl::excel_sheets("data-raw/raw/unap-tesis/RAFAEL-data/TEMPLATES Rafael.xlsx")
+
+all <- data_frame(ID=as.character(),
+                  OD=as.double(),
+                  Plate=as.character(),
+                  Type=as.character(),
+                  Ab.unit=as.double(),
+                  order=as.integer()
+                  )
+#str(all)
+
+# 2 GENERATE R DATA.FRAME
+for (j in 1:length(wb_sheet)) {
+  
+  wb_Pf_main <- readxl::read_xlsx("data-raw/raw/unap-tesis/RAFAEL-data/TEMPLATES Rafael.xlsx",
+                  range = "A21:M29",
+                  sheet = j)#j
+
+  wb_Pf <- readxl::read_xlsx("data-raw/raw/unap-tesis/RAFAEL-data/TEMPLATES Rafael.xlsx",
+                  range = "A35:M43",
+                  sheet = j)#j
+  
+  all_p <- wb_Pf_main %>% 
+  dplyr::rename(row="X__1") %>% 
+  gather(loc,ID,-row) %>% 
+  mutate(loc=as.numeric(loc)) %>% 
+  arrange(row,loc) %>% 
+  mutate(ID= ifelse(row == "H" & loc == 9, "Blank", ID)) %>% #ANOTACION AUSCENTE EN TEMPLATES
+  full_join(
+    wb_Pf %>% 
+      dplyr::rename(row="X__1") %>% 
+      gather(loc,OD,-row) %>% 
+      mutate(loc=as.numeric(loc)) %>% 
+      arrange(row,loc)
+  ) %>% 
+  mutate(Plate=paste0("N",j),#j
+         Type=ifelse(row=="A" | ID=="Blank","std",
+                     ifelse(ID=="C+" | ID=="C-","ctr","unk")),
+         Ab.unit=ifelse(row=="A",stringr::str_replace(ID,"STD 1/(.+)","\\1"),
+                    ifelse(ID=="Blank","0",NA_character_))
+         ) %>% 
+  mutate(Ab.unit=as.numeric(Ab.unit)) %>% 
+  mutate(Ab.unit=ifelse(row=="A",max(Ab.unit,na.rm=T)/Ab.unit,Ab.unit)) %>% #select(-row,-loc)
+  replace_na(list(ID = "na")) %>% 
+  filter(ID!="na") %>% 
+  mutate(order=seq(1,dim(.)[1])) %>% 
+  dplyr::select(#-address,
+         -starts_with("row"),#-col,
+         -loc)
+  
+  all <- union(all,all_p)
+  
+}
+
+all <- all %>% arrange(Plate,order)
+#all %>% dplyr::count(Type)
+```
+
+```{r}
+
+fin <- data_frame(Plate=as.character(),
+                  order=as.integer(),
+                  ID=as.character(),
+                  Type=as.character(),
+                  Ab.unit=as.double(),
+                  OD=as.double(),
+                  pheno=as.character(),
+                  igg=as.character()
+                  )
+#str(fin)
+
+for (j in 1:length(wb_sheet)) {
+  
+  fin_p <- full_join(phe %>% 
+            filter(Plate==levels(phe$Plate)[j]) %>% #requires j
+            mutate(order=seq(13,12+dim(.)[1])),
+          all %>% 
+            filter(Plate==levels(phe$Plate)[j]) %>% #requires j
+            filter(Type=="unk") %>% 
+            dplyr::select(-Plate,-ID),
+          by="order") %>% 
+    dplyr::select(Plate,order,ID,Type,Ab.unit,OD,pheno,igg)
+  
+  fin <- union(fin,fin_p)
+  
+}
+
+fin <- fin %>% arrange(Plate,order) #474
+
+# ------- fix 2235 issue ------- #  
+r <- fin %>% filter(ID!=2235) #454
+s <- fin %>% filter(ID==2235) %>% 
+  mutate(seq=rep(c(1,2),5,each=2)) %>% dplyr::select(Plate,order,ID,seq,everything()) %>% 
+  unite(ID,c(ID,seq)) #20
+fin <- union(r,s) %>% arrange(Plate,order) #474
+fin %>% filter(ID=="2235_1" | ID=="2235_2")
+# ------- fix 2235 issue ------- #
+
+#OJO!!!! MALA ANOTACIÓN
+#fin %>% filter(Plate=="N2") %>% dplyr::count(pheno)
+#fin %>% filter(Plate=="N2") %>% filter(pheno=="asymptomatic")
+#fin %>% dplyr::count(Plate)
+
+end <- fin %>% 
+  union(all %>% 
+          filter(Type!="unk") %>% 
+          dplyr::select(Plate,ID,Type,Ab.unit,OD,order) %>% 
+          mutate(pheno=NA_character_,
+                 igg=NA_character_)
+        ) %>% 
+  arrange(Plate,order) %>% 
+  dplyr::select(-order)
+
+#end #%>% filter(ID==2235)
+```
+
+```{r,eval=FALSE,echo=FALSE}
+#end %>% filter(Type=="unk") %>% dplyr::count(Plate,ID,pheno,igg) %>% arrange(ID,n)
+#end %>% filter(Type=="unk") %>% dplyr::count(Plate,pheno,igg) #%>% arrange(ID,n)
+#end %>% filter(Plate=="N5")
+#end %>% filter(Plate=="N6" & pheno=="asymptomatic") %>% arrange(ID)
+#end %>% filter(Plate=="N7" & pheno=="asymptomatic") %>% arrange(ID)
+#end %>% filter(ID=="3053" | ID=="9165") %>% arrange(ID)
+#end %>% filter(ID=="9801") %>% arrange(ID)
+#end %>% filter(Plate=="N2" & pheno=="asymptomatic") %>% arrange(ID)
+end %>% filter(ID=="3053" | ID=="9165" | ID=="9801") %>% arrange(ID)
+```
+
+### standarization
+
+```{r}
+# mod is mean  od (plus sd and cv)
+mod <- end %>% 
+  filter(Type=="unk") %>% 
+  group_by(Plate,igg,ID) %>% 
+  summarise_at(vars(OD),c("mean","sd")) %>% 
+  ungroup() %>% 
+  dplyr::rename(mean.OD="mean",
+                sd.OD="sd") %>% 
+  mutate(cv.OD=100*sd.OD/mean.OD) %>% 
+  mutate(order=seq(1,dim(.)[1]))
+  #filter(ID=="1570")
+
+mab <- end %>% 
+  filter(Type=="unk") %>% 
+  group_by(Plate,igg,ID) %>% 
+  slice(1) %>% 
+  ungroup() %>% #filter(ID=="1570")
+  mutate(order=seq(1,dim(.)[1])) %>% 
+  full_join(mod %>% dplyr::select(order,mean.OD,sd.OD,cv.OD),
+            by="order") %>% #mutate(test.id= ID.x==ID.y) %>% dplyr::count(test.id)
+  dplyr::select(-order,-OD) %>% 
+  mutate(ord=seq(1,dim(.)[1])) %>% 
+  unite(code,ID,ord,sep="_",remove = F)
+```
+
+```{r,eval=FALSE, echo=FALSE}
+#mab %>% dplyr::count(Plate,pheno,igg)
+#mab %>% dplyr::count(Plate,ID,pheno,igg)
+
+mab %>% filter(#ID=="2235" | 
+                 ID=="3053" | ID=="9165" | ID=="9801") %>% arrange(ID)
+```
+
+
+#### blank issue
+
+```{r}
+#mascara
+blk <- end %>% 
+  filter(ID=="Blank") %>% 
+  group_by(Plate) %>% slice(1) %>% ungroup() %>% 
+  dplyr::select(-OD)
+#media por par de blancos por placa
+std <- end %>% 
+  filter(ID=="Blank") %>% 
+  group_by(Plate) %>% 
+  summarise_at(vars(OD),mean,na.rm=T) %>% 
+  ungroup() %>% 
+  #dplyr::rename(mean.OD="OD") %>% 
+  full_join(blk,by="Plate") %>% 
+  dplyr::select(Plate,ID,Type,Ab.unit,OD,everything()) %>% 
+  union(end %>% filter(Type=="std" & ID!="Blank")) %>% 
+  arrange(Plate,Ab.unit) %>% 
+  mutate(Plate=as.factor(Plate))
+```
+
+#### 4pll per template
+
+```{r,message=FALSE}
+
+mab_ir <- NULL
+mod_bx <- NULL
+
+#
+# new dose levels as support for the line
+#mdo$Ab.units %>% summary()
+new_x <- expand.grid(exp(seq(log(0.1),log(2048),length=100)))
+# db to add predictions of all plates
+new <- data_frame(ord=as.character(),
+                  resp=as.double(),
+                  p=as.double(),
+                  pmin=as.double(),
+                  pmax=as.double(),
+                  Plate=as.character())
+#
+
+for (j in 1:length(levels(phe$Plate))) {
+  
+#
+# 5 PARAMETER ESTIMATION 4pLL model
+#
+wb.m1 <- drm(OD ~ Ab.unit, Plate, 
+               data= std %>% filter(Plate==levels(phe$Plate)[j]),#j
+             #data= std,
+               fct = LL.4(names = c("b", "c", "d", "e")))
+#
+wb.model <- wb.m1
+# 6 BOX-COX TRANSFORMATION against RESIDUAL heterogeneity
+wb.model.BX <- boxcox(wb.model, 
+                     main=expression("Optimal " ~ lambda ~ " with confidence intervals"), 
+                     plotit = FALSE)
+#coefficients(wb.model.BX) %>% matrix(7,4)
+mab_p <- mab %>% as.data.frame()
+# 7 UNK AB.UNITS ESTIMATION by INVERSE REGRESSION
+mir <- ED(wb.model.BX, 
+                 mab_p[mab_p$Plate==levels(phe$Plate)[j],"mean.OD"],#j
+                   #wb_MEAN[1:n,5],
+                   type = "absolute",interval = "delta",
+                   #clevel = "Pfal", 
+                 display = FALSE)
+  
+mab_ir <- rbind(mab_ir,mir)
+mod_bx <- rbind(mod_bx,coefficients(wb.model.BX))
+
+#
+# predictions and confidence intervals
+pdm <- predict(wb.model.BX, newdata = new_x, interval = "confidence")
+# new data with predictions
+new_p <- bind_cols(new_x %>% 
+                     as.tibble() %>% 
+                     rownames_to_column(var = "ord")
+                   , pdm %>% 
+                     as.tibble() %>% 
+                     rownames_to_column(var = "ord")
+                   ) %>%
+  dplyr::select(-ord1) %>% 
+  mutate(Plate=levels(phe$Plate)[j]) %>% 
+  dplyr::rename(resp=Var1,p=Prediction,pmin=Lower,pmax=Upper)
+
+new <- union(new,new_p)
+#
+
+}
+
+#mab
+#mab[mab$Plate==levels(phe$Plate)[1],] #%>% duplicated() %>% sum()
+
+# 7.1 FEED UNK AB.UNITS DATA.FRAME
+mdo <- mab_ir %>% as_tibble(rownames="rowname") %>% 
+  #dplyr::rename(ord=rowname) %>% 
+  separate(rowname,c("par","Plate","mean.OD.c"),sep = ":") %>% 
+  rownames_to_column("ord") %>% 
+  #mutate(ord=seq(1,dim(.)[1])) %>% 
+  full_join(mab %>% 
+              mutate(ord=as.character(ord)) %>% 
+              mutate(mean.OD.c=as.character(mean.OD))
+            ,
+            by = c("ord","Plate","mean.OD.c")) %>% 
+  dplyr::select(Plate,ord,ID,code,Type,pheno,igg,mean.OD,sd.OD,cv.OD,Ab.units=Estimate,
+         everything(),-par,-mean.OD.c,-Ab.unit) #%>% filter(ID=="2235_1" | ID=="2235_2")
+  #filter(!code=="2235_137") # MANUAL FILTERING of replicate on different templates
+
+mod_bt <- mod_bx %>% as.data.frame() %>% rownames_to_column() %>% as.tibble() %>% 
+  dplyr::rename(Plate=rowname) %>% 
+  mutate(Plate=stringr::str_replace(Plate,"(\\d)","N\\1"))
+
+new <- new %>% mutate(ord=as.numeric(ord)) %>% arrange(Plate,ord)
+```
+
+#### outputs
+
+```{r}
+#
+#fin
+#end
+#mod
+#mab
+
+# standard curve data
+std
+
+# estimated ab unit data
+mdo
+
+# estimated parameters per standard curve
+mod_bt
+
+# predicted model per standard curve 
+new
+```
+
+```{r,eval=FALSE,echo=FALSE}
+mdo %>% arrange(ID,Plate)
+mdo %>% group_by(ID) %>%  dplyr::count() %>% arrange(desc(n))
+mdo %>% filter(ID=="3053" | ID=="9165" | ID=="9801") %>% arrange(ID)
+#mdo %>% filter(ID=="2235" | ID=="1524" | ID=="1843") %>% arrange(desc(ID))
+end %>% filter(ID=="2235") %>% group_by(Plate) %>% dplyr::count(pheno,igg) #TIENE REPLICA EN OTRO TEMPLATE!!
+mdo %>% filter(ID=="2235") # data filtered
+```
+
+### quality control plots
+
+```{r}
+#std
+ctr <- end %>% filter(Type=="ctr")
+#ctr %>% filter(Plate==levels(phe$Plate)[1] & ID=="C+") %>% .$OD
+#std %>% filter(Plate==levels(phe$Plate)[1] & ID=="Blank") %>% .$OD
+```
+
+#### cv
+
+```{r, fig.height=4, fig.width=8}
+mdo %>% 
+  ggplot(aes(mean.OD,cv.OD,colour=Plate)) +
+  geom_point() +
+  coord_cartesian(ylim = c(0,100)) +
+  geom_hline(aes(yintercept=20),linetype="dashed",size=0.3) +
+  geom_vline(aes(xintercept=0.25),linetype="dashed",size=0.3) +
+  facet_wrap(~Plate,ncol = 4) +
+  labs(title="QC plot: Intra-plate coefficient of variation")
+```
+
+#### 4pll
+
+```{r, fig.height=4, fig.width=8}
+std %>% 
+  mutate(Ab.unit=ifelse(Ab.unit==0,0.5,Ab.unit)) %>% 
+  ggplot(aes(Ab.unit,OD)) +
+  geom_hline(aes(yintercept=OD,linetype=ID),data=ctr) +
+  geom_point(aes(colour=Plate)) +
+  geom_ribbon(data=new, aes(x=resp, y=p, ymin=pmin, ymax=pmax), alpha=0.2) +
+  geom_line(data=new, aes(x=resp, y=p, colour=Plate)) +
+  #coord_trans(x="log") +
+  scale_x_log10() +
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~Plate,ncol = 4) +
+  labs(title="QC plot: 4-parameter log-logistic model per plate")
+  #xlab("Ferulic acid (mM)") + ylab("Root length (cm)")
+```
+
+```{r,eval=FALSE}
+std %>% 
+  ggplot(aes(Ab.unit,OD,colour=Plate)) +
+  geom_point() +
+  facet_wrap(~Plate)
+```
+
+```{r, fig.height=5, fig.width=6, eval=FALSE}
+std %>% 
+  ggplot(aes(log10(Ab.unit),OD,colour=Plate)) +
+  geom_hline(aes(yintercept=OD,linetype=ID),ctr,size=0.3) +
+  geom_point() +
+  facet_wrap(~Plate)
+```
+
+```{r, fig.height=4, fig.width=8}
+mdo %>% 
+  ggplot(aes(Ab.units,mean.OD,colour=igg)) +
+  coord_cartesian(ylim = c(0,1)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin=Lower,xmax=Upper), colour="black", size=.2) +
+  scale_x_log10() +
+  facet_wrap(~Plate+pheno,nrow = 2) + 
+  labs(title="Estimates of antibody units (AU) per plate and phenotype")
+  # inverse regression method
+  #facet_wrap(igg~pheno,nrow = 2)
+```
+
+```{r, fig.height=4, fig.width=8,eval=FALSE,echo=FALSE}
+#### se
+mdo %>% 
+  mutate(std_error=Upper-Lower) %>% 
+  ggplot2::ggplot(aes(std_error,Ab.units, colour=Plate)) +
+  geom_point(alpha=0.5) +
+  #geom_histogram(#binwidth = 100,
+                 #breaks=seq(0, 3500, by = 100)
+                 #position = "fill"
+                 #) +
+  geom_vline(xintercept = 1000, #lwd=2,#col = "red", 
+             lty=3) +
+  facet_wrap(~Plate+pheno
+             ,nrow = 2#,scales = "free"
+             ) + 
+  #scale_x_log10() +
+  #scale_y_log10() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title="Standard errors of antibody units (AU) per plate and phenotype")
+```
+
+### distribution plots
+
+#### linear
+
+##### scale fix
+
+```{r,fig.width=10,fig.height=4}
+##### ab units
+a <- mdo %>% 
+  ggplot(aes(x=Ab.units,fill=pheno)) + theme_bw() #+
+  #scale_x_log10()
+
+b <- a +
+  geom_histogram(alpha=.5,position = "identity") + facet_grid(~igg)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_hist.png")
+
+c <- a + 
+  geom_density(alpha=.5,position = "identity") + facet_grid(~igg)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_dens.png")
+  #facet_wrap(transform~measure,scales = "free")
+
+Rmisc::multiplot(b,c,cols = 1)
+```
+
+
+##### scale free
+
+```{r,fig.width=10,fig.height=4}
+##### ab units
+a <- mdo %>% 
+  ggplot(aes(x=Ab.units,fill=pheno)) + theme_bw() #+
+  #scale_x_log10()
+
+b <- a +
+  geom_histogram(alpha=.5,position = "identity") + 
+  facet_wrap(~igg, scale= "free", ncol = 5)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_hist.png")
+
+c <- a + 
+  geom_density(alpha=.5,position = "identity") + 
+  facet_wrap(~igg, scale= "free", ncol = 5)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_dens.png")
+  #facet_wrap(transform~measure,scales = "free")
+
+Rmisc::multiplot(b,c,cols = 1)
+```
+
+
+```{r,fig.width=10,fig.height=4,eval=FALSE}
+##### od
+a <- mdo %>% 
+  ggplot(aes(x=mean.OD,fill=pheno)) + theme_bw() #+
+  #scale_x_log10()
+
+b <- a +
+  geom_histogram(alpha=.5,position = "identity") + facet_grid(~igg)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/od_hist.png")
+
+c <- a + 
+  geom_density(alpha=.5,position = "identity") + facet_grid(~igg)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/od_dens.png")
+  #facet_wrap(transform~measure,scales = "free")
+
+Rmisc::multiplot(b,c,cols = 1)
+```
+
+#### log
+
+##### scale fix
+
+```{r,fig.width=10,fig.height=4}
+##### ab units
+a <- mdo %>% 
+  ggplot(aes(x=Ab.units,fill=pheno)) + theme_bw() +
+  scale_x_log10()
+
+b <- a +
+  geom_histogram(alpha=.5,position = "identity") + facet_grid(~igg)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_hist.png")
+
+c <- a + 
+  geom_density(alpha=.5,position = "identity") + facet_grid(~igg)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_dens.png")
+  #facet_wrap(transform~measure,scales = "free")
+
+Rmisc::multiplot(b,c,cols = 1)
+```
+
+##### scale free
+
+```{r,fig.width=10,fig.height=4}
+##### ab units
+a <- mdo %>% 
+  ggplot(aes(x=Ab.units,fill=pheno)) + theme_bw() +
+  scale_x_log10()
+
+b <- a +
+  geom_histogram(alpha=.5,position = "identity") + 
+  facet_wrap(~igg, scale= "free", ncol = 5)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_hist.png")
+
+c <- a + 
+  geom_density(alpha=.5,position = "identity") + 
+  facet_wrap(~igg, scale= "free", ncol = 5)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/ab_dens.png")
+  #facet_wrap(transform~measure,scales = "free")
+
+Rmisc::multiplot(b,c,cols = 1)
+```
+
+```{r,fig.width=10,fig.height=4,eval=FALSE}
+##### od
+a <- mdo %>% 
+  ggplot(aes(x=mean.OD,fill=pheno)) + theme_bw() +
+  scale_x_log10()
+
+b <- a +
+  geom_histogram(alpha=.5,position = "identity") + facet_grid(~igg)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/od_hist.png")
+
+c <- a + 
+  geom_density(alpha=.5,position = "identity") + facet_grid(~igg)
+#ggsave("data-raw/raw/unap-tesis/RAFAEL-data/od_dens.png")
+  #facet_wrap(transform~measure,scales = "free")
+
+Rmisc::multiplot(b,c,cols = 1)
+```
+
+# COVARIATES
+
+```{r}
+cova <- readxl::read_xlsx("data-raw/raw/unap-tesis/RAFAEL-data/Base Rafael.xlsx",
+                  range = "A1:P59",
+                  sheet = 1) %>% 
+  slice(-1) %>% 
+  dplyr::rename(EDAD="X__1",SEXO="X__2") %>% 
+  rename_all(funs(stringr::str_to_lower(.))) %>% 
+  dplyr::select(codigo:gametocitos) %>% 
+  dplyr::select(codigo,condicion="condición",edad,sexo,comunidad,fiebre)
+```
+
+```{r}
+covb <- readxl::read_xlsx("data-raw/raw/unap-tesis/RAFAEL-data/DENSIDADES.xlsx",
+                  range = "A1:E59",
+                  sheet = 1) %>% 
+  slice(-1) %>% 
+  rename_all(funs(stringr::str_to_lower(.))) %>% 
+  dplyr::select(1:4) %>% 
+  dplyr::rename(par="parástios/ul de sangre") %>% 
+  dplyr::select(-4) %>% 
+  dplyr::rename(condicion="condición")
+```
+
+#### merge issues
+
+- __4 muestras__ con __incompatibilidad de covariables__ en __`edad`__ y __`sexo`__.
+    + prioridad: `parasitemia`
+    + retiro de observaciones con __`par`=0__
+- ¿variable `condición`?
+
+- SOLVE THIS!! AFFECTS [HERE](#tidy-up)
+
+```{r}
+#cova %>% glimpse()#dplyr::count(codigo,condicion)
+#covb %>% glimpse()#dplyr::count(codigo,condicion)
+
+#covx <- full_join(cova, covb, by="codigo")
+covx <- full_join(cova, covb, by=c("codigo","condicion")) %>% arrange(codigo) %>% 
+  filter(!(codigo=="2235" & sexo==0)) %>% 
+  mutate(edad=if_else(codigo=="2235" & par==2010,"40",edad),
+         condicion=as.factor(condicion)) %>% #modification: email 20oct2017
+  mutate(edad=if_else(codigo=="9801","26",edad),
+         sexo=if_else(codigo=="9801","0",sexo),
+         condicion=forcats::fct_recode(condicion,"asymptomatic"="0",
+                                       "symptomatic"="1")) %>% 
+  mutate(edad=as.numeric(edad)) %>% 
+  mutate(codigo=if_else(codigo=="2235" & edad==40,"2235_2",
+                        if_else(codigo=="2235" & edad==34,"2235_1",codigo))) %>% 
+  dplyr::rename(pheno=condicion) %>% dplyr::select(-comunidad,-fiebre) #%>% 
+  #filter(!(codigo=="2235" & edad==34)) #SOLUCION MAS FACIL? NO, SE PROCEDIO A AGREGAR SUFIJO A CODIGO
+covx %>% 
+  dplyr::select(codigo,pheno,par,edad,sexo) %>% 
+  #dplyr::count(codigo,pheno,par,edad,sexo) %>% arrange(desc(n)) %>% 
+  filter(codigo=="2235" | codigo=="3053" | codigo=="9165" | codigo=="9801") %>% 
+  arrange(codigo,edad)
+
+#covx %>% 
+#  dplyr::count(codigo) %>% arrange(desc(n)) %>% filter(n!=1)
+
+#covx %>% filter(codigo=="2235" | codigo=="3053" | codigo=="9165" | codigo=="9801") %>% arrange(codigo) %>% 
+#  dplyr::select(codigo,edad,sexo,par)
+#cova %>% filter(codigo=="2235" | codigo=="3053" | codigo=="9165" | codigo=="9801") %>% arrange(codigo) %>% dplyr::select(codigo,edad,sexo)
+#covb %>% filter(codigo=="2235" | codigo=="3053" | codigo=="9165" | codigo=="9801") %>% arrange(codigo) %>% dplyr::select(codigo,par)
+
+# par covariates finale
+covf <- covx %>% #filter(!(codigo=="2235" & par==0 | codigo=="3053" & par==0 | codigo=="9165" & par==0 | codigo=="9801" & par==0)) %>% 
+  dplyr::rename(ID=codigo)
+covf %>% glimpse()
+#covf %>% dplyr::count(comunidad)
+```
+
+```{r, eval=FALSE}
+mdo %>% glimpse()
+covf %>% #dplyr::count(ID)
+  filter(ID=="2235_1" | ID=="2235_2")
+mdo %>% #dplyr::count(ID) %>% arrange(desc(n))
+  filter(ID=="2235_1" | ID=="2235_2")
+```
+
+```{r}
+# MODIFY: cross info between pheno and condicion
+mco <- full_join(mdo,covf,by=c("ID","pheno")) %>% #dplyr::count(ID) %>% arrange(desc(n))
+  #dplyr::select(-condicion) %>% 
+  mutate(Ab.units_log=log10(Ab.units))
+mco %>% filter(ID=="2235_1" | ID=="2235_2")
+```
+
+#### test covariates
+
+```{r}
+# MODIFY???!!!!!
+mcv <- covx %>% #dplyr::count(codigo)
+  #filter(codigo=="2235" | codigo=="3053" | codigo=="9165" | codigo=="9801") %>% 
+  #filter(!(codigo=="2235" | 
+  #           codigo=="3053" | 
+  #           codigo=="9165" | 
+  #           codigo=="9801")) %>% 
+  #filter(codigo=="2235" | codigo=="3053" | codigo=="9165" | codigo=="9801") %>% 
+  arrange(codigo) %>% 
+  dplyr::select(codigo,pheno,edad,sexo,par) %>% 
+  dplyr::rename(ID=codigo) %>% 
+  full_join(mdo %>% 
+              group_by(ID) %>% 
+              slice(1) %>% 
+              ungroup()
+            ,by=c("ID","pheno")) %>% 
+  dplyr::select(ID,pheno,edad,sexo,par) %>% 
+  #mutate(sexo=forcats::fct_recode(sexo,
+  #                                "sex1"="1", "sex0"="0")) %>% 
+  mutate(sexo=as.factor(sexo),
+         pheno=as.factor(pheno),
+         edad=as.numeric(edad))
+```
+
+```{r,error=TRUE,eval=FALSE}
+mcv_u <- Hmisc::upData(mcv %>% dplyr::select(-ID),
+                         labels = c(edad="Age",
+                                    sexo="Sex",
+                                    par="Parasite density"
+                                    ),
+                         units = c(edad="(years)",
+                                   par="(par/uL)"
+                                   ),
+                         levels = list(pheno=list("Asymptomatic"="asymptomatic",
+                                                    "Symptomatic"="symptomatic"),
+                                       sexo=list("Female"="0",
+                                                    "Male"="1") #???
+                                       )
+                         )
+
+Hmisc::html(Hmisc::contents(mcv_u), maxlevels=10, levelType='table')
+```
+
+```{r,error=TRUE}
+s1 <- Hmisc::summaryM(sexo + edad + par ~ pheno,
+               data=mcv,#_u, #CORREGIRLO CON MUTATE Y RENAME
+               overall=FALSE, test=TRUE)
+
+Hmisc::latex(s1, caption='Sample covariates',
+      exclude1=TRUE, #npct='both', 
+      test=TRUE , prtest="P",file="",
+      digits=3, prn=FALSE,
+      #prmsd=TRUE, brmsd=TRUE, #msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = FALSE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%", html = TRUE, 
+      width="100%"
+      ) #change here for LaTeX PDF
+```
+
+```{r}
+readr::write_rds(mcv#_u
+                 ,"data/unap-rafa-covar.rds")
+```
+
+
+## solve reviewers issue
+
+```{r}
+readr::read_rds("data/unap-rafa-covar.rds")
+rawdb <- readr::read_rds("data/unap-rafael.rds") %>% as_tibble() %>% arrange(id) %>% 
+  filter(igg=="igg") %>% 
+  dplyr::select(2,3,edad:parasite_d)
+nexdb <- readxl::read_xlsx("data-raw/raw/unap-tesis/RAFAEL-data/rsaavedra_data-extra2.xlsx") %>% 
+  mutate(id=as.character(id)) %>% 
+  arrange(id) %>% 
+  filter(antibody=="igg") %>% 
+  rename_all(funs(make.names(.))) %>% #glimpse()
+  dplyr::select(id,carrier,age,sex,parasite.de,Fever,community:pcv..) %>% #glimpse()
+  mutate(sm_specifi = if_else(is.na(sm_specifi),"No",sm_specifi),
+         pcv_cat = if_else(pcv.. <30,"yes","no")) %>% 
+  mutate(carrier=as.factor(carrier),
+         sex=as.factor(sex),
+         community=as.factor(community),
+         Above.the.expected.height.weight=as.factor(Above.the.expected.height.weight),
+         Healthy=as.factor(Healthy),
+         helminths=as.factor(helminths),
+         self_medication=as.factor(self_medication),
+         Fever=as.factor(Fever),
+         sm_specifi=as.factor(sm_specifi),
+         pcv_cat = as.factor(pcv_cat)
+         ) %>% #%>% count(sm_specifi)
+  dplyr::select(-self_medication)
+qplot(x=age,data = nexdb)
+qplot(x=pcv..,data = nexdb)
+#getwd()
+#rawdb %>% inner_join(nexdb)
+#rawdb %>% anti_join(nexdb)
+#nexdb %>% anti_join(rawdb)
+library(compareGroups)
+
+compareGroups(carrier ~ ., 
+                data = nexdb
+                ,method = c(parasite.de = 2,age = 2)
+  ) %>% 
+  createTable(show.all = T, show.n = T) %>% 
+  export2xls("data/unap-rafa-covar-table.xls")
+
+setwd("D:/0proyectos/R_/elixr")
+
+
+######################PENDIENTE:BASE para MODELO#######################-
+
+
+trudb <- readr::read_rds("data/unap-rafael.rds") %>% as_tibble() %>% arrange(id) %>% 
+  #count(id) %>% arrange(desc(n))
+  dplyr::select(-parasite_d, #-edad, #-sexo,
+         #-carrier, 
+         -contains("od")) %>% #count(id) %>% arrange(desc(n))
+  
+  #filter(id=="3053" | id=="9165") %>% arrange(id,igg) %>% 
+  #group_by(id,igg) %>% 
+  #filter(ab.se == min(ab.se)) %>% 
+  #ungroup() %>% 
+  
+  dplyr::select(-plate,-ab.se,-serology) %>% 
+  spread(igg,ab) %>% arrange(id) #%>% count(id) %>% arrange(desc(n))
+
+nexdb %>% count(id) %>% arrange(desc(n))
+trudb %>% count(id) %>% arrange(desc(n))
+
+nexdb %>% filter(id=="9801")
+
+nexdb %>% mutate(l=str_length(id)) %>% count(l)
+trudb %>% mutate(l=str_length(id)) %>% count(l)
+
+nexdb %>% arrange(id) %>% print(n=Inf)
+trudb %>% arrange(id) %>% print(n=Inf)
+
+```
+
+
+# SEROLOGICAL CLASSIFICATION
+
+## To Do
+
+- Implement the mean / ROC / mixture models method
+
+## mixtools
+
+### check distributions
+
+```{r,fig.width=7,fig.height=2.5}
+a <- mco %>% #filter(igg=="igg3") %>% 
+  ggplot(aes(x=Ab.units
+             #,fill=pheno
+             #,fill=igg
+             )) + theme_bw() +
+  #scale_x_log10() +
+  geom_density(alpha=.5,position = "identity") +
+  geom_histogram(aes(x=Ab.units,..density..),
+                 alpha=.5,position = "identity") +
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title="AU linear distribution")
+
+b <- mco %>% #filter(igg=="igg3") %>% 
+  ggplot(aes(sample=Ab.units
+             #,fill=pheno
+             #,fill=igg
+             )) +
+  geom_qq(alpha=.2) +
+  geom_qq_line(line.p = c(0.25, 0.75)) +
+  labs(title="Gaussian quantile-quantile plot") +
+  coord_cartesian(ylim = c(0,2000))
+
+Rmisc::multiplot(a,b,cols = 2)
+```
+
+
+```{r,fig.width=10,fig.height=2.2}
+mco %>% 
+  ggplot(aes(x=Ab.units
+             #,fill=pheno
+             )) + theme_bw() +
+  #scale_x_log10() +
+  geom_density(alpha=.5,position = "identity",adjust= 1/2
+               ) + 
+  geom_histogram(aes(x=Ab.units,..density..),
+                 alpha=.5,position = "identity") + 
+  facet_wrap(~igg, scales = "free",ncol = 5) +
+  labs(title="AU linear distribution per IgG subtype")
+```
+
+### apply mixtools
+
+```{r}
+# source: http://tinyheero.github.io/2015/10/13/mixture-model.html
+f <- mco %>% mutate(igg=as.factor(igg)) %>% 
+  mutate(igg=forcats::fct_relevel(igg,"igg","igg1","igg2","igg3")) %>% .$igg
+
+#library("mixtools")
+
+#' Plot a Mixture Component
+#' 
+#' @param x Input data
+#' @param mu Mean of component
+#' @param sigma Standard deviation of component
+#' @param lam Mixture weight of component
+plot_mix_comps <- function(x, mu, sigma, lam) {
+  lam * dnorm(x, mu, sigma)
+}
+
+set.seed(1)
+#length(levels(f))
+#wait <- mco %>% filter(igg=="igg2") %>% 
+#  .$Ab.units %>% log()
+
+llmix <- data_frame(igg=as.character(),
+                    kpr=as.numeric(),
+                    lik=as.numeric())
+for (j in 2:3) {
+    
+    mixmdl_p <- normalmixEM(mco %>% 
+                              #filter(igg==levels(f)[i]) %>% 
+                              .$Ab.units #%>% log10()
+                            , 
+                            k = j)
+    llmix <- llmix %>% 
+      union(data_frame(igg="all",#levels(f)[i],
+                       kpr=j,
+                       lik=mixmdl_p$loglik))
+    
+  }
+llmix %>% arrange(igg,desc(lik)) %>% mutate(aic=2*kpr-2*lik)
+
+#
+llmix <- data_frame(igg=as.character(),
+                    kpr=as.numeric(),
+                    lik=as.numeric())
+for (i in 1:length(levels(f))) {
+  
+  for (j in 2:3) {
+    
+    mixmdl_p <- normalmixEM(mco %>% 
+                              filter(igg==levels(f)[i]) %>% 
+                              .$Ab.units #%>% log10()
+                            , 
+                            k = j)
+    llmix <- llmix %>% 
+      union(data_frame(igg=levels(f)[i],
+                       kpr=j,
+                       lik=mixmdl_p$loglik))
+    
+  }
+  
+}
+llmix %>% arrange(igg,desc(lik)) %>% mutate(aic=2*kpr-2*lik) #%>% 
+  #group_by(igg) %>% filter(lik==max(lik))
+
+#mixmdl <- normalmixEM(wait, k = 3)
+#mixmdl$loglik
+```
+
+```{r,fig.height=3,fig.width=12}
+### FOR ALL AB.UNITS (NO IGG SUBTYPES)
+set.seed(1)
+
+#for (i in 1:length(levels(f))) {
+  
+wait <- mco %>% #filter(igg==levels(f)[i]) %>% 
+  .$Ab.units #%>% log10()
+mixmdl <- normalmixEM(wait, k = 3)
+###
+r <- data.frame(x = mixmdl$x) %>%
+  ggplot() +
+  geom_histogram(aes(x, ..density..), 
+                 #binwidth = 1, 
+                 #colour = "black", 
+                 #fill = "gray",
+                 alpha=.5,position = "identity"
+                 ) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[1], 
+                            mixmdl$sigma[1], 
+                            lam = mixmdl$lambda[1]),
+                colour = "green", lwd = 1.5) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[2], 
+                            mixmdl$sigma[2], 
+                            lam = mixmdl$lambda[2]),
+                colour = "blue", lwd = 1.5) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[3], 
+                            mixmdl$sigma[3], 
+                            lam = mixmdl$lambda[3]),
+                colour = "red", lwd = 1.5) +
+  ylab("Density") +
+  xlab("Ab.units") +
+  labs(title= paste0("Ab.units: ",
+                     #ifelse(levels(f)[i]=="igg","IgG ",
+                      #      ifelse(levels(f)[i]=="igg1","IgG1 ",
+                        #           ifelse(levels(f)[i]=="igg2","IgG2 ",
+                         #                 ifelse(levels(f)[i]=="igg3","IgG3 ","IgG4 ")
+                          #                )
+                          #         )
+                          #  ),
+                     "3-component distribution"
+                     #,": LogLik=",
+                     #mixmdl$loglik %>% format(digits=3)
+                     )) 
+  #+ scale_x_log10()
+
+####
+u <- 0.90 # 90% classification probability
+
+post.df <- as.data.frame(cbind(x = mixmdl$x, mixmdl$posterior)) %>% 
+  mutate(comp.12=comp.1+comp.2) %>% # sum probabilities of s+ and s++
+  mutate(label = ifelse(comp.3 > u, "s-", 
+                        ifelse(comp.12 > u, "s+", "s0"
+                               #ifelse(comp.1 > u,"s++","s0")
+                               ))) %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s0","s+"#,"s++"
+                                    ))
+
+s <- post.df %>% 
+  ggplot(aes(x = factor(label))) +
+  geom_bar() +
+  xlab("Component") +
+  ylab("Number of Data Points") +
+  labs(title="Classification")
+
+###
+t <- post.df %>% 
+  ggplot() +
+  #geom_line(aes(x,comp.1), colour="green", lwd = 1.5) +
+  #geom_line(aes(x,comp.2), colour="blue", lwd = 1.5) +
+  geom_line(aes(x,comp.12), colour="blue", lwd = 1.5) +
+  geom_line(aes(x,comp.3), colour="red", lwd = 1.5) +
+  geom_hline(yintercept = u, col = "black") +
+  #geom_vline(xintercept = cutoffs[2], col = "black", lty=3) +
+  #geom_vline(xintercept = cutoffs[1], col = "black", lty=3) +
+  xlab("Ab.units") +
+  ylab("classification probability") +
+  labs(title="Cutoff")
+
+Rmisc::multiplot(r,t,s,cols = 3)
+  
+#}
+
+#sum(mco$Ab.units_log == mixmdl$x)
+#length(mixmdl$x)
+#sum(!post.df$x==mco$Ab.units_log)
+
+msr <- inner_join(mco %>% rownames_to_column(),
+           post.df %>%
+             #dplyr::rename(Ab.units_log=x) %>% 
+             dplyr::select(#Ab.units_log,
+                           label) %>% 
+             rownames_to_column(),
+           by="rowname") #%>% 
+  #mutate(test= Ab.units_log.x==Ab.units_log.y) %>% dplyr::count(test)
+
+msr <- msr[FALSE,] #%>% glimpse()
+```
+
+### 2-component
+
+```{r,fig.height=3,fig.width=12,eval=FALSE}
+
+set.seed(1)
+
+for (i in 1:length(levels(f))) {
+  
+wait <- mco %>% filter(igg==levels(f)[i]) %>% 
+  .$Ab.units #%>% log10()
+mixmdl <- normalmixEM(wait, k = 3)
+###
+r <- data.frame(x = mixmdl$x) %>%
+  ggplot() +
+  geom_histogram(aes(x, ..density..), 
+                 #binwidth = 1, 
+                 #colour = "black", 
+                 #fill = "gray",
+                 alpha=.5,position = "identity"
+                 ) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[1], 
+                            mixmdl$sigma[1], 
+                            lam = mixmdl$lambda[1]),
+                colour = "red", lwd = 1.5) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[2], 
+                            mixmdl$sigma[2], 
+                            lam = mixmdl$lambda[2]),
+                colour = "blue", lwd = 1.5) +
+  #stat_function(geom = "line", 
+  #              fun = plot_mix_comps,
+  #              args = list(mixmdl$mu[3], 
+  #                          mixmdl$sigma[3], 
+  #                          lam = mixmdl$lambda[3]),
+  #              colour = "green", lwd = 1.5) +
+  ylab("Density") +
+  xlab("Ab.units") +
+  labs(title= paste0(ifelse(levels(f)[i]=="igg","IgG: ",
+                            ifelse(levels(f)[i]=="igg1","IgG1: ",
+                                   ifelse(levels(f)[i]=="igg2","IgG2: ",
+                                          ifelse(levels(f)[i]=="igg3","IgG3 ","IgG4: ")
+                                          )
+                                   )
+                            ),
+                     "3-component distribution"
+                     #,": LogLik=",
+                     #mixmdl$loglik %>% format(digits=3)
+                     )) 
+  #+ scale_x_log10()
+
+####
+u <- 0.90 # 90% classification probability
+
+post.df <- as.data.frame(cbind(x = mixmdl$x, mixmdl$posterior)) %>% 
+  mutate(comp.sp=ifelse(mean(comp.2)>100,
+                        comp.2+comp.3,
+                        comp.1+comp.2)) %>% # sum probabilities of s+ and s++
+  mutate(label = ifelse(comp.1 > u, "s-", 
+                        #ifelse(comp.sp > u, "s+", "s0"
+                        ifelse(comp.2 > u, "s+", "s0"
+                               #ifelse(comp.1 > u,"s++","s0")
+                               ))) %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s0","s+"#,"s++"
+                                    )) 
+
+s <- post.df %>% 
+  ggplot(aes(x = factor(label))) +
+  geom_bar() +
+  xlab("Component") +
+  ylab("Number of Data Points") +
+  labs(title="Classification")
+
+###
+t <- post.df %>% 
+  ggplot() +
+  #geom_line(aes(x,comp.1), colour="green", lwd = 1.5) +
+  geom_line(aes(x,comp.2), colour="blue", lwd = 1.5) +
+  #geom_line(aes(x,comp.sp), colour="blue", lwd = 1.5) +
+  geom_line(aes(x,comp.1), colour="red", lwd = 1.5) +
+  geom_hline(yintercept = u, col = "black") +
+  #geom_vline(xintercept = 63.6, col = "black", lty=3) +
+  #geom_vline(xintercept = 69.7, col = "black", lty=3) +
+  xlab("Ab.units") +
+  ylab("classification probability") +
+  labs(title="Cutoff")
+
+
+###
+msr_p <- inner_join(mco %>%
+                    filter(igg==levels(f)[i]) %>% 
+                    rownames_to_column(),
+           post.df %>%
+             #dplyr::rename(Ab.units_log=x) %>% 
+             dplyr::select(#Ab.units_log,
+                           label) %>% 
+             rownames_to_column(),
+           by="rowname") #%>% 
+  #mutate(test= Ab.units_log.x==Ab.units_log.y) %>% dplyr::count(test)
+
+
+msr <- union(msr, msr_p)
+
+
+Rmisc::multiplot(r,t,s,cols = 3)
+  
+}
+```
+
+### three component distribution
+
+- Possible mistake for __IgG2__ and __IgG4__: 
+    + Definition of _S-_ using only the 1st component and _S+_ using the 2nd and 3rd one, as was standardized for all the `igg subtypes`.
+    + __CORRECTION__: If 2nd component have a mean AU __lower than an ARBITRARY THRESHOLD__, define _S+_ as the sum of only the 3rd component probabilities.
+        - RESULT: a threshold of __100__ give results as expected for `igg2` and `igg4` seropositivity.
+            + IN REFERENCE: __Rouhani 2015 (figure 2)__.
+            + ACHIEVED CRITERIA: lower proportion of indetermined serology `s0`
+        - ALTERNATIVE: a threshold of __40__ may be convinient for `igg4` in order to explain its:
+            + significantly higher mean AU in symptomatics, and
+            + strong association to symptomatic susceptibility.
+            + According to the component CLASSIFICATION CRITERIA based on the proportion of `s0`, which is higher than the previous threshold, this is not the best classification.
+            + However, if a boost or other phenomena (including a different genotype within the study population) that increase the proportion of IgG4 during a symptomatic episode is assumed, this may be the right one.
+            + Interestingly, this 2nd component is full of symptomatic samples.
+    + NOTE: Even though the mean of the 2nd component is higher than 100, for `igg` the threshold of seropositivity is lower than 40 AU, under the right criteria.
+
+
+```{r,fig.height=3,fig.width=12}
+set.seed(1)
+
+# i= 3
+for (i in 1:length(levels(f))) {
+  
+wait <- mco %>% filter(igg==levels(f)[i]) %>% 
+  .$Ab.units #%>% log10()
+mixmdl <- normalmixEM(wait, k = 3)
+###
+r <- data.frame(x = mixmdl$x) %>%
+  ggplot() +
+  geom_histogram(aes(x, ..density..), 
+                 #binwidth = 1, 
+                 #colour = "black", 
+                 #fill = "gray",
+                 alpha=.5,position = "identity"
+                 ) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[1], 
+                            mixmdl$sigma[1], 
+                            lam = mixmdl$lambda[1]),
+                colour = "red", lwd = 1.5) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[2], 
+                            mixmdl$sigma[2], 
+                            lam = mixmdl$lambda[2]),
+                colour = "blue", lwd = 1.5) +
+  stat_function(geom = "line", 
+                fun = plot_mix_comps,
+                args = list(mixmdl$mu[3], 
+                            mixmdl$sigma[3], 
+                            lam = mixmdl$lambda[3]),
+                colour = "green", lwd = 1.5) +
+  ylab("Density") +
+  xlab("Ab.units") +
+  labs(title= paste0(ifelse(levels(f)[i]=="igg","IgG: ",
+                            ifelse(levels(f)[i]=="igg1","IgG1: ",
+                                   ifelse(levels(f)[i]=="igg2","IgG2: ",
+                                          ifelse(levels(f)[i]=="igg3","IgG3 ","IgG4: ")
+                                          )
+                                   )
+                            ),
+                     "3-component distribution"
+                     #,": LogLik=",
+                     #mixmdl$loglik %>% format(digits=3)
+                     )) 
+  #+ scale_x_log10()
+
+####
+u <- 0.90 # 90% classification probability
+
+post.df <- as.data.frame(cbind(x = mixmdl$x, mixmdl$posterior)) %>% 
+  #mutate(comp.12=comp.1+comp.2,
+  #       comp.23=comp.2+comp.3) %>% 
+  mutate(comp.sp=if_else(rep(mixmdl$mu[2]>40,length(mixmdl$x)), # UMBRAL ARBITRARIO!!
+                        comp.2+comp.3, # sero+ equals to the sum of comp 2+3
+                        comp.3)) %>% # sero+ equals to the sum of comp 3
+  mutate(comp.sn=if_else(rep(mixmdl$mu[2]>40,length(mixmdl$x)),
+                        comp.1, # sero- equals to the sum of comp 1
+                        comp.1+comp.2)) %>% # sero+ equals to the sum of comp 1+2
+  mutate(label = if_else(comp.sn > u, "s-", 
+                        ifelse(comp.sp > u, "s+", "s0"
+                        #ifelse(comp.2 > u, "s+", #"s0"
+                               #ifelse(comp.1 > u,"s++","s0")
+                               ))) %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s0","s+"#,"s++"
+                                    )) 
+
+s <- post.df %>% 
+  ggplot(aes(x = factor(label))) +
+  geom_bar() +
+  xlab("Component") +
+  ylab("Number of Data Points") +
+  labs(title="Classification")
+
+###
+t <- post.df %>% 
+  ggplot() +
+  #geom_line(aes(x,comp.1), colour="green", lwd = 1.5) +
+  #geom_line(aes(x,comp.2), colour="blue", lwd = 1.5) +
+  #geom_point(aes(x,comp.sp), colour="blue", lwd = 1.5) +
+  geom_line(aes(x,comp.sp), colour="blue", lwd = 1.5) +
+  #geom_point(aes(x,comp.sn), colour="red", lwd = 1.5) +
+  geom_line(aes(x,comp.sn), colour="red", lwd = 1.5) +
+  geom_hline(yintercept = u, col = "black") +
+  #geom_vline(xintercept = 63.6, col = "black", lty=3) +
+  #geom_vline(xintercept = 69.7, col = "black", lty=3) +
+  xlab("Ab.units") +
+  ylab("classification probability") +
+  labs(title="Cutoff")
+
+
+###
+msr_p <- inner_join(mco %>%
+                    filter(igg==levels(f)[i]) %>% 
+                    rownames_to_column(),
+           post.df %>%
+             #dplyr::rename(Ab.units_log=x) %>% 
+             dplyr::select(#Ab.units_log,
+                           label) %>% 
+             rownames_to_column(),
+           by="rowname") #%>% 
+  #mutate(test= Ab.units_log.x==Ab.units_log.y) %>% dplyr::count(test)
+
+
+msr <- union(msr, msr_p)
+
+
+Rmisc::multiplot(r,t,s,cols = 3)
+  
+}
+```
+
+# DATA FRAME
+
+```{r,eval=FALSE,echo=FALSE}
+#mco %>% glimpse()
+#msr %>% glimpse()
+msr %>% dplyr::count(ID)
+covx %>% dplyr::count(codigo)
+msr %>% dplyr::select(ID) %>% mutate(data="msr") %>% 
+  full_join(covx %>% dplyr::select(ID=codigo) %>% mutate(data="covx"),by="ID")
+```
+
+```{r}
+msr_write <- msr %>% #dplyr::count(ID)
+  #full_join(mcv %>% dplyr::select(-par),by=c("ID","pheno")) %>% #arrange(ID)
+  mutate(ord=as.numeric(ord)) %>%  arrange(ord) %>% 
+  dplyr::select(-Ab.units_log, -rowname) %>%
+  rename_all(funs(stringr::str_to_lower(.))) %>% 
+  mutate(label=forcats::fct_recode(label,"posit"="s+","negat"="s-","indet"="s0")) %>% 
+  dplyr::rename(serology=label,
+                parasite_d=par, n=ord,
+                id_n=code,carrier=pheno,
+                od.mean=mean.od,od.sd=sd.od,od.cv=cv.od,
+                ab=ab.units,ab.se=`std. error`,ab.lci=lower,ab.uci=upper#,
+                ) %>% #filter(id=="9165") %>% arrange(igg)
+  #dplyr::count(id) %>% arrange(desc(nn))
+  dplyr::select(-type,-n,-id_n,-ends_with("ci")) %>% arrange(id) %>% 
+  glimpse()
+
+#summary(mdo)
+readr::write_csv(
+  msr_write,"data/unap-rafael.csv")
+readr::write_rds(
+  msr_write, "data/unap-rafael.rds")
+```
+
+```{r}
+summary(msr_write)
+# CHECK 2235 ISSUE
+msr_write %>% filter(id=="2235_1" | id=="2235_2")
+msr_write %>% filter(id=="3053" | id=="9165" | id=="9801")
+# CHECK if no NA in age and sex
+msr_write %>% dplyr::select(1:4,edad:serology) %>% arrange(id) %>% filter(is.na(edad))
+#covx
+```
+
+
+# STATISTICAL ANALYSIS PLAN
+
+## To Do
+
+- Do it
+
+## Sample size
+
+```{r}
+mco %>% 
+  group_by(igg) %>% dplyr::count(pheno)
+```
+
+
+## Test Hypothesis
+
+### Mean AU
+
+```{r, message=FALSE,fig.width=4,fig.height=2.2}
+mco %>% #filter(igg==levels(f)[1]) %>% 
+  mutate(igg=forcats::fct_recode(igg,
+                                 "IgG"="igg",
+                                 "IgG1"="igg1",
+                                 "IgG2"="igg2",
+                                 "IgG3"="igg3",
+                                 "IgG4"="igg4"
+                                 ),
+         pheno=forcats::fct_recode(pheno,
+                                   "Asymptomatic"="asymptomatic",
+                                   "Symptomatic"="symptomatic")) %>%
+  ggplot(aes(igg,Ab.units)) +
+  geom_boxplot(#position=position_dodge(0.8)
+  ) +
+  geom_dotplot(#aes(fill=sev_WHO), 
+    binaxis='y', stackdir='center', alpha=.3, 
+    dotsize=1#, position=position_dodge(0.8)
+  ) +
+  scale_y_log10() +
+  
+  #labs(title="Test AU mean equality among phenotypes per IgG subtypes") +
+  xlab("IgG subclass") + ylab("Antibody units (log scale)")
+```
+
+
+```{r mean_au,message=FALSE,fig.width=10,fig.height=2.2}
+f <- mco %>% mutate(igg=as.factor(igg)) %>% .$igg
+
+#mco <- mco %>% 
+#  #dplyr::select(Ab.units,par) %>% 
+#  mutate(Ab.units=log10(Ab.units),par=log10(par)) %>% 
+#  filter(par!=-Inf) #%>% 
+
+stt <- data_frame(##estimate=as.double(),
+                  ##estimate1=as.double(),
+                  ##estimate2=as.double(),
+                  statistic=as.double(),
+                  p.value=as.double(),
+                  #parameter=as.double(),#
+                  #conf.low=as.double(),#
+                  #conf.high=as.double(),#
+                  method=as.factor(NULL),
+                  alternative=as.factor(NULL),
+                  igg=as.character(),
+                  lab=as.character())
+
+for (l in 1:length(levels(f))) {
+  
+## Primero, Prueba de Hipótesis para comparar varianzas:
+i <- mco %>% filter(igg==levels(f)[l]) %>% 
+  var.test(Ab.units_log ~ pheno, data = .) %>% broom::tidy()
+## Rpta: Bajo n.s. 0.05, F cae en Región de no-Rechazo de Hipótesis Nula (RnoRHo)
+## Conclusión: Supuesto de igualdad de varianzas poblacionales SÍ es válido
+## Segundo, Prueba de Hipótesis para comparar medias:
+j <- mco %>% filter(igg==levels(f)[l]) %>% 
+  #t.test(Ab.units_log ~ pheno, data = ., var.equal= i$p.value>0.05) %>%
+  #wilcox.test(Ab.units_log ~ pheno, data = .) %>%#, 
+  wilcox.test(Ab.units ~ pheno, data = .) %>%#, 
+              #conf.int=TRUE) %>% 
+  broom::tidy() %>%  #%>% format(digits=2)
+  dplyr::select(-starts_with("estimate")) %>% 
+  mutate(igg=levels(f)[l],
+         lab= paste0(#"t=",#should be done -> mix variance equality test
+                     #"W=",#non-parametric used in literature
+                     #statistic %>% format(digits=2),
+                     #", df=",parameter %>% format(digits=2),
+                     #", P",ifelse(p.value<0.001,"<0.001",
+                     "italic('P')",ifelse(p.value<0.001,"<0.001",
+                                  paste0("==",p.value %>% format(digits=2))
+                                  )
+                     )
+         )
+
+stt <- stt %>% union(j)
+
+}
+
+stt <- stt %>% arrange(igg) %>% dplyr::select(igg,everything()) %>% 
+  mutate(x=.5,
+         y=.15) %>% 
+  mutate(igg=forcats::fct_recode(igg,
+                                 "IgG"="igg",
+                                 "IgG1"="igg1",
+                                 "IgG2"="igg2",
+                                 "IgG3"="igg3",
+                                 "IgG4"="igg4"
+                                 ))
+
+# plot
+mco %>% #filter(igg==levels(f)[1]) %>% 
+  mutate(igg=forcats::fct_recode(igg,
+                                 "IgG"="igg",
+                                 "IgG1"="igg1",
+                                 "IgG2"="igg2",
+                                 "IgG3"="igg3",
+                                 "IgG4"="igg4"
+                                 ),
+         pheno=forcats::fct_recode(pheno,
+                                   "Asymptomatic"="asymptomatic",
+                                   "Symptomatic"="symptomatic")) %>%
+  ggplot(aes(pheno,Ab.units)) +
+  geom_boxplot(#position=position_dodge(0.8)
+  ) +
+  geom_dotplot(#aes(fill=sev_WHO), 
+    binaxis='y', stackdir='center', alpha=.3, 
+    dotsize=1#, position=position_dodge(0.8)
+  ) +
+  
+  facet_wrap(~igg,ncol = 5) + 
+  
+  geom_text(aes(x,y,label=lab),data = stt,parse = T,
+            #vjust=.5,hjust=0.05,size=3.5) +
+            vjust=.5,hjust=0.05,size=3.5) + # if log10, then change it.
+  
+  #coord_cartesian(ylim = c(-300,2000)) + # if log10, then change it.
+  scale_y_log10() +
+  
+  #labs(title="Test AU mean equality among phenotypes per IgG subtypes") +
+  xlab("Carrier") + ylab("Antibody units (log scale)")
+ggsave("figure/unap-rafael-mean_au.png")
+```
+
+- nota:
+    + prueba de hipotesis no-paramétrica
+    + ploteo en escala logística
+
+```{r}
+msr %>% group_by(igg) %>% dplyr::summarise(min=min(Ab.units),
+                                          q25=quantile(Ab.units) %>% .[2],
+                                          mean=mean(Ab.units),
+                                          q50=quantile(Ab.units) %>% .[3],
+                                          q75=quantile(Ab.units) %>% .[4],
+                                          max=max(Ab.units))
+```
+
+```{r}
+msr %>% group_by(igg,pheno) %>% dplyr::summarise(min=min(Ab.units),
+                                          q25=quantile(Ab.units) %>% .[2],
+                                          mean=mean(Ab.units),
+                                          q50=quantile(Ab.units) %>% .[3],
+                                          q75=quantile(Ab.units) %>% .[4],
+                                          max=max(Ab.units))
+```
+
+### Proportion sero+
+
+```{r}
+msr %>% dplyr::count(igg,label) %>% 
+  group_by(igg) %>% mutate(tot=sum(n),prop= (n*100)/(sum(n))) %>% 
+  filter(label=="s+")
+```
+
+```{r,fig.width=5.25,fig.height=2.5}
+msr %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=igg,fill=label)) +
+  geom_bar(position = "fill") +
+  #facet_grid(~igg) +
+  labs(title="Proportion of seropositives per IgG subtype")
+```
+
+```{r}
+msr_sp_lab <- msr %>% 
+    mutate(igg=forcats::fct_recode(igg,
+                                 "IgG"="igg",
+                                 "IgG1"="igg1",
+                                 "IgG2"="igg2",
+                                 "IgG3"="igg3",
+                                 "IgG4"="igg4"
+                                 ),
+         pheno=forcats::fct_recode(pheno,
+                                   "Asymptomatic"="asymptomatic",
+                                   "Symptomatic"="symptomatic")) %>%
+  dplyr::count(igg,pheno,label) %>% 
+  group_by(igg,pheno) %>% 
+  mutate(tot=sum(n),
+         prop= (n*100)/(sum(n)),
+         y=(n)/(sum(n))) %>% 
+  mutate(lab=cumsum(y),
+         lab= ifelse(lab==1,(2-y)/2,y/2)) %>% 
+  mutate(prop=format(prop,digits = 2)) %>% 
+  mutate(prop=str_trim(prop)) %>% 
+  mutate(prop=if_else(str_length(prop)<4,
+                      str_replace(prop,"(.+)","\\1\\.0"),prop)) %>% 
+  mutate(yy=str_c(n," (",prop,"%",")")) %>% 
+  filter(label=="s+") %>% 
+  ungroup() %>% print()
+  #dplyr::select(-n,-label, -tot) %>% 
+  #spread(pheno,prop)
+```
+
+```{r}
+msr %>% 
+  dplyr::select(pheno,igg,label) %>% 
+  #filter(igg==levels(f)[i]) %>% 
+  #dplyr::select(-igg) %>% 
+  group_by(igg,pheno,label) %>% dplyr::summarise(n=n()) %>% ungroup() %>% 
+  spread(label,n)
+```
+
+
+```{r}
+ftt <- data_frame(igg=as.character(),
+                  p.value=as.double(),
+                  #estimate=as.double(),
+                  method=as.character()#,
+                  #alternative=as.factor()
+                  )
+
+
+for (i in 1:length(levels(f))) {
+  
+fst <- msr %>% 
+  filter(!label=="s0") %>% 
+  dplyr::select(pheno,igg,label) %>% 
+  filter(igg==levels(f)[i]) %>% 
+  dplyr::select(-igg) %>% 
+  group_by(pheno,label) %>% dplyr::summarise(n=n()) %>% ungroup() %>% 
+  #spread(label,n) %>% as.matrix() %>% 
+  reshape2::acast(pheno ~ label,
+                  value.var = "n") #%>% #class()
+
+fst[is.na(fst)] <- 0
+
+ftt <- ftt %>% 
+  union(
+  fisher.test(fst) %>% broom::tidy() %>% 
+    mutate(igg=levels(f)[i]) %>% 
+    dplyr::select(igg,p.value,
+                  #estimate,
+                  method#,alternative
+                  )
+)
+
+
+  
+}
+
+ftt %>% arrange(igg) %>% 
+  mutate(sig=ifelse(p.value<0.05,"signif","not-signif"))
+```
+
+```{r}
+fttt <- ftt %>% arrange(igg) %>% dplyr::select(igg,everything()) %>% 
+  mutate(x=.5,
+         y=-.05) %>% 
+  mutate(lab= paste0("italic('P')",ifelse(p.value<0.001,"<0.001",
+                                  paste0("==",p.value %>% format(digits=2))
+                                  )
+                     )
+         ) %>% 
+  mutate(lab=stringr::str_replace(lab,"(P = 0\\...)(.+)","\\1")) %>% 
+  mutate(igg=forcats::fct_recode(igg,
+                                 "IgG"="igg",
+                                 "IgG1"="igg1",
+                                 "IgG2"="igg2",
+                                 "IgG3"="igg3",
+                                 "IgG4"="igg4"
+                                 ))
+```
+
+```{r prop_sero,fig.width=11,fig.height=2.2}
+msr_igcprop <- msr %>% 
+  mutate(igg=forcats::fct_recode(igg,
+                                 "IgG"="igg",
+                                 "IgG1"="igg1",
+                                 "IgG2"="igg2",
+                                 "IgG3"="igg3",
+                                 "IgG4"="igg4"
+                                 ),
+         pheno=forcats::fct_recode(pheno,
+                                   "Asymptomatic"="asymptomatic",
+                                   "Symptomatic"="symptomatic")) %>%
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  full_join(fttt %>% dplyr::select(igg,lab,y,x),by = "igg") %>% 
+  mutate(lab=if_else(label=="s+",lab,NA_character_)) %>% 
+  arrange(lab) %>% 
+  mutate(lab=if_else(igg==lead(igg),NA_character_,lab)) %>% 
+  filter(!label=="s0") 
+
+msr_sp_lab <- msr_igcprop %>% 
+  dplyr::count(igg,pheno,label) %>% 
+  group_by(igg,pheno) %>% 
+  mutate(tot=sum(n),
+         prop= (n*100)/(sum(n)),
+         y=(n)/(sum(n))) %>% 
+  mutate(#lab=cumsum(y),
+         lab= #ifelse(lab==1,(2-y)/2,
+                     y/2#)
+         ) %>% 
+  mutate(prop=format(prop,digits = 2)) %>% 
+  mutate(prop=str_trim(prop)) %>% 
+  mutate(prop=if_else(str_length(prop)<4,
+                      str_replace(prop,"(.+)","\\1\\.0"),prop)) %>% 
+  mutate(yy=str_c(n," (",prop,"%",")")) %>% 
+  filter(label=="s+") %>% 
+  ungroup()
+
+msr_igcprop %>% 
+  ggplot(aes(x=pheno,fill=label)) +
+  geom_bar(position = "fill") +
+  facet_grid(~igg) +
+  
+  coord_cartesian(ylim = c(-.12,1)) +
+  geom_text(aes(x=x,
+                y=y,label=lab),parse = T,#position = "fill",#data = fttt,,
+            ##vjust=.5,hjust=0.05,size=3.5) +
+            vjust=1,hjust=0.0005,size=3.5
+            ) + # if log10, then change it.
+  
+  geom_text(data=msr_sp_lab,
+            aes(x = pheno, y= lab, label = yy), size=3) +
+  
+  #labs(title="Proportion of seropositives among phenotypes per IgG subtype") +
+  xlab("Carrier") + ylab("Proportion") +
+  scale_fill_grey(#start = 0, end = .9,
+                  name="Serology",labels=c("Negative","Positive"#,"Indeterminate"
+                                           ))
+ggsave("figure/unap-rafael-prop_sero.png")
+```
+
+
+```{r}
+##aqui
+s1 <- Hmisc::summaryM(IgG+IgG1+IgG2+IgG3+IgG4
+                      ~ pheno,
+               data=msr %>% filter(label!="s0") %>% # %>% dplyr::count(pheno,label)
+                 mutate(igg=forcats::fct_recode(igg,
+                                 "IgG"="igg",
+                                 "IgG1"="igg1",
+                                 "IgG2"="igg2",
+                                 "IgG3"="igg3",
+                                 "IgG4"="igg4"
+                                 ),
+                        pheno=forcats::fct_recode(pheno,
+                                   "Asymptomatic"="asymptomatic",
+                                   "Symptomatic"="symptomatic")) %>% 
+                 dplyr::select(ID,pheno,igg,label) %>% 
+                 mutate(label=forcats::fct_drop(label),
+                        n=1:n()) %>% 
+                 #mutate(Ab.units=if_else((Ab.units),"1","0")) %>% 
+                 #mutate(Ab.units=as.factor(Ab.units)) %>% 
+                 spread(igg,label)
+               ,overall=FALSE, test=TRUE)
+
+Hmisc::latex(s1, caption='Sample covariates',
+      exclude1=TRUE, npct='both', 
+      digits=3, prtest="P", prn=FALSE, file="",
+      #prmsd=TRUE, brmsd=TRUE, #msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = FALSE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%", html = TRUE, width="100%"
+      ) #change here for LaTeX PDF
+```
+```{r}
+##aqui
+s1 <- Hmisc::summaryM(label
+                      ~ pheno,
+               data=msr %>% filter(igg=="igg1"),
+               overall=FALSE, test=TRUE)
+
+Hmisc::latex(s1, caption='Sample covariates',
+      exclude1=TRUE, npct='both', 
+      digits=3,
+      #prmsd=TRUE, brmsd=TRUE, #msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = TRUE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%", html = TRUE, width="100%"
+      ) #change here for LaTeX PDF
+```
+
+```{r}
+##aqui
+s1 <- Hmisc::summaryM(label
+                      ~ pheno,
+               data=msr %>% filter(igg=="igg2"),
+               overall=FALSE, test=TRUE)
+
+Hmisc::latex(s1, caption='Sample covariates',
+      exclude1=TRUE, npct='both', 
+      digits=3,
+      #prmsd=TRUE, brmsd=TRUE, #msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = TRUE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%", html = TRUE, width="100%"
+      ) #change here for LaTeX PDF
+```
+
+```{r}
+##aqui
+s1 <- Hmisc::summaryM(label
+                      ~ pheno,
+               data=msr %>% filter(igg=="igg3"),
+               overall=FALSE, test=TRUE)
+
+Hmisc::latex(s1, caption='Sample covariates',
+      exclude1=TRUE, npct='both', 
+      digits=3,
+      #prmsd=TRUE, brmsd=TRUE, #msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = TRUE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%", html = TRUE, width="100%"
+      ) #change here for LaTeX PDF
+```
+
+```{r}
+##aqui
+s1 <- Hmisc::summaryM(label
+                      ~ pheno,
+               data=msr %>% filter(igg=="igg4"),
+               overall=FALSE, test=TRUE)
+
+Hmisc::latex(s1, caption='Sample covariates',
+      exclude1=TRUE, npct='both', 
+      digits=3,
+      #prmsd=TRUE, brmsd=TRUE, #msdsize=mu$smaller2, #NOT-EVALUATE if PDF
+      middle.bold=TRUE, long = TRUE,
+      #legend.bottom = TRUE, #insert.bottom = TRUE, 
+      what="%", html = TRUE, width="100%"
+      ) #change here for LaTeX PDF
+```
+
+<!-- -->
+
+```{r,eval=FALSE, echo=FALSE}
+TeaTasting <-
+matrix(c(3, 1, 1, 3),
+       nrow = 2,
+       dimnames = list(Guess = c("Milk", "Tea"),
+                       Truth = c("Milk", "Tea")))
+fisher.test(TeaTasting, alternative = "greater")
+## => p = 0.2429, association could not be established
+
+Job <- matrix(c(1,2,1,0, 3,3,6,1, 10,10,14,9, 6,7,12,11), 4, 4,
+dimnames = list(income = c("< 15k", "15-25k", "25-40k", "> 40k"),
+                satisfaction = c("VeryD", "LittleD", "ModerateS", "VeryS")))
+fisher.test(Job)
+fisher.test(Job, simulate.p.value = TRUE, B = 1e5)
+
+class(Job)
+```
+
+
+### Distribution sero+
+
+- the __minimum__ value of the __sero+__ distribution is close to the __cut-off__ and could be assumed as its value, but is not exactly that value.
+
+```{r,fig.width=10.5,fig.height=2.5}
+msr %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=Ab.units,fill=label)) +
+  #geom_bar(position = "fill") +
+  geom_histogram(position = "stack") +
+  facet_grid(~igg,scales = "free") +
+  labs(title="Proportion of seropositives")
+```
+
+```{r}
+msr %>% 
+  filter(label=="s+") %>% 
+  group_by(igg) %>% dplyr::summarise(min=min(Ab.units),
+                              q25=quantile(Ab.units) %>% .[2],
+                              mean=mean(Ab.units),
+                              q50=quantile(Ab.units) %>% .[3],
+                              q75=quantile(Ab.units) %>% .[4],
+                              max=max(Ab.units))
+```
+
+```{r,fig.width=10.5,fig.height=4}
+msr %>% 
+  mutate(label=forcats::fct_relevel(label,"s-","s+","s0"#,"s++"
+                                    )) %>% 
+  ggplot(aes(x=Ab.units,fill=label)) +
+  #geom_bar(position = "fill") +
+  #scale_x_log10() +
+  geom_histogram(position = "stack") +
+  facet_grid(pheno~igg,scales = "free") +
+  labs(title="Proportion of seropositives")
+```
+
+## Correlation
+
+### IgG subtypes
+
+```{r}
+mco %>% dplyr::count(ID) %>% arrange(desc(n))
+```
+
+```{r,fig.height=4,fig.width=6}
+mco %>% dim()
+
+u <- mco %>% filter(pheno=="asymptomatic") %>% 
+  dplyr::select(ID,igg,Ab.units,pheno) %>% arrange(ID) %>% 
+  #mutate(Ab.units=log10(Ab.units)) %>%
+  #group_by(ID,pheno) %>% 
+  mutate(n=group_indices(.,ID,pheno)) %>% #NUEVO!!!!!!!
+  spread(igg,Ab.units) %>% 
+  dplyr::select(-ID,-n) %>% 
+  mutate(pheno="asymptomatic") %>% 
+  mutate(pheno=forcats::fct_recode(pheno,
+                                   "Asymptomatic"="asymptomatic",
+                                   "Symptomatic"="symptomatic")) %>%
+  dplyr::rename("IgG"="igg","IgG1"="igg1",
+                "IgG2"="igg2","IgG3"="igg3","IgG4"="igg4")
+
+v <- mco %>% filter(pheno=="symptomatic") %>% 
+  dplyr::select(ID,igg,Ab.units) %>% 
+  #mutate(Ab.units=log10(Ab.units)) %>% 
+  spread(igg,Ab.units) %>% 
+  dplyr::select(-ID) %>% 
+  mutate(pheno="symptomatic") %>% 
+  mutate(pheno=forcats::fct_recode(pheno,
+                                   "Asymptomatic"="asymptomatic",
+                                   "Symptomatic"="symptomatic")) %>%
+  dplyr::rename("IgG"="igg","IgG1"="igg1",
+                "IgG2"="igg2","IgG3"="igg3","IgG4"="igg4")
+
+#par(mfrow=c(1,3))
+
+a <- union(u,v) %>% 
+  dplyr::select(-pheno) 
+a %>% 
+  PerformanceAnalytics::chart.Correlation(method = "spearman",main="all",histogram = F)
+
+b <- union(u,v) %>% 
+  filter(pheno=="Asymptomatic") %>% 
+  dplyr::select(-pheno) 
+
+b %>% 
+  PerformanceAnalytics::chart.Correlation(method = "spearman",main="asymptomatic",histogram = F)
+
+c <- union(u,v) %>% 
+  filter(pheno=="Symptomatic") %>% 
+  dplyr::select(-pheno) 
+
+c %>% 
+  PerformanceAnalytics::chart.Correlation(method = "spearman",main="symptomatic",histogram = F)
+
+#a
+
+#par(mfrow=c(1,1))
+```
+
+```{r}
+#d <- c
+#d <- b
+#d <- c
+#cor(d[which(complete.cases(d)),],method = "spearman")
+
+cor.ext <- function(d) {#d <- a
+
+e <- Hmisc::rcorr(as.matrix(d[which(complete.cases(d)),]), type="spearman")
+#e
+rr <- e$r %>% as.data.frame() %>% mutate_all(funs(if_else(.==1,NA_real_,.))) %>% 
+  gather(ig,vl) %>% mutate(vl=format(vl,digits = 2)) %>% mutate(vl=as.numeric(vl)) %>% 
+  group_by(ig) %>% 
+  mutate(id=1:n()) %>% 
+  spread(ig,vl) %>% dplyr::select(-id) %>% rownames_to_column() #%>% dplyr::select(-rowname)
+pp <- e$P %>% as.data.frame() %>% mutate_all(funs(if_else(.<0.001,111,
+                                                    if_else(.<0.01,11,
+                                                            if_else(.<0.05,1,0))))) %>% 
+  mutate_all(as.character) %>% 
+  mutate_all(funs(if_else(.=="111","(***)",
+                          if_else(.=="11","(**)",
+                                  if_else(.=="1","(*)","(ns)"))))) %>% rownames_to_column()
+
+ee <- rr %>% gather(ig,vl) %>% mutate(vl="") %>% group_by(ig) %>% mutate(id=1:n()) %>% spread(ig,vl) %>% dplyr::select(-id) %>% dplyr::select(rowname,everything())
+
+ppp <- as.matrix(pp)
+rrr <- as.matrix(rr)
+eee <- as.matrix(ee)
+
+#eee <- rrr
+
+eee[1,3] <- paste(rrr[1,3],ppp[1,3])
+eee[1:2,4] <- paste(rrr[1:2,4],ppp[1:2,4])
+#eee[2,4] <- paste(rrr[2,4],ppp[2,4])
+eee[1:3,5] <- paste(rrr[1:3,5],ppp[1:3,5])
+#eee[2,5] <- paste(rrr[2,5],ppp[2,5])
+#eee[3,5] <- paste(rrr[3,5],ppp[3,5])
+eee[1:4,6] <- paste(rrr[1:4,6],ppp[1:4,6])
+ext <- eee %>% as_data_frame() %>% mutate(rowname=colnames(.)[-1]) #%>% #as.matrix()
+  #dplyr::rename("subtype"=rowname)
+return(ext)
+  
+}
+
+aa <- cor.ext(a) %>% #dplyr::rename("all"=rowname) %>% 
+  column_to_rownames() %>% as.matrix() #%>% knitr::kable(format = "latex")
+bb <- cor.ext(b) %>% #dplyr::rename("asympt"=rowname) %>% 
+  column_to_rownames() %>% as.matrix()
+cc <- cor.ext(c) %>% #dplyr::rename("sympt"=rowname) %>% 
+  column_to_rownames() %>% as.matrix()
+
+readr::write_rds(aa,"data/cor_all.rds")
+readr::write_rds(bb,"data/cor_asymp.rds")
+readr::write_rds(cc,"data/cor_sympt.rds")
+```
+
+```{r}
+aa
+bb
+cc
+#knitr::kable(cc,"latex")
+```
+
+```{r}
+ax <- t(as.matrix(c("","","","","")))
+rownames(ax) <- "All individuals"
+colnames(ax) <- c("IgG","IgG1","IgG2","IgG3","IgG4")
+bx <- t(as.matrix(c("","","","","")))
+rownames(bx) <- "Asymptomatics"
+colnames(bx) <- c("IgG","IgG1","IgG2","IgG3","IgG4")
+cx <- t(as.matrix(c("","","","","")))
+rownames(cx) <- "Symptomatics"
+colnames(cx) <- c("IgG","IgG1","IgG2","IgG3","IgG4")
+dd <- rbind(ax,aa,bx,bb,cx,cc)[-c(6,12,18),-1]
+readr::write_rds(dd,"data/cor_full.rds")
+```
+
+```{r,message=FALSE,fig.height=5,fig.width=6}
+#mco %>% 
+#  dplyr::select(pheno,igg,Ab.units,par) %>% 
+#  GGally::ggpairs(mapping = aes(color = pheno))
+
+union(u,v) %>% 
+  mutate(pheno=forcats::fct_relevel(pheno,"Symptomatic","Asymptomatic")) %>% 
+  dplyr::rename("Status"=pheno) %>% 
+  GGally::ggscatmat(color = "Status",corMethod = "spearman") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title="Correlation between IgG subtypes per phenotype")# +scale_fill_grey(start = 0, end = .9)
+
+# correlación general y estratificada
+#union(u,v) %>% 
+#  GGally::ggpairs(mapping = aes(color = pheno))
+```
+
+```{r,eval=FALSE,echo=FALSE}
+library(desctable)
+library(DT)
+library(pander)
+mtcars %>%
+  #dplyr::mutate(am = factor(am, labels = c("Automatic", "Manual"))) %>%
+  group_by(am) %>%
+  desctable(tests = list(.default = ~wilcox.test,
+                         mpg      = ~t.test)) %>%
+  pander
+```
+
+### parasitemia
+
+```{r,fig.height=2,fig.width=10}
+mco %>% 
+  ggplot(aes(Ab.units,fill=pheno)) +
+  geom_density(position = "identity",alpha=0.6) +
+  facet_grid(~igg,scales = "free_x") +
+  #geom_rug() + 
+  scale_x_log10()
+```
+
+```{r,fig.height=2,fig.width=4}
+mco %>% #summary(mco$par)
+  ggplot(aes(par,fill=pheno)) +
+  geom_density(position = "identity",alpha=0.6) +
+  #facet_grid(~igg,scales = "free_x") +
+  #geom_rug() + 
+  scale_x_log10()
+```
+
+```{r,fig.height=3,fig.width=10}
+mco %>% 
+  ggplot(aes(Ab.units,par,fill=pheno)) +
+  geom_point(aes(colour=pheno)) +
+  #scale_x_log10() + 
+  scale_y_log10() +
+  facet_grid(pheno~igg,scales = "free") +
+  geom_smooth(aes(colour=pheno),method = lm)
+```
+
+```{r,fig.height=4,fig.width=6,eval=FALSE}
+u <- mco %>% filter(pheno=="asymptomatic") %>% 
+  dplyr::select(ID,igg,Ab.units,par) %>% 
+  #mutate(Ab.units=log10(Ab.units)) %>% 
+  spread(igg,Ab.units) %>% 
+  dplyr::select(-ID)
+
+v <- mco %>% filter(pheno=="symptomatic") %>% 
+  dplyr::select(ID,igg,Ab.units,par) %>% 
+  #mutate(Ab.units=log10(Ab.units)) %>% 
+  spread(igg,Ab.units) %>% 
+  dplyr::select(-ID) 
+
+#union(u,v) %>% 
+#  PerformanceAnalytics::chart.Correlation(histogram = FALSE,method = "spearman")
+```
+
+```{r,fig.width=10,fig.height=3,eval=FALSE}
+mco %>% 
+  ggplot(aes(Ab.units,par)) +
+  geom_point(aes(colour=pheno)) +
+  scale_x_log10() +
+  scale_y_log10() +
+  facet_grid(pheno~igg
+             #,scales = "free"
+             ) +
+  geom_smooth(method = lm)
+```
+
+```{r corr_ig_par,message=FALSE,fig.width=10,fig.height=3.6}
+f <- mco %>% mutate(igg=as.factor(igg)) %>% .$igg
+g <- mco %>% mutate(pheno=as.factor(pheno)) %>% .$pheno
+
+#mco <- mco %>% 
+#  #dplyr::select(Ab.units,par) %>% 
+#  mutate(Ab.units=log10(Ab.units),par=log10(par)) %>% 
+#  filter(par!=-Inf) #%>% 
+
+stt <- data_frame(estimate=as.double(),
+                  ##estimate1=as.double(),
+                  ##estimate2=as.double(),
+                  statistic=as.double(),
+                  p.value=as.double(),
+                  #parameter=as.double(),#
+                  #conf.low=as.double(),#
+                  #conf.high=as.double(),#
+                  method=as.factor(NULL),
+                  alternative=as.factor(NULL),
+                  igg=as.character(),
+                  pheno=as.character(),
+                  signf=as.character(),
+                  rho=as.character(),
+                  lab=as.character())
+
+for (l in 1:length(levels(f))) {
+  
+  for (k in 1:length(levels(g))) {
+    
+## Primero,
+j <- mco %>% filter(par!=0) %>%  filter(igg==levels(f)[l] & pheno==levels(g)[k]) %>% #l #k
+  #t.test(Ab.units_log ~ pheno, data = ., var.equal= i$p.value>0.05) %>%
+  #wilcox.test(Ab.units_log ~ pheno, data = .) %>%#, 
+              #conf.int=TRUE) %>% 
+  cor.test(~ log10(Ab.units) + log10(par), 
+           data = ., method = "spearman") %>% 
+  broom::tidy() %>%  #%>% format(digits=2)
+  #dplyr::select(-starts_with("estimate")) %>% 
+  mutate(igg=levels(f)[l],#l
+         pheno=levels(g)[k],#k
+         signf=if_else(p.value<0.001,"ooo",
+                       if_else(p.value<0.01,"oo",
+                               if_else(p.value<0.05,"o","ns"#""#
+                                       ))),
+         rho= estimate %>% format(digits=2),
+         lab= paste0(#"t=",#should be done -> mix variance equality test
+                     #"W=",#non-parametric used in literature
+                     #"S=",f$statistic,", rho="
+                     "rho=",estimate %>% format(digits=2),
+                     "\nP",ifelse(p.value<0.001,"<0.001",
+                                  paste0("=",p.value %>% format(digits=2)))
+                     )
+         )
+
+#i <- mco %>% filter(igg==levels(f)[l] & pheno==levels(g)[k]) %>% #l #k
+#  #t.test(Ab.units_log ~ pheno, data = ., var.equal= i$p.value>0.05) %>%
+#  #wilcox.test(Ab.units_log ~ pheno, data = .) %>%#, 
+#              #conf.int=TRUE) %>% 
+#  cor.test(~ Ab.units + par, 
+#           data = ., method = "spearman") %>% 
+#  broom::tidy() %>%  #%>% format(digits=2)
+#  #dplyr::select(-starts_with("estimate")) %>% 
+#  mutate(igg=levels(f)[l],#l
+#         pheno=levels(g)[k],#k
+#         signf=if_else(p.value<0.001,"(***)",
+#                       if_else(p.value<0.01,"(**)",
+#                               if_else(p.value<0.05,"(*)","(ns)"))),
+#         rho= estimate %>% format(digits=2),
+#         lab= paste0(#"t=",#should be done -> mix variance equality test
+#                     #"W=",#non-parametric used in literature
+#                     #"S=",f$statistic,", rho="
+#                     "rho=",estimate %>% format(digits=2)#,
+#                     #"\nP",ifelse(p.value<0.001,"<0.001",
+#                      #            paste0("=",p.value %>% format(digits=2)))
+#                     )
+#         )
+
+stt <- stt %>% union(j) #%>% union(i)
+    
+  }
+
+}
+
+sttt <- stt %>% arrange(igg,pheno) %>% dplyr::select(igg,pheno,everything()) %>% 
+  mutate(x=if_else(igg=="igg1"|igg=="igg3"|igg=="igg4",10,
+                   if_else(igg=="igg2",.7,.1)),
+         y=60000)
+
+# plot
+specie_name <- c("asymptomatic"="Asymptomatic","symptomatic"="Symptomatic",
+                 "igg"="IgG","igg1"="IgG1","igg2"="IgG2","igg3"="IgG3","igg4"="IgG4"
+                 )
+#mco %>%
+msr %>% filter(label!="s0") %>% #summary()
+  filter(par!=0) %>% 
+  ggplot(aes(Ab.units,par)) +
+  geom_point(aes(colour=label)
+             ) +
+  scale_x_log10() +
+  scale_y_log10(limits=c(100,65000)
+                ) +
+  facet_grid(pheno~igg,labeller = as_labeller(specie_name)
+             ,scales = "free_x"
+             ) +
+  #geom_smooth(method = lm,se=F,col="grey50",lwd=.5) +
+  #geom_smooth(method = loess,se=F,col="grey50",lwd=.5) +
+  
+  geom_text(aes(x,y,label=paste0("rho","==",
+                                 rho,"^",signf
+                                 )),data = sttt, parse = T,
+            vjust=1,hjust=0.05,size=3.5) +
+  
+  #labs(#title="Correlation between AU and parasitemia per IgG subtype and phenotype",
+   #    caption="oo: P < 0.01; o: P < 0.05; ns: non-significant"
+    #   ) +
+  xlab("Antibody units (log scale)") + 
+  ylab(expression(paste("Parasite/",mu,"L"," (log scale)"))) + #ylab("Parasite/uL") +
+  #coord_cartesian(ylim = c(0,20000))
+  scale_color_grey(start = .8, end = .2,
+                  name="Serology",labels=c("Negative","Positive"#,"Indeterminate"
+                                           ))
+ggsave("figure/unap-rafael-corr_ig_par.png")
+```
+
+```{r,eval=FALSE}
+d <- data.frame(x=1:3,y=1:3)
+qplot(x, y, data=d) + geom_text(aes(2, 2.5,
+              label="rho~and~some~other~text"), parse=TRUE)
+```
+
+```{r,message=FALSE,fig.width=10,fig.height=2.2}
+f <- mco %>% mutate(igg=as.factor(igg)) %>% .$igg
+
+#mco <- mco %>% 
+#  #dplyr::select(Ab.units,par) %>% 
+#  mutate(Ab.units=log10(Ab.units),par=log10(par)) %>% 
+#  filter(par!=-Inf) #%>% 
+
+stt <- data_frame(estimate=as.double(),
+                  ##estimate1=as.double(),
+                  ##estimate2=as.double(),
+                  statistic=as.double(),
+                  p.value=as.double(),
+                  #parameter=as.double(),#
+                  #conf.low=as.double(),#
+                  #conf.high=as.double(),#
+                  method=as.factor(NULL),
+                  alternative=as.factor(NULL),
+                  igg=as.character(),
+                  lab=as.character())
+
+for (l in 1:length(levels(f))) {
+  
+## Primero,
+j <- mco %>% filter(igg==levels(f)[l]) %>% #l
+  #t.test(Ab.units_log ~ pheno, data = ., var.equal= i$p.value>0.05) %>%
+  #wilcox.test(Ab.units_log ~ pheno, data = .) %>%#, 
+              #conf.int=TRUE) %>% 
+  cor.test(~ Ab.units + par, 
+           data = ., method = "spearman") %>% 
+  broom::tidy() %>%  #%>% format(digits=2)
+  #dplyr::select(-starts_with("estimate")) %>% 
+  mutate(igg=levels(f)[l],#l
+         lab= paste0(#"t=",#should be done -> mix variance equality test
+                     #"W=",#non-parametric used in literature
+                     #"S=",f$statistic,", rho="
+                     "rho=",estimate %>% format(digits=2),
+                     "\nP",ifelse(p.value<0.001,"<0.001",
+                                  paste0("=",p.value %>% format(digits=2)))
+                     )
+         )
+
+stt <- stt %>% union(j)
+
+}
+
+stt <- stt %>% arrange(igg) %>% dplyr::select(igg,everything()) %>% 
+  mutate(x=.1,
+         y=200)
+
+# plot
+mco %>% #filter(igg==levels(f)[1]) %>% 
+  ggplot(aes(Ab.units,par)) +
+  geom_point() +
+  scale_x_log10() +
+  scale_y_log10() +
+  geom_smooth(method = lm,se=F,col="grey50",lwd=.5) +
+  #geom_smooth(method = loess,se=F,col="grey50",lwd=.5) +
+  geom_text(aes(x,y,label=lab),data = stt,
+            vjust=.5,hjust=0.05,size=3.5) +
+  facet_grid(~igg
+             #,scales = "free"
+             ) +
+  #facet_wrap(~igg,ncol = 5)
+  labs(title="Correlation between AU and parasitemia per IgG subtype")
+```
+
+```{r,eval=FALSE,include=FALSE}
+# CHUNK: to compare `pearson cor.test` = `lm` != `spearman cor.test`
+
+#for (l in 1:length(levels(f))) {
+## via lm
+l=1
+mco %>% filter(igg==levels(f)[l] & pheno=="symptomatic") %>% #l=2
+  #t.test(Ab.units_log ~ pheno, data = ., var.equal= i$p.value>0.05) %>%
+  #wilcox.test(Ab.units_log ~ pheno, data = .) %>%#, 
+              #conf.int=TRUE) %>% 
+  #cor.test(~ Ab.units + par, method = "spearman",
+  lm(par ~ Ab.units, 
+           data = .#, method = "spearman"
+     ) %>% 
+  broom::tidy()
+
+#}
+```
+
+### age
+
+```{r}
+age <- #mco %>% 
+  msr %>% 
+  dplyr::select(ID, code, pheno, igg, Ab.units,label) %>% 
+  full_join(mcv,by=c("ID","pheno"))
+```
+
+```{r,fig.height=2,fig.width=10}
+age %>% #summary(age$edad)
+  ggplot(aes(Ab.units,fill=pheno)) +
+  geom_density(position = "identity",alpha=0.7) +
+  facet_wrap(~igg,scales = "free",ncol = 5) #+scale_x_log10()
+```
+
+```{r,fig.height=2,fig.width=4}
+age %>% #summary(age$edad)
+  ggplot(aes(edad,fill=pheno)) +
+  geom_density(position = "identity",alpha=0.7)
+```
+
+
+```{r corr_ig_age,message=FALSE,fig.width=10,fig.height=3.6}
+f <- age %>% mutate(igg=as.factor(igg)) %>% .$igg
+g <- age %>% mutate(pheno=as.factor(pheno)) %>% .$pheno
+
+#mco <- mco %>% 
+#  #dplyr::select(Ab.units,par) %>% 
+#  mutate(Ab.units=log10(Ab.units),par=log10(par)) %>% 
+#  filter(par!=-Inf) #%>% 
+
+stt <- data_frame(estimate=as.double(),
+                  ##estimate1=as.double(),
+                  ##estimate2=as.double(),
+                  statistic=as.double(),
+                  p.value=as.double(),
+                  #parameter=as.double(),#
+                  #conf.low=as.double(),#
+                  #conf.high=as.double(),#
+                  method=as.factor(NULL),
+                  alternative=as.factor(NULL),
+                  igg=as.character(),
+                  pheno=as.character(),
+                  signf=as.character(),
+                  rho=as.character(),
+                  lab=as.character())
+
+for (l in 1:length(levels(f))) {
+  
+  for (k in 1:length(levels(g))) {
+    
+## Primero,
+j <- age %>% filter(igg==levels(f)[l] & pheno==levels(g)[k]) %>% #l #k
+  #t.test(Ab.units_log ~ pheno, data = ., var.equal= i$p.value>0.05) %>%
+  #wilcox.test(Ab.units_log ~ pheno, data = .) %>%#, 
+              #conf.int=TRUE) %>% 
+  cor.test(~ Ab.units + edad, 
+           data = ., method = "spearman") %>% 
+  broom::tidy() %>%  #%>% format(digits=2)
+  #dplyr::select(-starts_with("estimate")) %>% 
+  mutate(igg=levels(f)[l],#l
+         pheno=levels(g)[k],#k
+         signf=if_else(p.value<0.001,"ooo",
+                       if_else(p.value<0.01,"oo",
+                               if_else(p.value<0.05,"o","ns"#""#
+                                       ))),
+         rho= estimate %>% format(digits=2),
+         lab= paste0(#"t=",#should be done -> mix variance equality test
+                     #"W=",#non-parametric used in literature
+                     #"S=",f$statistic,", rho="
+                     "rho=",estimate %>% format(digits=2),
+                     "\nP",ifelse(p.value<0.001,"<0.001",
+                                  paste0("=",p.value %>% format(digits=2)))
+                     )
+         )
+
+#i <- age %>% filter(igg==levels(f)[l] & pheno==levels(g)[k]) %>% #l #k
+#  #t.test(Ab.units_log ~ pheno, data = ., var.equal= i$p.value>0.05) %>%
+#  #wilcox.test(Ab.units_log ~ pheno, data = .) %>%#, 
+#              #conf.int=TRUE) %>% 
+#  cor.test(~ Ab.units + edad, 
+#           data = ., method = "spearman") %>% 
+#  broom::tidy() %>%  #%>% format(digits=2)
+#  #dplyr::select(-starts_with("estimate")) %>% 
+#  mutate(igg=levels(f)[l],#l
+#         pheno=levels(g)[k],#k
+#         lab= paste0(#"t=",#should be done -> mix variance equality test
+#                     #"W=",#non-parametric used in literature
+#                     #"S=",f$statistic,", rho="
+#                     "rho=",estimate %>% format(digits=2),
+#                     "\nP",ifelse(p.value<0.001,"<0.001",
+#                                  paste0("=",p.value %>% format(digits=2)))
+#                     )
+#         )
+
+stt <- stt %>% union(j) #%>% union(i)
+    
+  }
+
+}
+
+sttu <- stt %>% arrange(igg,pheno) %>% dplyr::select(igg,pheno,everything()) %>% 
+  mutate(x=.1,
+         y=78)
+
+# plot
+specie_name <- c("asymptomatic"="Asymptomatic","symptomatic"="Symptomatic",
+                 "igg"="IgG","igg1"="IgG1","igg2"="IgG2","igg3"="IgG3","igg4"="IgG4"
+                 )
+age %>% filter(label!="s0") %>%
+  ggplot(aes(Ab.units,edad)) +
+  geom_point(aes(colour=label)
+             ) +
+  #scale_x_log10() +
+  #scale_y_log10() +
+  facet_grid(pheno~igg,labeller = as_labeller(specie_name)
+             ,scales = "free_x"
+             ) +
+  #geom_smooth(method = lm,se=F,col="grey50",lwd=.5) +
+  #geom_smooth(method = loess,se=F,col="grey50",lwd=.5) +
+  geom_text(aes(x,y,label=paste0("rho","==",
+                                 rho,"^",signf
+                                 )),data = sttu, parse = T,
+            vjust=.5,hjust=0.05,size=3.5) +
+  #labs(title="Correlation between AU and parasitemia per IgG subtype and phenotype") +
+  xlab("Antibody units") + ylab("Age (years)") +
+  coord_cartesian(ylim = c(0,85)) +
+  scale_color_grey(start = .8, end = .2,
+                  name="Serology",labels=c("Negative","Positive"#,"Indeterminate"
+                                           ))
+ggsave("figure/unap-rafael-corr_ig_age.png")
+```
+
+```{r,message=FALSE,fig.width=10,fig.height=2.2}
+f <- age %>% mutate(igg=as.factor(igg)) %>% .$igg
+
+#mco <- mco %>% 
+#  #dplyr::select(Ab.units,par) %>% 
+#  mutate(Ab.units=log10(Ab.units),par=log10(par)) %>% 
+#  filter(par!=-Inf) #%>% 
+
+stt <- data_frame(estimate=as.double(),
+                  ##estimate1=as.double(),
+                  ##estimate2=as.double(),
+                  statistic=as.double(),
+                  p.value=as.double(),
+                  #parameter=as.double(),#
+                  #conf.low=as.double(),#
+                  #conf.high=as.double(),#
+                  method=as.factor(NULL),
+                  alternative=as.factor(NULL),
+                  igg=as.character(),
+                  lab=as.character())
+
+for (l in 1:length(levels(f))) {
+  
+## Primero,
+j <- age %>% filter(igg==levels(f)[l]) %>% #l
+  #t.test(Ab.units_log ~ pheno, data = ., var.equal= i$p.value>0.05) %>%
+  #wilcox.test(Ab.units_log ~ pheno, data = .) %>%#, 
+              #conf.int=TRUE) %>% 
+  cor.test(~ Ab.units + edad, 
+           data = ., method = "spearman") %>% 
+  broom::tidy() %>%  #%>% format(digits=2)
+  #dplyr::select(-starts_with("estimate")) %>% 
+  mutate(igg=levels(f)[l],#l
+         lab= paste0(#"t=",#should be done -> mix variance equality test
+                     #"W=",#non-parametric used in literature
+                     #"S=",f$statistic,", rho="
+                     "rho=",estimate %>% format(digits=2),
+                     "\nP",ifelse(p.value<0.001,"<0.001",
+                                  paste0("=",p.value %>% format(digits=2)))
+                     )
+         )
+
+stt <- stt %>% union(j)
+
+}
+
+stt <- stt %>% arrange(igg) %>% dplyr::select(igg,everything()) %>% 
+  mutate(x=.1,
+         y=55)
+
+# plot
+age %>% #filter(igg==levels(f)[1]) %>% 
+  ggplot(aes(Ab.units,edad)) +
+  geom_point() +
+  #scale_x_log10() +
+  #scale_y_log10() +
+  geom_smooth(method = lm,se=F,col="grey50",lwd=.5) +
+  #geom_smooth(method = loess,se=F,col="grey50",lwd=.5) +
+  geom_text(aes(x,y,label=lab),data = stt,
+            vjust=.5,hjust=0.05,size=3.5) +
+  facet_grid(~igg
+             ,scales = "free"
+             ) +
+  #facet_wrap(~igg,ncol = 5)
+  labs(title="Correlation between AU and parasitemia per IgG subtype")
+```
+
+
+## Association
+
+- outcome: symptomatic P.f. malaria
+
+### On Power and sample size
+
+#### minimum number of candidate predictors
+
+```{r}
+case=20
+ctrl=24
+m_c=min(case,ctrl) #limiting sample size
+p=5 #current number of predictors
+#round(m_c/15) #
+p <- m_c/15
+```
+
+- Given the current _limiting sample size_, for a reliable model the number of __candidate predictors must be lower than `r round(m_c/15)`.__
+
+#### minimum number of cases
+
+```{r}
+k=5 #number of covariates
+p= 0.4 # prevalence of outcome
+n_x=10*k/p
+```
+
+- Given the __measured covariates__ and __prevalence__ of modeled outcome, the __minimum sample size required is `r n_x`__.
+
+```{r}
+# exposition: symptomatic malaria (60% asympt in Pf)
+#
+# given the proportion (prevalence) relevant OR and required power, 
+# obtain the sample size required
+p=0.40 #proportion of exposure in general population OR outcome provalence
+#(OR=pA*(1-pB)/pB/(1-pA)) # 2
+OR=.5 #hypothetical OR
+#
+kappa=1 # sampling ratio between case:control
+alpha=0.05 #type 1 error (false positives)
+beta=0.20 #power=1-beta #type 2 error (false negatives)
+#(n= (((1+kappa)^2)*((qnorm(1-alpha/2)+qnorm(1-beta))^2)) / (kappa*p*(1-p)*((log(OR))^2)) )
+n1= (4*((qnorm(1-alpha/2)+qnorm(1-beta))^2)) / (p*(1-p)*((log(OR))^2)) 
+#ceiling(n) # Afridi 220, Bragga 263, Stanisic 206, Medeiros 28+24
+```
+
+- Given the known __prevalence__ of symptomatic malaria in Iquitos and a relevant __Odds Ratio__ reported in literature, a __sample size of `r ceiling(n1)`__ would be required to achieve a __power 80%__.
+
+```{r}
+# given the available sample size and obtained Odds Ratio, 
+# obtain the actual power
+n2= 44
+#(OR=.5)
+z=log(OR)*sqrt(n2)/sqrt(((1+kappa)^2)/(kappa*p*(1-p)))
+Power=pnorm(z-qnorm(1-alpha/2))+pnorm(-z-qnorm(1-alpha/2))
+```
+
+- Following the same method, given the __current sample size__, this analysis have a __power of `r format(Power*100,digits = 4)`%__.
+
+```{r,eval=FALSE,echo=FALSE}
+#http://powerandsamplesize.com/Calculators/Test-Odds-Ratio/Equality
+# TEST ODDD EQUALITY BETWEEN TWO GROUPS
+pA=0.40 #probability of the outcome in group A
+pB=0.25 #probability of the outcome in group B
+kappa=1 # sampling ratio
+alpha=0.05 #error rate
+beta=0.20 #power=1-beta
+(OR=pA*(1-pB)/pB/(1-pA)) # 2
+(nB=(1/(kappa*pA*(1-pA))+1/(pB*(1-pB)))*((qnorm(1-alpha/2)+qnorm(1-beta))/log(OR))^2)
+ceiling(nB) # 156
+z=log(OR)*sqrt(nB)/sqrt(1/(kappa*pA*(1-pA))+1/(pB*(1-pB)))
+(Power=pnorm(z-qnorm(1-alpha/2))+pnorm(-z-qnorm(1-alpha/2)))
+```
+
+
+### Tidy up
+
+#### inmuno
+
+```{r}
+#library(tidyverse)
+
+mmo <- mco %>% #filter(igg=="igg") %>% 
+  mutate(pheno=as.factor(pheno)) %>% 
+  mutate(pheno=forcats::fct_relevel(pheno,"symptomatic")) %>% 
+  mutate(pheno.num=ifelse(pheno=="asymptomatic",0,1)) %>% 
+  mutate(pheno.log=ifelse(pheno=="asymptomatic",FALSE,TRUE))
+```
+
+- the only reads available for sample `2235` are for the asymptomatic state!
+
+```{r,eval=FALSE}
+cova %>% 
+covb %>% 
+covx %>% 
+  filter(codigo=="2235" | codigo=="3053" | codigo=="9165" | codigo=="9801") %>% 
+  arrange(codigo) #%>% 
+  #dplyr::select(codigo,edad,sexo,par,everything())
+```
+
+```{r,eval=FALSE}
+## add covariates
+full_join(mmo,mcv,by=c("ID","par","pheno")) %>% 
+  filter(ID=="2235" | ID=="3053" | ID=="9165" | ID=="9801") %>% 
+  arrange(ID)
+```
+
+#### covariates
+
+- NOTA: 2235 tiene dos observaciones en matriz de covariables, pero en templates solo ha sido identificado como asintomático!
+
+```{r}
+mcv_t <- mcv %>% #filter(igg=="igg") %>% 
+  mutate(pheno=as.factor(pheno)) %>% 
+  mutate(pheno=forcats::fct_relevel(pheno,"symptomatic")) %>% 
+  mutate(pheno.num=ifelse(pheno=="asymptomatic",0,1)) %>% 
+  mutate(pheno.log=ifelse(pheno=="asymptomatic",FALSE,TRUE))
+```
+
+
+#### inmuno per subclass
+
+```{r}
+### MULTIPLE LOGISTIC REGRESSION
+mmo_x <- mmo %>% 
+  dplyr::select(ID,
+                #code,
+                #pheno,
+                igg
+                ,Ab.units
+                #,Ab.units_log
+                ,pheno.num#,pheno.log # 1: symptomatic, 0:: asymptomatic
+                ) %>% 
+  spread(igg
+         ,Ab.units
+         #,Ab.units_log
+         )
+
+#mmo_x.omit = na.omit(mmo_x)
+```
+
+#### add covariates
+
+```{r}
+mlr <- mcv_t %>% 
+  dplyr::select(ID,pheno.num, edad, sexo, par) %>% 
+  inner_join(mmo_x,by=c("ID","pheno.num"))
+
+mlr_na = na.omit(mlr)
+
+#dd <- rms::datadist(mlr_na); options(datadist='dd')
+```
+
+```{r}
+# https://stackoverflow.com/questions/7505547/detach-all-packages-while-working-in-r
+
+detachAllPackages <- function() {
+
+  basic.packages <- c("package:stats",
+                      "package:graphics",
+                      "package:grDevices",
+                      "package:utils",
+                      "package:datasets",
+                      "package:methods",
+                      "package:base")
+
+  package.list <- search()[
+    ifelse(
+      unlist(
+        gregexpr("package:",search())
+        )==1,TRUE,FALSE
+      )
+    ]
+
+  package.list <- setdiff(package.list,basic.packages)
+
+  if (length(package.list)>0)  
+    for (package in package.list) 
+      detach(package, character.only=TRUE)
+
+}
+
+detachAllPackages()
+```
+
+
+```{r, message=FALSE}
+# EXPLAINED: https://stats.stackexchange.com/questions/64788/interpreting-a-logistic-regression-model-with-multiple-predictors
+
+library(tidyverse)
+mmo_x_rms <- mlr_na %>% 
+  mutate(igg_c=ntile(igg,3),
+         igg1_c=ntile(igg1,3),
+         igg2_c=ntile(igg2,3),
+         igg3_c=ntile(igg3,3),
+         igg4_c=ntile(igg4,3)
+         ) %>% 
+  mutate(igg_c=as.factor(igg_c),
+         igg1_c=as.factor(igg1_c),
+         igg2_c=as.factor(igg2_c),
+         igg3_c=as.factor(igg3_c),
+         igg4_c=as.factor(igg4_c)) %>% 
+  mutate(igg_d=igg/10,
+         igg1_d=igg1/10,
+         igg2_d=igg2/10,
+         igg3_d=igg3/10,
+         igg4_d=igg4/10) %>% 
+  mutate(igg_l=log10(igg),
+         igg1_l=log10(igg1),
+         igg2_l=log10(igg2),
+         igg3_l=log10(igg3),
+         igg4_l=log10(igg4)) #%>% 
+  #dplyr::select(ID,pheno.num,
+   #             igg=igg_c,
+    #            igg1=igg1_c,
+     #           igg2=igg2_c,
+      #          igg3=igg3_c,
+       #         igg4=igg4_c
+        #        )
+
+dd <- rms::datadist(mmo_x_rms); options(datadist='dd')
+```
+
+#### data with missings
+
+```{r}
+mmo %>% dplyr::count(igg)
+```
+
+### Univariate
+
+#### PRE: univariate
+
+```{r,eval=FALSE,echo=FALSE}
+trm <- data_frame(igg=as.character(),
+                  term=as.character(),
+                  estimate=as.double(),
+                  std.error=as.double(),
+                  statistic=as.double(),
+                  p.value=as.double())
+
+dvm <- data_frame(igg=as.character(),
+                  null.deviance= as.double(),
+                  df.null= as.integer(),
+                  logLik= as.double(),
+                  AIC= as.double(),
+                  BIC= as.double(),
+                  deviance= as.double(),
+                  df.residual= as.integer())
+
+aov <- data_frame(igg=as.character(),
+                  Resid..Df=as.double(),
+                  Resid..Dev=as.double(),
+                  df=as.double(),
+                  Deviance=as.double(),
+                  p.value=as.double())
+
+for (i in 1:length(levels(f))) {
+  
+model <- glm(pheno ~ Ab.units_log,
+            data= mmo %>% filter(igg==levels(f)[i]),
+            family = binomial(link="logit"))
+
+trm <- trm %>% 
+  union(
+    broom::tidy(model) %>% 
+      mutate(igg=levels(f)[i]) %>% 
+      dplyr::select(igg,term,everything())
+  )
+
+dvm <- dvm %>% 
+  union(
+    broom::glance(model) %>% 
+      mutate(igg=levels(f)[i]) %>% 
+      dplyr::select(igg,everything())
+  )
+
+broom::glance(model) # TEST AIC
+
+aov <- aov %>% 
+  union(
+    anova(model,
+          update(model, ~1),
+          test="Chisq") %>% 
+      broom::tidy() %>% 
+      mutate(igg=levels(f)[i]) %>% 
+      dplyr::select(igg,everything())
+  )
+
+}
+
+#dvm %>% arrange(igg)
+#trm %>% arrange(igg,term) %>% #.$term
+#  filter(term!="(Intercept)") %>% 
+#  dplyr::select(-term)
+#aov %>% arrange(igg,Resid..Df)
+```
+
+```{r,eval=FALSE,echo=FALSE}
+#summary(model)
+#model$coefficients
+#confint(model)
+exp(model$coefficients)         # exponentiated coefficients
+exp(confint(model))             # 95% CI for exponentiated coefficients
+```
+
+```{r,fig.width=10,fig.height=2.5,eval=FALSE,echo=FALSE}
+#model = glm(pheno ~ Ab.units,
+#            data= mmo,
+#            family = binomial(link="logit"))
+ggplot(mmo, aes(x=Ab.units, y=pheno.num)) + 
+  geom_point(alpha=.3) + 
+  stat_smooth(method="glm", method.args=list(family="binomial"), se=TRUE) +
+  facet_grid(~igg,scales = "free") +
+  #scale_x_log10() + #better model by means of AIC
+  labs(title= expression(paste("Antibody responses associated with susceptibility to symptomatic malaria"))) +
+  #to protection against
+  #with susceptibility to
+  ylab("Probability")
+```
+
+##### age
+
+```{r,eval=FALSE,echo=FALSE}
+mod1 = rms::lrm(as.factor(pheno.num) ~ edad
+                ,data=mmo_x_rms, x=TRUE, y=TRUE)
+mod1
+paste("AIC=",AIC(mod1))
+summary(mod1)
+#plot(summary(mod1), log=TRUE,main = "log Odds Ratio",cex.main = 0)
+```
+
+##### sex
+
+```{r,eval=FALSE,echo=FALSE}
+mod1 = rms::lrm(as.factor(pheno.num) ~ sexo
+                ,data=mmo_x_rms, x=TRUE, y=TRUE)
+mod1
+paste("AIC=",AIC(mod1))
+summary(mod1)
+#plot(summary(mod1), log=TRUE,main = "log Odds Ratio",cex.main = 0)
+```
+
+##### parasitemia
+
+```{r,eval=FALSE,echo=FALSE}
+mod1 = rms::lrm(as.factor(pheno.num) ~ par #+ igg1 + igg2 + igg3 + igg4
+                ,data=mmo_x_rms, x=TRUE, y=TRUE)
+mod1
+paste("AIC=",AIC(mod1))
+summary(mod1)
+```
+
+##### igg
+
+```{r,eval=FALSE,echo=FALSE}
+mod1 = rms::lrm(as.factor(pheno.num) ~ igg #+ igg1 + igg2 + igg3 + igg4
+                ,data=mmo_x_rms, x=TRUE, y=TRUE)
+mod1
+paste("AIC=",AIC(mod1))
+summary(mod1)
+```
+
+##### igg1
+
+```{r,eval=FALSE,echo=FALSE}
+mod1 = rms::lrm(as.factor(pheno.num) ~ igg1 #+ igg1 + igg2 + igg3 + igg4
+                ,data=mmo_x_rms, x=TRUE, y=TRUE)
+mod1
+paste("AIC=",AIC(mod1))
+summary(mod1)
+```
+
+##### igg2
+
+```{r,eval=FALSE,echo=FALSE}
+mod1 = rms::lrm(as.factor(pheno.num) ~ igg2 #+ igg1 + igg2 + igg3 + igg4
+                ,data=mmo_x_rms, x=TRUE, y=TRUE)
+mod1
+paste("AIC=",AIC(mod1))
+summary(mod1)
+```
+
+##### igg3
+
+```{r,eval=FALSE,echo=FALSE}
+mod1 = rms::lrm(as.factor(pheno.num) ~ igg3 #+ igg1 + igg2 + igg3 + igg4
+                ,data=mmo_x_rms, x=TRUE, y=TRUE)
+mod1
+paste("AIC=",AIC(mod1))
+summary(mod1)
+```
+
+##### igg4
+
+```{r,eval=FALSE,echo=FALSE}
+mod1 = rms::lrm(as.factor(pheno.num) ~ igg4 #+ igg1 + igg2 + igg3 + igg4
+                ,data=mmo_x_rms, x=TRUE, y=TRUE)
+mod1
+paste("AIC=",AIC(mod1))
+summary(mod1)
+```
+
+##### IgG model
+
+```{r,eval=FALSE,echo=FALSE,include=FALSE}
+### MY PROCEDURE
+model = glm(pheno.num ~ igg + igg1 + igg2 + igg3 + igg4 + edad + sexo
+            ,data= mmo_x_rms,
+            family = binomial(link="logit")#,na.action = na.omit
+            )
+
+#summary(model)
+
+#broom::augment(model)
+paste("AIC=",AIC(model))
+#broom::glance(model) # TEST AIC
+#broom::tidy(model)
+
+#model$coefficients
+#confint(model)
+exp(model$coefficients)         # exponentiated coefficients # ODDS RATIO
+exp(confint(model))             # 95% CI for exponentiated coefficients
+```
+
+```{r,fig.height=2.2,fig.width=3.8,eval=FALSE,echo=FALSE,include=FALSE}
+#cut(seq(.01,1,by=.001),breaks = 3)
+#quantile(seq(.01,.1,by=.001))
+#quantile(seq(.01,.1,by=.001),probs = c(0,0.33,0.66,1))
+GGally::ggcoef(model,exponentiate = T,
+               exclude_intercept = T,
+               errorbar_height = .25,
+               mapping = aes(x = estimate, y = term#, 
+                             #size = p.value, 
+                             #colour=p.value
+                             )) +
+  #scale_size_continuous(trans = "reverse"#,
+                        #labels = as.numeric(quantile(seq(.01,.1,by=.001),
+                        #                             probs = c(0,0.33,0.66,1))
+                        #                    )
+                        #,limits = c(.1,.001)
+   #                     ) +
+  #scale_colour_viridis_c(trans = "reverse"#,
+                        #labels = as.numeric(quantile(seq(.01,.1,by=.001),
+                        #                             probs = c(0,0.33,0.66,1))
+                        #                    )
+                        #,limits = c(.1,.001)
+    #                    ) +
+  #scale_x_log10() +
+  #coord_trans(x="log10") +
+  #coord_cartesian(xlim = c(-10,100)) +
+  labs(title="Susceptibility to symptomatic malaria") +
+  #Protection against
+  #Susceptibility to
+  #Lower risk to 
+  xlab("odds ratio (log scale)") +
+  ylab("antibody subtype") +
+  theme(#legend.position=c(.11, .84),
+        legend.margin = margin(0,0,0,0),
+        legend.title = element_text(size=10),
+        legend.key.height = unit(.8,"line")) #+
+  #scale_x_continuous(#brakes= c(),
+   #                  label = c("0.1",#"1","10",
+    #                           "100",#"1000",
+     #                          "100000"))
+```
+
+##### stepwise selection
+
+```{r,eval=FALSE,echo=FALSE}
+### TUTORIAL
+
+model.null = glm(pheno.num ~ 1
+            ,data= mmo_x_rms,
+            family = binomial(link="logit")#,na.action = na.omit
+            )
+
+model.full = glm(pheno.num ~ igg + igg1 + igg2 + igg3 + igg4 + par + edad + sexo
+            ,data= mmo_x_rms,
+            family = binomial(link="logit")#,na.action = na.omit
+            )
+
+step(model.null,
+     scope = list(upper=model.full),
+             direction="both",
+             test="Chisq",
+             data=mmo_x_rms)
+```
+
+```{r,eval=FALSE,echo=FALSE,include=FALSE}
+model.final = glm(pheno.num ~ igg + igg1 + igg3 + igg4 + edad + sexo
+            ,data= mmo_x_rms,
+            family = binomial(link="logit")#,na.action = na.omit
+            )
+#summary(model.final)
+#rcompanion::nagelkerke(model.final) #nagelkerke 0.492
+#lmtest::lrtest(model.final) #0.0001
+#plot(fitted(model.final),rstandard(model.final)) #OK
+#summary(model.final)$deviance / summary(model.final)$df.residual #1.01 < 1.5
+```
+
+
+###### selected model
+
+```{r,eval=FALSE,echo=FALSE,include=FALSE}
+model = model.final
+
+#summary(model)
+
+paste("AIC=",AIC(model))
+#broom::augment(model)
+#broom::glance(model) # TEST AIC
+#broom::tidy(model)
+
+#model$coefficients
+#confint(model)
+exp(model$coefficients)         # exponentiated coefficients # ODDS RATIO
+exp(confint(model))             # 95% CI for exponentiated coefficients
+```
+
+```{r,fig.height=2.2,fig.width=3.8,eval=FALSE,echo=FALSE,include=FALSE}
+#cut(seq(.01,1,by=.001),breaks = 3)
+#quantile(seq(.01,.1,by=.001))
+#quantile(seq(.01,.1,by=.001),probs = c(0,0.33,0.66,1))
+GGally::ggcoef(model,exponentiate = T,
+               exclude_intercept = T,
+               errorbar_height = .25,
+               mapping = aes(x = estimate, y = term#, 
+                             #size = p.value, 
+                             #colour=p.value
+                             )) +
+  scale_size_continuous(trans = "reverse"#,
+                        #labels = as.numeric(quantile(seq(.01,.1,by=.001),
+                        #                             probs = c(0,0.33,0.66,1))
+                        #                    )
+                        ##,limits = c(.1,.001)
+                        ) +
+  scale_colour_viridis_c(trans = "reverse"#,
+                        #labels = as.numeric(quantile(seq(.01,.1,by=.001),
+                        #                             probs = c(0,0.33,0.66,1))
+                        #                    )
+                        #,limits = c(.1,.001)
+                        ) +
+  #scale_x_log10() +
+  #coord_trans(x="log10") +
+  #coord_cartesian(xlim = c(-10,100)) +
+  labs(title="Susceptibility to symptomatic malaria") +
+  #Protection against
+  #Susceptibility to
+  #Lower risk to 
+  xlab("odds ratio (log scale)") +
+  ylab("antibody subtype") +
+  theme(#legend.position=c(.11, .84),
+        legend.margin = margin(0,0,0,0),
+        legend.title = element_text(size=10),
+        legend.key.height = unit(.8,"line")) #+
+  #scale_x_continuous(#brakes= c(),
+   #                  label = c("0.1",#"1","10",
+    #                           "100",#"1000",
+     #                          "100000"))
+```
+
+# session info
+
+```{r}
+devtools::session_info()
+```
+
+
+# References

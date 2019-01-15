@@ -1,0 +1,250 @@
+---
+output: pdf_document
+header-includes:
+- \usepackage{multirow}
+- \usepackage{pdflscape}
+- \usepackage{afterpage}
+- \usepackage{capt-of}
+- \usepackage{array}
+- \usepackage{longtable}
+---
+
+<!--------------------------------------------------------->
+
+\afterpage{
+    \clearpage
+    \newgeometry{left=2cm,right=1cm,top=0.5cm,bottom=0.5cm}
+    \thispagestyle{empty}
+    \begin{landscape}
+        \centering
+        
+%latex.default(cstats, title = title, file = file, append = TRUE,     caption = finalcaption, rowlabel = rowlabel, table.env = (!tabenv1 &&         table.env) || (tabenv1 && istr == 1), col.just = col.just,     numeric.dollar = FALSE, insert.bottom = finallegend, rowname = lab,     dcolumn = dcolumn, extracolheads = extracolheads, extracolsize = NNsize,     insert.top = if (strat != ".ALL.") strat, ...)%
+\begin{table}[!tbp]
+\caption{Baseline characteristics of the study population. $N$ is the number of non-missing values. \noindent Test used: Pearson test.\label{s1}} 
+\begin{center}
+\begin{tabular}{lrccccc}
+\hline\hline
+\multicolumn{1}{l}{}&\multicolumn{1}{c}{N}&\multicolumn{1}{c}{Llanchama}&\multicolumn{1}{c}{Ninarumi}&\multicolumn{1}{c}{Puerto Almendra}&\multicolumn{1}{c}{Zungarococha}&\multicolumn{1}{c}{Test Statistic}\tabularnewline
+&&\multicolumn{1}{c}{{\scriptsize $N=116$}}&\multicolumn{1}{c}{{\scriptsize $N=286$}}&\multicolumn{1}{c}{{\scriptsize $N=106$}}&\multicolumn{1}{c}{{\scriptsize $N=428$}}&\tabularnewline
+\hline
+Sex&936&&&&&$\chi^{2}_{3}$=4.8,~P=0.187\tabularnewline
+~~~~Female&&51\%~{\scriptsize~$\frac{~59}{116}$}&58\%~{\scriptsize~$\frac{167}{286}$}&60\%~{\scriptsize~$\frac{~64}{106}$}&52\%~{\scriptsize~$\frac{223}{428}$}&\tabularnewline
+Age~groups~(years)&936&&&&&$\chi^{2}_{9}$=12.16,~P=0.205\tabularnewline
+~~~~(0,8]&&31\%~{\scriptsize~$\frac{~36}{116}$}&28\%~{\scriptsize~$\frac{~81}{286}$}&26\%~{\scriptsize~$\frac{~28}{106}$}&21\%~{\scriptsize~$\frac{~91}{428}$}&\tabularnewline
+~~~~(8,17]&&23\%~{\scriptsize~$\frac{~27}{116}$}&28\%~{\scriptsize~$\frac{~81}{286}$}&22\%~{\scriptsize~$\frac{~23}{106}$}&26\%~{\scriptsize~$\frac{112}{428}$}&\tabularnewline
+~~~~(17,36]&&24\%~{\scriptsize~$\frac{~28}{116}$}&19\%~{\scriptsize~$\frac{~55}{286}$}&27\%~{\scriptsize~$\frac{~29}{106}$}&26\%~{\scriptsize~$\frac{113}{428}$}&\tabularnewline
+~~~~(36,Inf]&&22\%~{\scriptsize~$\frac{~25}{116}$}&24\%~{\scriptsize~$\frac{~69}{286}$}&25\%~{\scriptsize~$\frac{~26}{106}$}&26\%~{\scriptsize~$\frac{112}{428}$}&\tabularnewline
+Education~($\geq$18~years)&455&&&&&$\chi^{2}_{9}$=21.08,~P=0.012\tabularnewline
+~~~~Primary&&38\%~{\scriptsize~$\frac{20}{~52}$}&52\%~{\scriptsize~$\frac{64}{123}$}&60\%~{\scriptsize~$\frac{33}{~55}$}&41\%~{\scriptsize~$\frac{93}{225}$}&\tabularnewline
+~~~~Incomplete~secondary&&25\%~{\scriptsize~$\frac{13}{~52}$}&24\%~{\scriptsize~$\frac{30}{123}$}&20\%~{\scriptsize~$\frac{11}{~55}$}&22\%~{\scriptsize~$\frac{49}{225}$}&\tabularnewline
+~~~~Complete~seconday/+&&33\%~{\scriptsize~$\frac{17}{~52}$}&16\%~{\scriptsize~$\frac{20}{123}$}&18\%~{\scriptsize~$\frac{10}{~55}$}&34\%~{\scriptsize~$\frac{76}{225}$}&\tabularnewline
+~~~~None&&~4\%~{\scriptsize~$\frac{~2}{~52}$}&~7\%~{\scriptsize~$\frac{~9}{123}$}&~2\%~{\scriptsize~$\frac{~1}{~55}$}&~3\%~{\scriptsize~$\frac{~7}{225}$}&\tabularnewline
+Occupation~($\geq$15~years)&462&&&&&$\chi^{2}_{9}$=29.02,~P\textless 0.001\tabularnewline
+~~~~Farmer/Guard/Logger/Fisher&&35\%~{\scriptsize~$\frac{~20}{~57}$}&20\%~{\scriptsize~$\frac{~24}{120}$}&~7\%~{\scriptsize~$\frac{~~4}{~54}$}&13\%~{\scriptsize~$\frac{~30}{231}$}&\tabularnewline
+~~~~Housewife&&54\%~{\scriptsize~$\frac{~31}{~57}$}&63\%~{\scriptsize~$\frac{~76}{120}$}&63\%~{\scriptsize~$\frac{~34}{~54}$}&58\%~{\scriptsize~$\frac{134}{231}$}&\tabularnewline
+~~~~Laborer/Trader/Driver&&~2\%~{\scriptsize~$\frac{~~1}{~57}$}&~6\%~{\scriptsize~$\frac{~~7}{120}$}&13\%~{\scriptsize~$\frac{~~7}{~54}$}&13\%~{\scriptsize~$\frac{~29}{231}$}&\tabularnewline
+~~~~None~(Students/Pensioner)&&~9\%~{\scriptsize~$\frac{~~5}{~57}$}&11\%~{\scriptsize~$\frac{~13}{120}$}&17\%~{\scriptsize~$\frac{~~9}{~54}$}&16\%~{\scriptsize~$\frac{~38}{231}$}&\tabularnewline
+Electricity~availability&936&&&&&$\chi^{2}_{3}$=270.73,~P\textless 0.001\tabularnewline
+~~~~No&&54\%~{\scriptsize~$\frac{~63}{116}$}&~6\%~{\scriptsize~$\frac{~18}{286}$}&15\%~{\scriptsize~$\frac{~16}{106}$}&~1\%~{\scriptsize~$\frac{~~6}{428}$}&\tabularnewline
+Predominant~material~in~wall&919&&&&&$\chi^{2}_{3}$=312.32,~P\textless 0.001\tabularnewline
+~~~~Wood&&100\%~{\scriptsize~$\frac{115}{115}$}&~74\%~{\scriptsize~$\frac{204}{277}$}&~84\%~{\scriptsize~$\frac{~87}{104}$}&~26\%~{\scriptsize~$\frac{110}{423}$}&\tabularnewline
+~~~~Concrete&&~~0\%~{\scriptsize~$\frac{~~0}{115}$}&~26\%~{\scriptsize~$\frac{~73}{277}$}&~16\%~{\scriptsize~$\frac{~17}{104}$}&~74\%~{\scriptsize~$\frac{313}{423}$}&\tabularnewline
+~~~~Triplay&&~~0\%~{\scriptsize~$\frac{~~0}{115}$}&~~0\%~{\scriptsize~$\frac{~~0}{277}$}&~~0\%~{\scriptsize~$\frac{~~0}{104}$}&~~0\%~{\scriptsize~$\frac{~~0}{423}$}&\tabularnewline
+Predominant~material~in~floor&936&&&&&$\chi^{2}_{6}$=485.27,~P\textless 0.001\tabularnewline
+~~~~Wood&&23\%~{\scriptsize~$\frac{~27}{116}$}&~6\%~{\scriptsize~$\frac{~16}{286}$}&~0\%~{\scriptsize~$\frac{~~0}{106}$}&~1\%~{\scriptsize~$\frac{~~3}{428}$}&\tabularnewline
+~~~~Concrete&&~8\%~{\scriptsize~$\frac{~~9}{116}$}&11\%~{\scriptsize~$\frac{~31}{286}$}&26\%~{\scriptsize~$\frac{~28}{106}$}&79\%~{\scriptsize~$\frac{336}{428}$}&\tabularnewline
+~~~~Soil~or~sand&&69\%~{\scriptsize~$\frac{~80}{116}$}&84\%~{\scriptsize~$\frac{239}{286}$}&74\%~{\scriptsize~$\frac{~78}{106}$}&21\%~{\scriptsize~$\frac{~89}{428}$}&\tabularnewline
+Sleeping~under~bednet&930&&&&&$\chi^{2}_{3}$=13.25,~P=0.004\tabularnewline
+~~~~Never&&~6\%~{\scriptsize~$\frac{~~7}{116}$}&17\%~{\scriptsize~$\frac{~47}{284}$}&24\%~{\scriptsize~$\frac{~25}{106}$}&16\%~{\scriptsize~$\frac{~69}{424}$}&\tabularnewline
+Self-report~of~confirmed~malaria~episodes&931&&&&&$\chi^{2}_{9}$=172.31,~P\textless 0.001\tabularnewline
+~~~~(-Inf,0]&&~2\%~{\scriptsize~$\frac{~~2}{116}$}&57\%~{\scriptsize~$\frac{161}{284}$}&27\%~{\scriptsize~$\frac{~29}{106}$}&53\%~{\scriptsize~$\frac{225}{425}$}&\tabularnewline
+~~~~(0,1]&&11\%~{\scriptsize~$\frac{~13}{116}$}&10\%~{\scriptsize~$\frac{~28}{284}$}&~3\%~{\scriptsize~$\frac{~~3}{106}$}&15\%~{\scriptsize~$\frac{~64}{425}$}&\tabularnewline
+~~~~(1,3]&&56\%~{\scriptsize~$\frac{~65}{116}$}&20\%~{\scriptsize~$\frac{~56}{284}$}&45\%~{\scriptsize~$\frac{~48}{106}$}&18\%~{\scriptsize~$\frac{~77}{425}$}&\tabularnewline
+~~~~(3,~Inf]&&31\%~{\scriptsize~$\frac{~36}{116}$}&14\%~{\scriptsize~$\frac{~39}{284}$}&25\%~{\scriptsize~$\frac{~26}{106}$}&14\%~{\scriptsize~$\frac{~59}{425}$}&\tabularnewline
+\hline
+\end{tabular}\end{center}
+\end{table}
+
+\label{tab:hmisc}
+\end{landscape}
+\restoregeometry
+\clearpage
+}
+
+<!----- ALL ---->
+
+%latex.default(cstats, title = title, file = file, append = TRUE,     caption = finalcaption, rowlabel = rowlabel, table.env = (!tabenv1 &&         table.env) || (tabenv1 && istr == 1), col.just = col.just,     numeric.dollar = FALSE, insert.bottom = finallegend, rowname = lab,     dcolumn = dcolumn, extracolheads = extracolheads, extracolsize = NNsize,     insert.top = if (strat != ".ALL.") strat, ...)%
+\begin{table}[!tbp]
+\caption{Malaria prevalence (microscopy and PCR) and seroprevalence by study site. \noindent Test used: Pearson test.\label{s1}} 
+\begin{center}
+\begin{tabular}{lccccc}
+\hline\hline
+\multicolumn{1}{l}{}&\multicolumn{1}{c}{Llanchama}&\multicolumn{1}{c}{Ninarumi}&\multicolumn{1}{c}{Puerto Almendra}&\multicolumn{1}{c}{Zungarococha}&\multicolumn{1}{c}{Test Statistic}\tabularnewline
+&\multicolumn{1}{c}{{\scriptsize $N=116$}}&\multicolumn{1}{c}{{\scriptsize $N=286$}}&\multicolumn{1}{c}{{\scriptsize $N=106$}}&\multicolumn{1}{c}{{\scriptsize $N=428$}}&\tabularnewline
+\hline
+Microscopy&&&&&\tabularnewline
+~~~~P.falciparum&~~1\%~{\scriptsize~$\frac{~~1}{116}$}&~~1\%~{\scriptsize~$\frac{~~2}{286}$}&~~0\%~{\scriptsize~$\frac{~~0}{106}$}&~~2\%~{\scriptsize~$\frac{~~7}{428}$}&$\chi^{2}_{3}$=2.9,~P=0.41\tabularnewline
+~~~~P.vivax&11\%~{\scriptsize~$\frac{~13}{116}$}&~4\%~{\scriptsize~$\frac{~11}{286}$}&~6\%~{\scriptsize~$\frac{~~6}{106}$}&~3\%~{\scriptsize~$\frac{~14}{428}$}&$\chi^{2}_{3}$=14,~P=0.004\tabularnewline
+%~~~~non&88\%~{\scriptsize~$\frac{102}{116}$}&95\%~{\scriptsize~$\frac{273}{286}$}&94\%~{\scriptsize~$\frac{100}{106}$}&95\%~{\scriptsize~$\frac{407}{428}$}&\tabularnewline
+~~~~Total&12\%~{\scriptsize~$\frac{~14}{116}$}&~5\%~{\scriptsize~$\frac{~13}{286}$}&~6\%~{\scriptsize~$\frac{~~6}{106}$}&~5\%~{\scriptsize~$\frac{~21}{428}$}&$\chi^{2}_{3}$=9.8,~P=0.02\tabularnewline
+PCR&&&&&\tabularnewline
+~~~~P.falciparum&~~1\%~{\scriptsize~$\frac{~~1}{116}$}&~~1\%~{\scriptsize~$\frac{~~2}{286}$}&~~0\%~{\scriptsize~$\frac{~~0}{106}$}&~~1\%~{\scriptsize~$\frac{~~3}{428}$}&$\chi^{2}_{3}$=0.81,~P=0.85\tabularnewline
+~~~~P.vivax&27\%~{\scriptsize~$\frac{~31}{116}$}&18\%~{\scriptsize~$\frac{~52}{286}$}&25\%~{\scriptsize~$\frac{~26}{106}$}&11\%~{\scriptsize~$\frac{~45}{428}$}&$\chi^{2}_{3}$=26,~P\textless 0.001\tabularnewline
+%~~~~non&69\%~{\scriptsize~$\frac{~80}{116}$}&80\%~{\scriptsize~$\frac{230}{286}$}&75\%~{\scriptsize~$\frac{~80}{106}$}&89\%~{\scriptsize~$\frac{380}{428}$}&\tabularnewline
+~~~~Mixed&~3\%~{\scriptsize~$\frac{~~4}{116}$}&~1\%~{\scriptsize~$\frac{~~2}{286}$}&~0\%~{\scriptsize~$\frac{~~0}{106}$}&~0\%~{\scriptsize~$\frac{~~0}{428}$}&$\chi^{2}_{3}$=18,~P\textless 0.001\tabularnewline
+~~~~Total&31\%~{\scriptsize~$\frac{~36}{116}$}&20\%~{\scriptsize~$\frac{~56}{286}$}&25\%~{\scriptsize~$\frac{~26}{106}$}&11\%~{\scriptsize~$\frac{~48}{428}$}&$\chi^{2}_{3}$=31,~P\textless 0.001\tabularnewline
+Seropositivity&&&&&\tabularnewline
+~~~~Pf~MSP1-19kDa~QTSR&~9\%~{\scriptsize~$\frac{~10}{116}$}&~6\%~{\scriptsize~$\frac{~16}{286}$}&~7\%~{\scriptsize~$\frac{~~7}{106}$}&~2\%~{\scriptsize~$\frac{~~7}{428}$}&$\chi^{2}_{3}$=15,~P=0.002\tabularnewline
+~~~~Pv~MSP1-19kDa~Pv200&14\%~{\scriptsize~$\frac{~16}{116}$}&10\%~{\scriptsize~$\frac{~30}{286}$}&17\%~{\scriptsize~$\frac{~18}{106}$}&15\%~{\scriptsize~$\frac{~66}{428}$}&$\chi^{2}_{3}$=4.5,~P=0.22\tabularnewline
+%~~~~non&76\%~{\scriptsize~$\frac{~88}{116}$}&82\%~{\scriptsize~$\frac{235}{286}$}&72\%~{\scriptsize~$\frac{~76}{106}$}&83\%~{\scriptsize~$\frac{355}{428}$}&\tabularnewline
+~~~~Mixed&~2\%~{\scriptsize~$\frac{~~2}{116}$}&~2\%~{\scriptsize~$\frac{~~5}{286}$}&~5\%~{\scriptsize~$\frac{~~5}{106}$}&~0\%~{\scriptsize~$\frac{~~0}{428}$}&$\chi^{2}_{3}$=16,~P=0.001\tabularnewline
+~~~~Total&24\%~{\scriptsize~$\frac{~28}{116}$}&18\%~{\scriptsize~$\frac{~51}{286}$}&28\%~{\scriptsize~$\frac{~30}{106}$}&17\%~{\scriptsize~$\frac{~73}{428}$}&$\chi^{2}_{3}$=9,~P=0.03\tabularnewline
+\hline
+\end{tabular}\end{center}
+\end{table}
+
+<!----------------------------------------->
+
+<!------------------INFECTION------------------------>
+
+
+%\afterpage{
+%    \clearpage
+%    \newgeometry{left=2cm,right=.5cm,top=0.5cm,bottom=0.5cm}
+%    \thispagestyle{empty}
+%    \begin{landscape}
+%        \centering
+%
+%
+%\begin{table}[!htbp] \centering 
+%  \caption{Multivariate and backward selected model for species-specific malaria infection} 
+%  \label{} 
+%\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+%\\[-1.8ex]\hline 
+%\hline \\[-1.8ex] 
+% & \multicolumn{4}{c}{\textit{Dependent variable:}} \\ 
+%\cline{2-5} 
+%\\[-1.8ex] & \multicolumn{2}{c}{\textit{P.vivax}} & \multicolumn{2}{c}{\textit{P.falciparum}} \\ 
+%\\[-1.8ex] & (1) & (2) & (1) & (2)\\ 
+%\hline \\[-1.8ex] 
+%  Sex &&&& \\
+%  ~~~~Female & 1 & 1 & 1 &  \\ 
+%  ~~~~Male & 1.407 (0.952, 2.079)$^{*}$ & 1.307 (0.923, 1.851) & 1.201 (0.550, 2.626) &  \\ 
+%  Age &&&& \\
+%  ~~~~36:8 & 0.771 (0.543, 1.094) &  & 1.201 (0.549, 2.626) &  \\ 
+%  Community &&&& \\
+%  ~~~~Zungarococha & 1 & 1 & 1 &  \\ 
+%  ~~~~Puerto Almendra & 1.571 (0.969, 2.548)$^{*}$ & 2.836 (1.650, 4.8737)$^{***}$ &  &  \\ 
+%  ~~~~Ninarumi & 1.413 (0.905, 2.206) & 2.018 (1.314, 3.100)$^{***}$ & 1.047 (0.438, 2.505) &  \\ 
+%  ~~~~Llanchama & 1.669 (1.017, 2.738)$^{**}$ & 3.678 (2.224, 6.085)$^{***}$ & 1.628 (0.665, 3.986) &  \\ 
+%  Occupation &&&& \\
+%  ~~~~Other & 1 &  & 1 &  \\ 
+%  ~~~~Outdoor & 1.162 (0.735, 1.838) &  & 1.266 (0.523, 3.068) &  \\ 
+%  Electricity availability &&&& \\
+%  ~~~~Yes & 1 &  & 1 & 1 \\ 
+%  ~~~~No & 1.244 (0.771, 2.007) &  & 1.708 (0.705, 4.137) & 4.167 (1.232, 14.088)$^{**}$ \\ 
+%  Predominant material in wall &&&& \\
+%  ~~~~Wood & 1 &  & 1 &  \\ 
+%  ~~~~Concrete & 0.698 (0.459, 1.061)$^{*}$ &  & 0.660 (0.282, 1.545) &  \\ 
+%  ~~~~Triplay & 0.849 (0.487, 1.479) &  & 0.785 (0.297, 2.089) &  \\ 
+%  Predominant material in floor &&&& \\
+%  ~~~~Soil or sand & 1 &  & 1 &  \\ 
+%  ~~~~Wood & 0.989 (0.591, 1.657) &  & 1.249 (0.501, 3.115) &  \\ 
+%  ~~~~Concrete & 0.733 (0.480, 1.120) &  & 1.108 (0.473, 2.595) &  \\ 
+%  Sleeping under bednet &&&& \\
+%  ~~~~Always & 1 &  & 1 &  \\ 
+%  ~~~~Never & 1.108 (0.718, 1.710) &  & 1.113 (0.46, 2.693) &  \\ 
+%%  Constant & 0.378 ($-$0.414, 1.170)$^{**}$ & 0.134 ($-$0.215, 0.484)$^{***}$ & 0.017 ($-$1.682, 1.717)$^{***}$ & 0.010 ($-$0.687, 0.706)$^{***}$ \\ 
+% \hline \\[-1.8ex] 
+%Observations & 517 & 936 & 455 & 936 \\ 
+%Events & 96 & 160 & 10 & 12 \\ 
+%R$^{2}$ & 0.092 & 0.058 & 0.068 & 0.036 \\ 
+%%$AUC$ & 0.705 & 0.643 & 0.756 & 0.613 \\ 
+%%$D_{xy}$ & 0.410 & 0.285 & 0.512 & 0.226 \\ 
+%$\chi^{2}$ & 38.220$^{***}$ (df = 5.457047) & 33.369$^{***}$ (df = 4) & 9.346$^{**}$ (df = 3.042954) & 4.324$^{**}$ (df = 1) \\ 
+%\hline 
+%\hline \\[-1.8ex] 
+%\textit{Note:} AOR (95\% CI) & \multicolumn{4}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+%(1) Multivariate model & \multicolumn{4}{r}{} \\ 
+%(2) Backward selected predictors & \multicolumn{4}{r}{} \\ 
+%\end{tabular} 
+%\end{table} 
+%
+%%\label{tab:hmisc}
+%\end{landscape}
+%\restoregeometry
+%\clearpage
+%}
+
+<!-----------------------EXPOSURE------------------------>
+
+
+%\afterpage{
+%    \clearpage
+%    \newgeometry{left=2cm,right=1cm,top=0.5cm,bottom=0.5cm}
+%    \thispagestyle{empty}
+%    \begin{landscape}
+%        \centering
+%
+%% Table created by stargazer v.5.2 by Marek Hlavac, Harvard University. E-mail: hlavac at fas.harvard.edu
+%% Date and time: lun, ris 11, 2017 - 10:20:46
+%\begin{table}[!htbp] \centering 
+%  \caption{Multivariate and backward selected model for species-specific malaria exposure} 
+%  \label{} 
+%\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+%\\[-1.8ex]\hline 
+%\hline \\[-1.8ex] 
+% & \multicolumn{4}{c}{\textit{Dependent variable:}} \\ 
+%\cline{2-5} 
+%\\[-1.8ex] & \multicolumn{2}{c}{\textit{P.vivax}} & \multicolumn{2}{c}{\textit{P.falciparum}} \\ 
+%\\[-1.8ex] & (1) & (2) & (1) & (2)\\ 
+%\hline \\[-1.8ex] 
+%  Sex &&&& \\
+%  ~~~~Female & 1 &  & 1 &  \\ 
+%  ~~~~Male & 0.986 (0.664, 1.473) &  & 0.570 (0.326, 0.994)$^{**}$ & 0.491 (0.267, 0.904)$^{**}$ \\
+%  Age &&&& \\
+%  ~~~~36:8 & 1.635 (1.209, 2.211)$^{***}$ & 1.680 (1.361, 2.073)$^{***}$ & 1.661 (1.153, 2.392)$^{***}$ & 1.705 (1.177, 2.470)$^{***}$ \\
+%  Community &&&& \\
+%  ~~~~Zungarococha & 1 &  & 1 & 1 \\ 
+%  ~~~~Puerto Almendra & 1.763 (1.233, 2.293)$^{**}$ & 2.642 (1.670, 4.182)$^{***}$ & 8.196 (3.867, 17.370)$^{***}$ & 11.549 (5.754, 23.181)$^{***}$ \\
+%  ~~~~Ninarumi & 1.075 (0.667, 1.733) & 1.009 (0.697, 1.461) & 4.414 (2.270, 8.582)$^{***}$ & 5.334 (3.012, 9.447)$^{***}$ \\ 
+%  ~~~~Llanchama & 1.038 (0.578, 1.866) & 1.445 (0.893, 2.337) & 4.218 (1.808, 9.841)$^{***}$ & 6.640 (3.266, 13.497)$^{***}$ \\ 
+%  Occupation &&&& \\
+%  ~~~~Other & 1 &  & 1 &  \\ 
+%  ~~~~Outdoor & 0.957 (0.576, 1.591) &  & 1.580 (0.776, 3.216) & 1.907 (0.870, 4.182) \\
+%  Electricity availability &&&& \\
+%  ~~~~Yes & 1 &  & 1 &  \\ 
+%  ~~~~No & 1.217 (0.696, 2.128) &  & 1.497 (0.738, 3.035) &  \\ 
+%  Predominant material in wall &&&& \\
+%  ~~~~Wood & 1 &  & 1 &  \\ 
+%  ~~~~Concrete & 1.129 (0.737, 1.731) &  & 0.940 (0.536, 1.650) &  \\ 
+%  ~~~~Triplay & 1.037 (0.518, 2.077) &  & 2.311 (0.741, 7.208) &  \\ 
+%  Predominant material in floor &&&& \\
+%  ~~~~Soil or sand & 1 &  & 1 &  \\ 
+%  ~~~~Concrete & 1.004 (0.644, 1.566) &  & 1.047 (0.577, 1.896) & \\ 
+%  ~~~~Wood & 0.708 (0.377, 1.331) &  & 1.848 (0.777, 4.394) & \\
+%  Sleeping under bednet &&&& \\ %terminado
+%  ~~~~Always & 1 & 1 & 1 &  \\ 
+%  ~~~~Never & 1.873 (1.224, 2.868)$^{***}$ & 1.660 (1.120, 2.459)$^{**}$ & 0.575 (0.311, 1.064)$^{*}$ & 0.521 (0.270, 1.005)$^{*}$ \\
+%  %Constant & 0.110 ($-$0.767, 0.987)$^{***}$ & 0.158 ($-$0.168, 0.484)$^{***}$ & 0.067 ($-$1.169, 1.304)$^{***}$ & 0.028 ($-$0.821, 0.878)$^{***}$ \\ 
+% \hline \\[-1.8ex] 
+%Observations & 517 & 930 & 517 & 517 \\ 
+%Events & 148 & 232 & 122 & 122 \\
+%R$^{2}$ & 0.072 & 0.076 & 0.239 & 0.240 \\ 
+%%$AUC$ & 0.649 & 0.614 & 0.786 & 0.775 \\
+%%$D_{xy}$ & 0.297 & 0.229 & 0.571 & 0.551 \\ 
+%$\chi^{2}$ & 33.297$^{***}$ (df = 7.360865) & 49.183$^{***}$ (df = 5) & 96.679$^{***}$ (df = 10.26039) & 90.043$^{***}$ (df = 7) \\ 
+%\hline 
+%\hline \\[-1.8ex] 
+%\textit{Note:} AOR (95\% CI) & \multicolumn{4}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+%(1) Multivariate model & \multicolumn{4}{r}{} \\ 
+%(2) Backward selected predictors & \multicolumn{4}{r}{} \\ 
+%\end{tabular} 
+%\end{table} 
+%
+%%\label{tab:hmisc}
+%\end{landscape}
+%\restoregeometry
+%\clearpage
+%}
+
