@@ -65,7 +65,7 @@ ggmap::qmplot(longitud, latitud,
                  location = "bottomright") +
   ggsn::north(x.min=-73.40,x.max=-73.339,y.min=-3.86,y.max=-3.825)
 ggsave("figure/map-iquitos_zungaro-bw.png",height=4.5,width=7.5)
-ggsave("figure/map-iquitos_zungaro-bw.pdf",height=4.5,width=7.5)
+*ggsave("figure/map-iquitos_zungaro-bw.pdf",height=4.5,width=7.5)
 
 
 #_ COMMUNITY MAPS ------------------------------------------------------

@@ -1279,6 +1279,8 @@ par(mfrow=c(1,1))
 
 ## Transmission intensity curves
 
+### model functions
+
 ```{r}
 Lccm1 <- function(theta,data) {
 # theta : vector of length two, including h, r (parameters to be maximized)
@@ -1356,8 +1358,11 @@ unap10a_rc %>%
   facet_grid(Specie~community_1)
 ```
 
+### datasets
+
 ```{r,fig.height=4,fig.width=12}
-## ERRORR!!!
+## ERROR CORREGIDO
+## POR COMUNIDAD
 unap10a_rc_x <- unap10a %>% 
   mutate(exposure_viv=if_else(sero_c=="viv" | sero_c=="mix",1,0),
          exposure_fal=if_else(sero_c=="fal" | sero_c=="mix",1,0),
@@ -1392,10 +1397,80 @@ unap10a_rc_x <- unap10a %>%
                                 sero.fal.p=sum(exposure_fal)/n()
                                 ) %>% 
   ungroup()
+
 unap10a_rc_x %>% dplyr::count(age_ten)
 quantile(unap10a_rc$age_7,probs = seq(0,1,0.1))
 quantile(unap10a$age_7,probs = seq(0,1,0.1))
+
+## PER COMUNITY DATASET
+unap10a_rc_y <- unap10a_rc_x %>% 
+  mutate(age_ten=stringr::str_replace(age_ten,"(\\(|\\[)(.+),(.+)\\]","\\2")) %>% 
+  filter(age_ten!="Inf") %>% 
+  mutate(age_ten=as.numeric(age_ten))
+
+#unap10a_rc_x %>% print(n=Inf)
+#unap10a_rc_y %>% print(n=Inf)
+
+unap10a_rc_y %>% write_rds("data/z0_revcat.rds")
+unap10a_rc_y %>% 
+  rename_all(funs(str_replace_all(.,"\\.","_"))) %>% 
+  haven::write_dta("data/z0_revcat.dta")
 ```
+
+```{r,fig.height=4,fig.width=12}
+## NIVEL GLOBAL
+unap10a_rc_x_g <- unap10a %>% 
+  mutate(exposure_viv=if_else(sero_c=="viv" | sero_c=="mix",1,0),
+         exposure_fal=if_else(sero_c=="fal" | sero_c=="mix",1,0),
+         infection_viv=if_else(pcr_c=="viv" | pcr_c=="mix",1,0),
+         infection_fal=if_else(pcr_c=="fal" | pcr_c=="mix",1,0)
+         ) %>% #dplyr::count(pcr_c,infection_fal)
+  #mutate(exposure_viv=as.factor(exposure_viv),
+   #      exposure_fal=as.factor(exposure_fal),
+    #     infection_viv=as.factor(infection_viv),
+     #    infection_fal=as.factor(infection_fal)
+      #   ) %>% 
+  dplyr::select(id,age_7,community_1,
+                exposure_viv:infection_fal) %>% 
+  #filter(age_7<=60) %>% 
+  mutate(age_ten=cut(age_7,c(quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[1],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[2],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[3],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[4],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[5],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[6],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[7],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[8],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[9],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[10],
+                             quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[11]),include.lowest = T)
+         ) %>%
+  group_by(#community_1,
+           age_ten) %>% summarise(tot.sero.viv=n(),
+                                sum.sero.viv=sum(exposure_viv),
+                                sero.viv.p=sum(exposure_viv)/n(),
+                                tot.sero.fal=n(),
+                                sum.sero.fal=sum(exposure_fal),
+                                sero.fal.p=sum(exposure_fal)/n()
+                                ) %>% 
+  ungroup()
+
+## GLOBAL DATASET
+unap10a_rc_y_g <- unap10a_rc_x_g %>% 
+  mutate(age_ten=stringr::str_replace(age_ten,"(\\(|\\[)(.+),(.+)\\]","\\2")) %>% 
+  filter(age_ten!="Inf") %>% 
+  mutate(age_ten=as.numeric(age_ten))
+
+#unap10a_rc_x %>% print(n=Inf)
+#unap10a_rc_y %>% print(n=Inf)
+
+unap10a_rc_y_g %>% write_rds("data/z0_revcat_zg.rds")
+unap10a_rc_y_g %>% 
+  rename_all(funs(str_replace_all(.,"\\.","_"))) %>% 
+  haven::write_dta("data/z0_revcat_zg.dta")
+```
+
+### plots
 
 ```{r,fig.height=4,fig.width=12}
 unap10a %>% #glimpse()
@@ -1427,7 +1502,7 @@ ggsave("figure/decile-pcr_sero.png")
 
 ```{r,fig.height=3,fig.width=12}
 unap10a %>% #glimpse()
-  select(id:community_1,densidad:mean.OD_Pviv) %>% 
+  select(id:community_1,starts_with("Ab.unit_")) %>% 
   mutate(age_ten=cut(age_7,c(quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[1],
                              quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[2],
                              quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[3],
@@ -1441,7 +1516,7 @@ unap10a %>% #glimpse()
                              quantile(unap10a$age_7,probs = seq(0,1,0.1),na.rm = T)[11]),include.lowest = T)
          ) %>% 
   #filter(is.na(age_ten)) %>% print(n=Inf)
-  select(id,community_1,age_ten,contains("Ab.unit")) %>% 
+  select(id,community_1,age_ten,starts_with("Ab.unit_")) %>% 
   gather(Specie,value,-id,-age_ten,-community_1) %>% 
   mutate(Specie=forcats::fct_recode(Specie,"P.falciparum"="Ab.unit_Pfal","P.vivax"="Ab.unit_Pviv")) %>% 
   ggplot(aes(age_ten,value,fill=Specie)) +
@@ -1453,22 +1528,6 @@ unap10a %>% #glimpse()
 ggsave("figure/decile-abunits.png")
 ```
 
-```{r}
-## ERRORR!!! SOLVED
-unap10a_rc_y <- unap10a_rc_x %>% 
-  mutate(age_ten=stringr::str_replace(age_ten,"(\\(|\\[)(.+),(.+)\\]","\\2")) %>% 
-  filter(age_ten!="Inf") %>% 
-  mutate(age_ten=as.numeric(age_ten))
-
-#unap10a_rc_x %>% print(n=Inf)
-#unap10a_rc_y %>% print(n=Inf)
-
-unap10a_rc_y %>% write_rds("data/z0_revcat.rds")
-unap10a_rc_y %>% 
-  rename_all(funs(str_replace_all(.,"\\.","_"))) %>% 
-  haven::write_dta("data/z0_revcat.dta")
-```
-
 ```{r,fig.height=4,fig.width=12}
 unap10a_rc_y %>% 
   dplyr::select(community_1,age_ten,#age_7,#tot.sero.viv,tot.sero.fal,
@@ -1478,9 +1537,30 @@ unap10a_rc_y %>%
   ggplot(aes(age_ten,#age_7,
              sero.p)) +
   geom_point() +
-  facet_grid(Specie~community_1) #+
+  facet_grid(Specie~community_1) +
+  ylim(c(0,1))
   #theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
+
+```{r,fig.height=4,fig.width=4}
+
+unap10a_rc_y_g
+
+unap10a_rc_y_g %>% 
+  mutate(community_1="Whole community") %>% 
+  dplyr::select(community_1,
+                age_ten,"P. vivax"=sero.viv.p,"P. falciparum"=sero.fal.p) %>%
+  gather(Specie,sero.p,-community_1,
+         -age_ten#-age_7
+         ) %>% 
+  ggplot(aes(age_ten,#age_7,
+             sero.p)) +
+  geom_point() +
+  facet_grid(Specie~community_1) + ylim(c(0,1))
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
 
 ### two estimates: h, r
 

@@ -8,6 +8,7 @@ library(forcats)
 library(naniar)
 
 rm(list = ls())
+theme_set(theme_bw())
 
 # BASE FINAL -----------------------------------------------------
 
@@ -92,7 +93,11 @@ bas <- read_rds("data/x-zungaro_basal.rds") %>%
                                                       "nunca-raravez"=c("1. Nunca","2. Rara vez"),
                                                       "amenudo-siempre"=c("3. A menudo","4. A veces","5. Siempre")),
          epi_frecuencia_rocia_casa_c=fct_collapse(epi_frecuencia_rocia_casa,
-                                                  "raravez-unaxano"=c("Rara vez","Una vez al ano")),
+                                                  "nunca-raravez-unaxano"=c("Nunca","Rara vez","Una vez al ano")),
+         epi_uso_red_dormir_c=fct_collapse(epi_uso_red_dormir,
+                                           "nunca"="no sabe",
+                                           "desde siempre"="recientemente"
+                                           ) ,
          
          #recategorizar EDAD: 0-6 6-11 12-17 18+
          age_jem = cut(age_7,c(0,6,11,17,Inf)),
@@ -155,7 +160,9 @@ bas <- read_rds("data/x-zungaro_basal.rds") %>%
          
          #relevelear
          epi_frecuencia_rocia_casa_c=fct_relevel(epi_frecuencia_rocia_casa_c,
-                                                 "Nunca","raravez-unaxano"),
+                                                 "nunca-raravez-unaxano","Cada 6 meses"
+                                                 #"Nunca","raravez-unaxano"
+                                                 ),
          epi_alguien_tuvo_malaria=fct_relevel(epi_alguien_tuvo_malaria,
                                               "Nunca","Si, hace algunos anos","Si, el ultimo ano"),
          
@@ -186,6 +193,8 @@ bas <- read_rds("data/x-zungaro_basal.rds") %>%
          #relacionjefefamilia
          #sexo
          
+         #corregir abunits_cuartil
+         
          
          ) %>% 
   select(-opciones_tenido_malaria)
@@ -194,11 +203,15 @@ bas <- read_rds("data/x-zungaro_basal.rds") %>%
 #bas %>% count(relacion_jefe_familia_c)
 #bas %>% count(actualmente_estudiando_18)
 
+#bas %>% count(Ab.unit_Pviv_4,Ab.unit_Pfal_4,sero_c) %>% print(n=Inf)
+
 bas %>% glimpse()
 
 #bas %>% count(epi_cerca_fuente_agua,epi_tipo_fuente_agua,epi_distancia_fuente_agua)
 #bas %>% count(epi_malaria_ultimos_meses,epi_viajo_fuera_villa,epi_meses_ultima_malaria,epi_especie_causo_malaria)
 #bas %>% count(epi_malaria_ultimos_meses)
+
+bas %>% count(community_1)
 
 # _BASE DE SUJETOS ---------------------------------------------------------
 
@@ -243,6 +256,9 @@ ind <- bas %>%
   mutate(#epi_redes_usadas_actualmente=stringr::str_to_lower(epi_redes_usadas_actualmente),
          residence_fct=if_else(residence<3,"<=2",">2"))
 
+#ind %>% count(sero_fal,Ab.unit_Pfal_4) #no olvidar la distribucion de la variable!!, recontra sesgada y 3/4 cuartiles son negativos!!
+#ind %>% count(sero_viv,Ab.unit_Pviv_4)
+
 # _BASE DE VIVIENDAS -------------------------------------------------------
 
 viv <- bas %>% 
@@ -279,7 +295,7 @@ viv <- bas %>%
 #cen_viv <- read_rds("data/vivienda_zungarococha_2018.rds") %>% 
 #  select(hh,n_indiv)
 
-viv_y <- ind %>% select(vivienda,id,micr_viv,prev_viv,sero_viv,sero_fal) %>% 
+viv_y <- ind %>% select(vivienda,id,micr_viv,prev_viv,prev_fal,sero_viv,sero_fal) %>% 
   gather(key,value,-vivienda,-id) %>% select(vivienda,key,id,value) %>% arrange(vivienda,key,id) %>% 
   mutate(value=if_else(value=="positive",1,0)) %>% #dplyr::count(value)
   group_by(vivienda,key) %>% 
@@ -296,6 +312,7 @@ viv_y <- ind %>% select(vivienda,id,micr_viv,prev_viv,sero_viv,sero_fal) %>%
   mutate(
     micr_viv_hoth = as.factor(micr_viv_hoth),
     prev_viv_hoth = as.factor(prev_viv_hoth),
+    prev_fal_hoth = as.factor(prev_fal_hoth),
     sero_fal_hoth = as.factor(sero_fal_hoth),
     sero_viv_hoth = as.factor(sero_viv_hoth)
   )
@@ -422,7 +439,7 @@ compareGroups(community_1 ~ .,
 compareGroups(community_1 ~ 
                 material_pared+material_piso+
                 epi_cerca_fuente_agua+
-                epi_frecuencia_rocia_casa+epi_rocia_con_insecticida_c+
+                epi_frecuencia_rocia_casa_c+epi_rocia_con_insecticida_c+
                 epi_malaria_ultimos_meses+
                 epi_alguien_tuvo_malaria+
                 micr_viv_hoth+prev_viv_hoth+sero_viv_hoth+sero_fal_hoth+sero_viv_prct+sero_fal_prct, 
@@ -442,7 +459,7 @@ compareGroups(community_1 ~
 compareGroups(micr_viv_hoth ~ 
                 material_pared_c+material_piso_c+
                 epi_cerca_fuente_agua+#epi_tipo_fuente_agua+epi_distancia_fuente_agua+
-                epi_frecuencia_rocia_casa+epi_rocia_con_insecticida_c+
+                epi_frecuencia_rocia_casa_c+epi_rocia_con_insecticida_c+
                 epi_malaria_ultimos_meses_c+#epi_viajo_fuera_villa+epi_meses_ultima_malaria+epi_especie_causo_malaria+
                 epi_alguien_tuvo_malaria, 
               data = viv ,byrow=T 
@@ -452,10 +469,10 @@ compareGroups(micr_viv_hoth ~
 
 compareGroups(prev_viv_hoth ~ 
                 material_pared_c+material_piso_c+
-                epi_cerca_fuente_agua+#epi_tipo_fuente_agua+epi_distancia_fuente_agua+
-                epi_frecuencia_rocia_casa+epi_rocia_con_insecticida_c+
-                epi_malaria_ultimos_meses_c+#epi_viajo_fuera_villa+epi_meses_ultima_malaria+epi_especie_causo_malaria+
-                epi_alguien_tuvo_malaria, 
+                epi_cerca_fuente_agua+epi_tipo_fuente_agua+epi_distancia_fuente_agua+
+                epi_frecuencia_rocia_casa_c+epi_rocia_con_insecticida_c+
+                epi_malaria_ultimos_meses_c+epi_viajo_fuera_villa+epi_meses_ultima_malaria+epi_especie_causo_malaria+
+                epi_alguien_tuvo_malaria+sero_viv_hoth, 
               data = viv ,byrow=T 
 ) %>% 
   createTable(show.n = T) %>% 
@@ -463,10 +480,10 @@ compareGroups(prev_viv_hoth ~
 
 compareGroups(sero_viv_hoth ~ 
                 material_pared_c+material_piso_c+
-                epi_cerca_fuente_agua+#epi_tipo_fuente_agua+epi_distancia_fuente_agua+
-                epi_frecuencia_rocia_casa+epi_rocia_con_insecticida_c+
-                epi_malaria_ultimos_meses_c+#epi_viajo_fuera_villa+epi_meses_ultima_malaria+epi_especie_causo_malaria+
-                epi_alguien_tuvo_malaria, 
+                epi_cerca_fuente_agua+epi_tipo_fuente_agua+epi_distancia_fuente_agua+
+                epi_frecuencia_rocia_casa_c+epi_rocia_con_insecticida_c+
+                epi_malaria_ultimos_meses_c+epi_viajo_fuera_villa+epi_meses_ultima_malaria+epi_especie_causo_malaria+
+                epi_alguien_tuvo_malaria+prev_viv_hoth, 
               data = viv ,byrow=T 
 ) %>% 
   createTable(show.n = T) %>% 
@@ -475,9 +492,10 @@ compareGroups(sero_viv_hoth ~
 compareGroups(sero_fal_hoth ~ 
                 material_pared_c+material_piso_c+
                 epi_cerca_fuente_agua+epi_tipo_fuente_agua+epi_distancia_fuente_agua+
-                epi_frecuencia_rocia_casa+epi_rocia_con_insecticida_c+
-                epi_malaria_ultimos_meses_c+#epi_viajo_fuera_villa+epi_meses_ultima_malaria+epi_especie_causo_malaria+
-                epi_alguien_tuvo_malaria, 
+                epi_frecuencia_rocia_casa_c+epi_rocia_con_insecticida_c+
+                epi_malaria_ultimos_meses_c+epi_viajo_fuera_villa+epi_meses_ultima_malaria+epi_especie_causo_malaria+
+                epi_alguien_tuvo_malaria+prev_fal_hoth
+              , 
               data = viv ,byrow=T 
 ) %>% 
   createTable(show.n = T) %>% 
@@ -526,7 +544,7 @@ compareGroups(community_1 ~
                 epi_estado_campos_agricultura_c+
                 epi_estado_canal_agua_c+
                 
-                epi_uso_red_dormir+
+                epi_uso_red_dormir_c+
                 epi_redes_usadas_actualmente, 
               data = ind #,byrow=T 
               #,method = c(residence = 2)
@@ -566,7 +584,7 @@ compareGroups(community_1 ~
                 epi_estado_campos_agricultura_c+
                 epi_estado_canal_agua_c+
                 
-                epi_uso_red_dormir +
+                epi_uso_red_dormir_c +
                 
                 micro_c+pcr_c+sero_c+
                 Ab.unit_Pviv+Ab.unit_Pviv_4+
@@ -600,7 +618,7 @@ compareGroups(prev_viv ~
                 epi_estado_campos_agricultura_c+
                 epi_estado_canal_agua_c+
                 
-                epi_uso_red_dormir
+                epi_uso_red_dormir_c+sero_viv
               
               ,data = ind ,byrow=T 
               #,method = c(Ab.unit_Pviv = 2,Ab.unit_Pfal=2)
@@ -610,7 +628,7 @@ compareGroups(prev_viv ~
 
 
 compareGroups(sero_viv ~ 
-                community_1 + 
+                community_1 + age_7 +
                 
                 age_quart+sex_8+
                 residence_fct+residence_quart+#residence+#
@@ -630,7 +648,7 @@ compareGroups(sero_viv ~
                 epi_estado_campos_agricultura_c+
                 epi_estado_canal_agua_c+
                 
-                epi_uso_red_dormir
+                epi_uso_red_dormir_c+prev_viv
               
               ,data = ind ,byrow=T 
               #,method = c(Ab.unit_Pviv = 2,Ab.unit_Pfal=2)
@@ -659,7 +677,7 @@ compareGroups(sero_fal ~
                 epi_estado_campos_agricultura_c+
                 epi_estado_canal_agua_c+
                 
-                epi_uso_red_dormir
+                epi_uso_red_dormir_c+prev_fal
               
               ,data = ind ,byrow=T 
               #,method = c(Ab.unit_Pviv = 2,Ab.unit_Pfal=2)
@@ -693,7 +711,7 @@ ind %>%
     epi_estado_campos_agricultura_c,
     epi_estado_canal_agua_c,
     
-    epi_uso_red_dormir,
+    epi_uso_red_dormir_c,
     
     prev_viv,
     sero_viv,Ab.unit_Pviv,Ab.unit_Pviv_4,
@@ -712,14 +730,14 @@ viv %>%
     
     material_pared,material_piso,
     epi_cerca_fuente_agua,#epi_tipo_fuente_agua,epi_distancia_fuente_agua,
-    epi_frecuencia_rocia_casa,epi_rocia_con_insecticida_c,
+    epi_frecuencia_rocia_casa_c,epi_rocia_con_insecticida_c,
     epi_malaria_ultimos_meses,#epi_viajo_fuera_villa,epi_meses_ultima_malaria,epi_especie_causo_malaria,
     epi_alguien_tuvo_malaria,
     
     longitud,latitud,
     
     micr_viv_hoth,
-    prev_viv_hoth,
+    prev_viv_hoth,prev_fal_hoth,
     sero_viv_hoth,sero_fal_hoth,
     sero_viv_prct,sero_fal_prct
   ) %>% 
@@ -751,7 +769,7 @@ ind_viv %>%
     #epi_rocia_con_insecticida_c,
     epi_estado_campos_agricultura_c,
     epi_estado_canal_agua_c,
-    epi_uso_red_dormir,
+    epi_uso_red_dormir_c,
     
     vivienda,
     material_pared_c,material_piso_c,
@@ -783,16 +801,81 @@ ind %>% count(age_gcb)
 ind %>% count(age_quart)
 
 #linealidad edad-outcome
-ind %>% ggplot(aes(age_ten)) + geom_bar(aes(fill=prev_viv),position = position_fill()) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
-ind %>% ggplot(aes(age_ten)) + geom_bar(aes(fill=sero_viv),position = position_fill()) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
-ind %>% ggplot(aes(age_ten)) + geom_bar(aes(fill=sero_fal),position = position_fill()) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ind %>% 
+  ggplot(aes(age_ten)) + 
+  geom_bar(aes(fill=prev_viv),position = position_fill()) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ind %>% 
+  ggplot(aes(age_ten)) + 
+  geom_bar(aes(fill=sero_viv),position = position_fill()) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ind %>% 
+  ggplot(aes(age_ten)) + 
+  geom_bar(aes(fill=sero_fal),position = position_fill()) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 #linealidad residencia-outcome
 #ind %>% ggplot(aes(residence_ten)) + geom_bar(aes(fill=prev_viv),position = position_fill()) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
-ind %>% ggplot(aes(residence_ten)) + geom_bar(aes(fill=sero_viv),position = position_fill()) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
-ind %>% ggplot(aes(residence_ten)) + geom_bar(aes(fill=sero_fal),position = position_fill()) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ind %>% 
+  ggplot(aes(residence_ten)) + 
+  geom_bar(aes(fill=sero_viv),position = position_fill()) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ind %>% 
+  ggplot(aes(residence_ten)) + 
+  geom_bar(aes(fill=sero_fal),position = position_fill()) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
 # MAPA CASO-CONTROL -------------------------------------------------------
 
+#ver: maps-per_iq_zung.R
 
+# REVERSE CATALITYC MODEL -------------------------------------------------
+
+pv <- haven::read_dta("data/z0_revcat_zg_pv.dta") %>% 
+  select(age=age_7,p, u_p, l_p) %>% 
+  mutate(specie="P. vivax",
+         community_1="Whole community")
+
+pf <- haven::read_dta("data/z0_revcat_zg_pf.dta") %>% 
+  select(age=age_7,p, u_p, l_p) %>% 
+  mutate(specie="P. falciparum",
+         community_1="Whole community")
+
+rcm <- union_all(pv,pf)
+
+read_rds("data/z0_revcat_zg.rds") %>% 
+  rename(age=age_ten) %>% 
+  mutate(community_1="Whole community") %>% 
+  dplyr::select(community_1,
+                age,"P. vivax"=sero.viv.p,"P. falciparum"=sero.fal.p) %>%
+  gather(specie,sero.p,-community_1,
+         -age#-age_7
+  ) %>% 
+  ggplot(aes(age,sero.p*100,colour=specie)) +
+  geom_point() +
+  
+  coord_fixed(ratio = 1) +
+  
+  geom_ribbon(data=rcm, aes(x=age, y=p*100, ymin=l_p*100, ymax=u_p*100, fill=specie), alpha=0.2, linetype=0) +
+  geom_line(data=rcm, aes(x=age, y=p*100, colour=specie)) +
+  
+  #facet_grid(specie~community_1) + 
+  ylim(c(0,50)) +
+  scale_x_continuous(breaks = seq(0,80,by = 10)) +
+  
+  ylab("% seropositive") + xlab("Age (years)")
+  
+ggsave("figure/rcm_whole.png",width = 6,height = 4)
+
+read_rds("data/z0_revcat.rds") %>% 
+  dplyr::select(community_1,age_ten,#age_7,#tot.sero.viv,tot.sero.fal,
+                5,8) %>% 
+  gather(Specie,sero.p,-community_1,-age_ten#-age_7
+  ) %>% 
+  ggplot(aes(age_ten,#age_7,
+             sero.p)) +
+  geom_point() +
+  facet_grid(Specie~community_1) +
+  ylim(c(0,1))
+ggsave("figure/rcm_commu.png",width = 12,height = 4)

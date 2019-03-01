@@ -870,6 +870,12 @@ e <- sum.tbl(msr_two,2,"s-=1, s+=2") %>%
   rbind(sum.tbl(msr_three_a,3,"s-=1, s+=2+3")) %>% 
   rbind(sum.tbl(msr_three_b,3,"s-=1+2, s+=3"))
 
+e %>% 
+  arrange(Specie,comp_num) %>% 
+  mutate(define=if_else(define==lag(define),NA_character_,define,define)) %>% 
+  select(Specie,everything()) %>% 
+  xlsx::write.xlsx("table/z0_mixture_class.xlsx",showNA = F)
+
 e %>% filter(Specie=="Pfal") %>% 
   mutate(define=if_else(define==lag(define),NA_character_,define,define))
 e %>% filter(Specie=="Pviv") %>% 
