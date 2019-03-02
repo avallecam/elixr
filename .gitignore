@@ -3,6 +3,7 @@
 analysis/*.csl
 analysis/trialerror/*
 analysis/*Hmisc*
+analysis/*.Rmd
 data/*
 data-raw/*
 figure/*
