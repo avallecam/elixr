@@ -145,7 +145,7 @@ glm sero_fal i.community_1 i.age_quart i.prev_fal i.tenido_malaria if mis1==0 & 
 
 ************************************ PREV-VIVAX+ (NESTED METHOD) ************************************ 
 
-corr trabajo_rpl community_1 age_quart sex_8 epi_cercania_fuente_agua_c epi_estuvo_campo_antes_c epi_uso_repelente_mos-quito_c epi_uso_mangas_largas_c epi_duerme_cerca_monte_c epi_estado_campos_agricultura_c epi_estado_canal_agua_c material_pared_c material_piso_c epi_cerca_fuente_agua epi_rocia_con_insecticida_c epi_alguien_tuvo_malaria  age_7 residence_fct residence_quart actualmente_estudiando tenido_malaria epi_uso_redes_cama_c epi_duerme_ventanas_abiertas_c epi_frecuencia_rocia_casa_c epi_malaria_ultimos_meses_c sero_viv sero_fal
+corr trabajo_rpl community_1 age_quart sex_8 epi_cercania_fuente_agua_c epi_estuvo_campo_antes_c epi_uso_repelente_mosquito_c epi_uso_mangas_largas_c epi_duerme_cerca_monte_c epi_estado_campos_agricultura_c epi_estado_canal_agua_c material_pared_c material_piso_c epi_cerca_fuente_agua epi_rocia_con_insecticida_c epi_alguien_tuvo_malaria  age_7 residence_fct residence_quart actualmente_estudiando tenido_malaria epi_uso_redes_cama_c epi_duerme_ventanas_abiertas_c epi_frecuencia_rocia_casa_c epi_malaria_ultimos_meses_c sero_viv sero_fal
 coldiag2 epi_duerme_cerca_monte_c material_piso_c sero_viv trabajo_rpl  age_quart epi_alguien_tuvo_malaria community_1
 
 *SIN vce(cluster vivienda )**************************
@@ -259,7 +259,7 @@ glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.epi_algui
 xi: glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.epi_alguien_tuvo_malaria i.trabajo_rpl i.epi_malaria_ultimos_meses_c if mis==0, family(poisson) link(log) eform nolog
 
 *stepwise
-stepwise, pe(.05): xi: glm prev_viv i.trabajo_rpl i.community_1 i.age_quart i.sex_8 i.epi_cercania_fuente_agua_c i.epi_estuvo_campo_antes_c i.epi_uso_repelente_mosquito_c i.epi_uso_mangas_largas_c i.epi_duerme_cerca_monte_c i.epi_estado_campos_agricultura_c i.epi_estado_canal_agua_c i.material_pared_c i.material_piso_c i.epi_cerca_fuente_agua i.epi_rocia_con_insecticida_c i.epi_alguien_tuvo_malaria  age_7 i.residence_fct i.residence_quart i.actualmente_estudiando i.tenido_malaria i.epi_uso_redes_cama_c i.epi_duerme_ventanas_abiertas_c i.epi_frecuencia_rocia_casa_c i.epi_malaria_ultimos_meses_c i.sero_viv i.sero_fal if mis==0, family(poisson) link(log) eform nolog
+*stepwise, pe(.05): xi: glm prev_viv i.trabajo_rpl i.community_1 i.age_quart i.sex_8 i.epi_cercania_fuente_agua_c i.epi_estuvo_campo_antes_c i.epi_uso_repelente_mosquito_c i.epi_uso_mangas_largas_c i.epi_duerme_cerca_monte_c i.epi_estado_campos_agricultura_c i.epi_estado_canal_agua_c i.material_pared_c i.material_piso_c i.epi_cerca_fuente_agua i.epi_rocia_con_insecticida_c i.epi_alguien_tuvo_malaria  age_7 i.residence_fct i.residence_quart i.actualmente_estudiando i.tenido_malaria i.epi_uso_redes_cama_c i.epi_duerme_ventanas_abiertas_c i.epi_frecuencia_rocia_casa_c i.epi_malaria_ultimos_meses_c i.sero_viv i.sero_fal if mis==0, family(poisson) link(log) eform nolog
 
 *cluster vivienda
 *glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.trabajo_rpl  i.age_quart i.epi_alguien_tuvo_malaria i.community_1  if mis==0, family(poisson) link(log) vce(cluster vivienda ) eform nolog

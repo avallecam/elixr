@@ -21,15 +21,15 @@ s1.tex
 *.tex
 *.log
 table/*
-*.do
+UNAPdofile20Sept16.do
 equation*
 mix-marilly*
 mixtools*
 revcatr*
+localg*
 surveym*
 test_r*
 unap-marilly*
-unap-rafael*
 unap8*
 *.txt
 abstract*
