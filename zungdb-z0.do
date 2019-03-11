@@ -108,6 +108,7 @@ glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.epi_algui
 *meglm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv if mis==0 || vivienda: , family(poisson) link(log) eform nolog
 *meglm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv if mis==0 || vivienda: R.material_piso_c , family(poisson) link(log) eform nolog
 
+tab epi_alguien_tuvo_malaria epi_malaria_ultimos_meses_c if mis==0
 
 ** SERO-VIVAX+ (NESTED METHOD) ************************************ 
 *modelo final
