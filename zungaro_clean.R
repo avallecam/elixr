@@ -42,7 +42,8 @@ bas <- read_rds("data/x-zungaro_basal.rds") %>%
          
          nivel_educacion=fct_collapse(nivel_educacion,
                                       "Primary"=c("primaria"),
-                                      "Secondary"=c("secundaria incompleta","secundaria completa"),
+                                      "Secondary or more"=c("secundaria incompleta","secundaria completa","tecnica","universitaria"),
+                                      #"Secondary"=c("secundaria incompleta","secundaria completa"),
                                       #"Incomplete Secondary"=c("secundaria incompleta"),
                                       #"Complete Secondary"=c("secundaria completa"),
                                       #"Complete Secondary or more"=c("secundaria completa", "tecnica","universitaria"),
@@ -213,6 +214,103 @@ bas %>% glimpse()
 
 bas %>% count(community_1)
 
+bas %>% count(nivel_educacion_c)
+bas %>% count(nivel_educacion)
+bas %>% count(actualmente_estudiando)
+
+bas %>% 
+  select(epi_viajo_fuera_villa,epi_ultimas_semanas_viajo,epi_numero_veces_viajo) %>% 
+  count(epi_ultimas_semanas_viajo)
+
+# _HISTORIA DE MALARIA -----------------------------------------------------
+
+#ind_viv %>% 
+#  select(id,tenido_malaria,cuantas_tenido_malaria,recibio_tratamiento_malaria,
+#         epi_alguien_tuvo_malaria,epi_malaria_ultimos_meses,
+#         epi_malaria_ultimos_meses_c,epi_meses_ultima_malaria) %>% 
+#  summary()
+#
+#viv %>% 
+#  select(#id,#tenido_malaria,cuantas_tenido_malaria,recibio_tratamiento_malaria,
+#    vivienda,epi_alguien_tuvo_malaria,epi_malaria_ultimos_meses,
+#    epi_malaria_ultimos_meses_c,epi_meses_ultima_malaria) %>% 
+#  summary()
+
+history_issue <- bas %>% 
+  #ind_viv %>% 
+  select(id,vivienda,tenido_malaria,cuantas_tenido_malaria,epi_meses_ultima_malaria) %>%
+  count(vivienda,epi_meses_ultima_malaria) %>% 
+  arrange(desc(n)) %>% 
+  count(vivienda) %>% 
+  arrange(desc(n)) %>% 
+  filter(n>1)
+#distinct(vivienda,.keep_all = T)
+
+bas %>% 
+  filter(vivienda %in% history_issue$vivienda) %>% 
+  select(vivienda,age_7,epi_meses_ultima_malaria) %>% 
+  arrange(vivienda,desc(age_7)) %>% 
+  print(n=Inf)
+
+history_vivienda <- bas %>% 
+  select(vivienda,tenido_malaria) %>% 
+  mutate(tenido_01=as.numeric(tenido_malaria)-1) %>% #count(tenido_01)
+  group_by(vivienda) %>% 
+  summarise(tenido_01_vivienda=sum(tenido_01,na.rm = T),
+            total_ind=n()) %>% 
+  ungroup() %>% 
+  mutate(tenido_malaria_vivienda=if_else(tenido_01_vivienda>0,"si","no"),
+         tenido_malaria_vivienda=fct_relevel(tenido_malaria_vivienda,"no")) 
+
+history_vivienda %>% filter(tenido_01_vivienda==0)
+
+bas %>% 
+  select(vivienda,tenido_malaria) %>% 
+  filter(vivienda=="NN004")
+
+## __solución ----
+history_sol <- bas %>% 
+  #filter(vivienda %in% history_issue$vivienda) %>% 
+  select(vivienda,age_7,epi_meses_ultima_malaria) %>% 
+  #left_join(history_vivienda) %>% #filter(vivienda=="NN004") #personas no registradas con malaria
+  group_by(vivienda) %>% 
+  arrange(desc(epi_meses_ultima_malaria)) %>% 
+  slice(1) %>% 
+  ungroup() %>% #count(epi_meses_ultima_malaria)
+  mutate(new_alguien_tuvo_malaria=if_else(epi_meses_ultima_malaria<6 & epi_meses_ultima_malaria!=0 & !is.na(epi_meses_ultima_malaria),
+                                          "si, hace menos de 6 meses",
+                                          if_else(epi_meses_ultima_malaria<=12 & epi_meses_ultima_malaria!=0 & !is.na(epi_meses_ultima_malaria),
+                                                  "si, el ultimo ano",
+                                                  if_else((epi_meses_ultima_malaria>12  | epi_meses_ultima_malaria!=0 | is.na(epi_meses_ultima_malaria)),
+                                                          "si, hace mas de un ano",
+                                                          #"nunca o hace mas de un ano",
+                                                          "nunca"
+                                                          #"na"
+                                                  ))),
+         new_alguien_tuvo_malaria=fct_relevel(new_alguien_tuvo_malaria,
+                                              "nunca",
+                                              "si, hace mas de un ano",
+                                              #"nunca o hace mas de un ano",
+                                              #"si, hace algunos anos",
+                                              "si, el ultimo ano"),
+         new_malaria_ultimos_meses_c=if_else(epi_meses_ultima_malaria<=12 & epi_meses_ultima_malaria!=0 & !is.na(epi_meses_ultima_malaria),
+                                             "si",
+                                             "No/No sabe")
+  ) %>% 
+  select(-age_7,-epi_meses_ultima_malaria)
+
+history_sol %>% count(new_alguien_tuvo_malaria)
+#viv %>% count(epi_alguien_tuvo_malaria)
+history_sol %>% count(new_malaria_ultimos_meses_c)
+#viv %>% count(epi_malaria_ultimos_meses_c)
+
+#viv %>% 
+#  left_join(history_sol,by = "vivienda") %>% 
+#  count(epi_alguien_tuvo_malaria,new_meses_ultima_malaria)
+
+bas <- bas %>% 
+  left_join(history_sol) #%>% glimpse()
+
 # _BASE DE SUJETOS ---------------------------------------------------------
 
 #sujetos por vivienda
@@ -278,7 +376,7 @@ viv <- bas %>%
          #consevada a nivel sujeto
          epi_frecuencia_rocia_casa,epi_frecuencia_rocia_casa_c,epi_alguien_tuvo_malaria,
          #preferida sobre rociamiento
-         epi_rocia_con_insecticida_c
+         epi_rocia_con_insecticida_c,new_alguien_tuvo_malaria,new_malaria_ultimos_meses_c
          ) %>% 
   #por cada vivienda
   group_by(vivienda) %>% 
@@ -468,33 +566,45 @@ compareGroups(micr_viv_hoth ~
   export2xls("table/z0-tab2_micr_viv_hoth.xls")
 
 compareGroups(prev_viv_hoth ~ 
+                electricidad_red_publica+combustible_cocinar+
+                ah_estereo+ah_television+ah_radio+ah_refrigerador+ah_motocicleta+ah_mototaxi+
+                fuente_agua+banio_conexion+
                 material_pared_c+material_piso_c+
                 epi_cerca_fuente_agua+epi_tipo_fuente_agua+epi_distancia_fuente_agua+
                 epi_frecuencia_rocia_casa_c+epi_rocia_con_insecticida_c+
                 epi_malaria_ultimos_meses_c+epi_viajo_fuera_villa+epi_meses_ultima_malaria+epi_especie_causo_malaria+
-                epi_alguien_tuvo_malaria+sero_viv_hoth, 
+                epi_alguien_tuvo_malaria+new_alguien_tuvo_malaria+new_malaria_ultimos_meses_c+
+                sero_viv_hoth, 
               data = viv ,byrow=T 
 ) %>% 
   createTable(show.n = T) %>% 
   export2xls("table/z0-tab2_prev_viv_hoth.xls")
 
 compareGroups(sero_viv_hoth ~ 
+                electricidad_red_publica+combustible_cocinar+
+                ah_estereo+ah_television+ah_radio+ah_refrigerador+ah_motocicleta+ah_mototaxi+
+                fuente_agua+banio_conexion+
                 material_pared_c+material_piso_c+
                 epi_cerca_fuente_agua+epi_tipo_fuente_agua+epi_distancia_fuente_agua+
                 epi_frecuencia_rocia_casa_c+epi_rocia_con_insecticida_c+
                 epi_malaria_ultimos_meses_c+epi_viajo_fuera_villa+epi_meses_ultima_malaria+epi_especie_causo_malaria+
-                epi_alguien_tuvo_malaria+prev_viv_hoth, 
+                epi_alguien_tuvo_malaria+new_alguien_tuvo_malaria+new_malaria_ultimos_meses_c+
+                prev_viv_hoth, 
               data = viv ,byrow=T 
 ) %>% 
   createTable(show.n = T) %>% 
   export2xls("table/z0-tab2_sero_viv_hoth.xls")
 
 compareGroups(sero_fal_hoth ~ 
+                electricidad_red_publica+combustible_cocinar+
+                ah_estereo+ah_television+ah_radio+ah_refrigerador+ah_motocicleta+ah_mototaxi+
+                fuente_agua+banio_conexion+
                 material_pared_c+material_piso_c+
                 epi_cerca_fuente_agua+epi_tipo_fuente_agua+epi_distancia_fuente_agua+
                 epi_frecuencia_rocia_casa_c+epi_rocia_con_insecticida_c+
                 epi_malaria_ultimos_meses_c+epi_viajo_fuera_villa+epi_meses_ultima_malaria+epi_especie_causo_malaria+
-                epi_alguien_tuvo_malaria+prev_fal_hoth
+                epi_alguien_tuvo_malaria+new_alguien_tuvo_malaria+new_malaria_ultimos_meses_c+
+                prev_fal_hoth
               , 
               data = viv ,byrow=T 
 ) %>% 
@@ -602,8 +712,8 @@ compareGroups(prev_viv ~
                 
                 age_quart+sex_8+
                 residence_fct+residence_quart+#residence+#
-                trabajo_rpl+actualmente_estudiando+
-                tenido_malaria+
+                trabajo_rpl+actualmente_estudiando+nivel_educacion+
+                tenido_malaria+epi_ultimas_semanas_viajo+
                 
                 epi_uso_repelente_mosquito_c+
                 epi_uso_mangas_largas_c+
@@ -632,8 +742,8 @@ compareGroups(sero_viv ~
                 
                 age_quart+sex_8+
                 residence_fct+residence_quart+#residence+#
-                trabajo_rpl+actualmente_estudiando+
-                tenido_malaria+
+                trabajo_rpl+actualmente_estudiando+nivel_educacion+
+                tenido_malaria+epi_ultimas_semanas_viajo+
                 
                 epi_uso_repelente_mosquito_c+
                 epi_uso_mangas_largas_c+
@@ -661,8 +771,8 @@ compareGroups(sero_fal ~
                 
                 age_quart+sex_8+
                 residence_fct+residence_quart+#residence+
-                trabajo_rpl+actualmente_estudiando+
-                tenido_malaria+
+                trabajo_rpl+actualmente_estudiando+nivel_educacion+
+                tenido_malaria+epi_ultimas_semanas_viajo+
                 
                 epi_uso_repelente_mosquito_c+
                 epi_uso_mangas_largas_c+
@@ -695,8 +805,8 @@ ind %>%
     
     age_quart,sex_8,
     residence_fct,residence_quart,
-    trabajo_rpl,actualmente_estudiando,
-    tenido_malaria,
+    trabajo_rpl,actualmente_estudiando,nivel_educacion,
+    tenido_malaria,epi_ultimas_semanas_viajo,
     
     epi_uso_repelente_mosquito_c,
     epi_uso_mangas_largas_c,
@@ -728,6 +838,11 @@ viv %>%
   select(
     vivienda,community_1,
     
+    electricidad_red_publica,combustible_cocinar,
+    ah_estereo,ah_television,ah_radio,ah_refrigerador,ah_motocicleta,ah_mototaxi,
+    fuente_agua,banio_conexion,
+    new_alguien_tuvo_malaria,new_malaria_ultimos_meses_c,
+    
     material_pared,material_piso,
     epi_cerca_fuente_agua,#epi_tipo_fuente_agua,epi_distancia_fuente_agua,
     epi_frecuencia_rocia_casa_c,epi_rocia_con_insecticida_c,
@@ -755,8 +870,8 @@ ind_viv %>%
     
     age_quart,sex_8,
     residence_fct,residence_quart,
-    trabajo_rpl,actualmente_estudiando,
-    tenido_malaria,
+    trabajo_rpl,actualmente_estudiando,nivel_educacion,
+    tenido_malaria,epi_ultimas_semanas_viajo,
     
     epi_uso_repelente_mosquito_c,
     epi_uso_mangas_largas_c,
@@ -772,6 +887,12 @@ ind_viv %>%
     epi_uso_red_dormir_c,
     
     vivienda,
+    
+    electricidad_red_publica,combustible_cocinar,
+    ah_estereo,ah_television,ah_radio,ah_refrigerador,ah_motocicleta,ah_mototaxi,
+    fuente_agua,banio_conexion,
+    new_alguien_tuvo_malaria,new_malaria_ultimos_meses_c,
+    
     material_pared_c,material_piso_c,
     epi_cerca_fuente_agua,#epi_tipo_fuente_agua,epi_distancia_fuente_agua,
     epi_frecuencia_rocia_casa_c,epi_rocia_con_insecticida_c,
@@ -779,11 +900,17 @@ ind_viv %>%
     epi_alguien_tuvo_malaria,
     longitud,latitud,
     
-    prev_viv,
+    micr_viv,prev_viv,
     sero_viv,Ab.unit_Pviv,Ab.unit_Pviv_4,
     sero_fal,Ab.unit_Pfal,Ab.unit_Pfal_4,
     
-    micr_fal,micr_viv,micr_mix,prev_fal,prev_mix,sero_mix
+    micr_fal,prev_fal,
+    micr_mix,prev_mix,sero_mix,
+    
+    micr_viv_hoth,
+    prev_viv_hoth,prev_fal_hoth,
+    sero_viv_hoth,sero_fal_hoth,
+    sero_viv_prct,sero_fal_prct
     
   ) %>% 
   #rename_all(funs(str_replace_all(.,"_",""))) %>% 
@@ -793,65 +920,6 @@ ind_viv %>%
   #transformar vectores chr a fct
   mutate_if(is.character,as.factor) %>% 
   write_dta("data/z0_ind_viv_t3.dta")
-
-
-# HISTORIA DE MALARIA -----------------------------------------------------
-
-ind_viv %>% 
-  select(id,tenido_malaria,cuantas_tenido_malaria,recibio_tratamiento_malaria,
-         epi_alguien_tuvo_malaria,epi_malaria_ultimos_meses,
-         epi_malaria_ultimos_meses_c,epi_meses_ultima_malaria) %>% 
-  summary()
-
-viv %>% 
-  select(#id,#tenido_malaria,cuantas_tenido_malaria,recibio_tratamiento_malaria,
-         vivienda,epi_alguien_tuvo_malaria,epi_malaria_ultimos_meses,
-         epi_malaria_ultimos_meses_c,epi_meses_ultima_malaria) %>% 
-  summary()
-
-history_issue <- bas %>% 
-#ind_viv %>% 
-  select(id,vivienda,tenido_malaria,cuantas_tenido_malaria,epi_meses_ultima_malaria) %>%
-  count(vivienda,epi_meses_ultima_malaria) %>% 
-  arrange(desc(n)) %>% 
-  count(vivienda) %>% 
-  arrange(desc(n)) %>% 
-  filter(n>1)
-  #distinct(vivienda,.keep_all = T)
-
-bas %>% 
-  filter(vivienda %in% history_issue$vivienda) %>% 
-  select(vivienda,age_7,epi_meses_ultima_malaria) %>% 
-  arrange(vivienda,desc(age_7)) %>% 
-  print(n=Inf)
-
-## _solución ----
-history_sol <- bas %>% 
-  #filter(vivienda %in% history_issue$vivienda) %>% 
-  select(vivienda,age_7,epi_meses_ultima_malaria) %>% 
-  group_by(vivienda) %>% 
-  arrange(desc(epi_meses_ultima_malaria)) %>% 
-  slice(1) %>% 
-  ungroup() %>% #count(epi_meses_ultima_malaria)
-  mutate(new_meses_ultima_malaria=if_else(epi_meses_ultima_malaria<6 & epi_meses_ultima_malaria!=0 & !is.na(epi_meses_ultima_malaria),
-                                          "si, hace menos de 6 meses",
-                                          if_else(epi_meses_ultima_malaria<=12 & epi_meses_ultima_malaria!=0 & !is.na(epi_meses_ultima_malaria),
-                                                  "si, el ultimo ano",
-                                                  if_else((epi_meses_ultima_malaria>12  | epi_meses_ultima_malaria==0 | is.na(epi_meses_ultima_malaria)),
-                                                          "nunca o hace mas de un ano",
-                                                          #"nunca"
-                                                          "na"))),
-         new_meses_ultima_malaria=fct_relevel(new_meses_ultima_malaria,
-                                              #"nunca",
-                                              "nunca o hace mas de un ano",
-                                              #"si, hace algunos anos",
-                                              "si, el ultimo ano")) #%>% 
-  #count(new_meses_ultima_malaria)
-  #print(n=Inf)
-
-viv %>% 
-  left_join(history_sol,by = "vivienda") %>% 
-  count(epi_alguien_tuvo_malaria,new_meses_ultima_malaria)
 
 # LINEALIDAD pre-modelo --------------------------------------------------------------
 
