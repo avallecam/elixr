@@ -217,6 +217,7 @@ bas %>% count(community_1)
 bas %>% count(nivel_educacion_c)
 bas %>% count(nivel_educacion)
 bas %>% count(actualmente_estudiando)
+bas %>% count(trabajo_rpl,trabajo_tdy)
 
 bas %>% 
   select(epi_viajo_fuera_villa,epi_ultimas_semanas_viajo,epi_numero_veces_viajo) %>% 
@@ -268,15 +269,23 @@ bas %>%
   select(vivienda,tenido_malaria) %>% 
   filter(vivienda=="NN004")
 
+## __problema
+
+bas %>% 
+  select(vivienda,id,epi_malaria_ultimos_meses_c,epi_meses_ultima_malaria) %>% 
+  count(epi_malaria_ultimos_meses_c,epi_meses_ultima_malaria) %>% print(n=Inf)
+
 ## __solución ----
 history_sol <- bas %>% 
   #filter(vivienda %in% history_issue$vivienda) %>% 
   select(vivienda,age_7,epi_meses_ultima_malaria) %>% 
   #left_join(history_vivienda) %>% #filter(vivienda=="NN004") #personas no registradas con malaria
-  group_by(vivienda) %>% 
+  
+  group_by(vivienda) %>% #objetivo: capturar la observación con el mayor reporte de MESES a último episodio de MALARIA
   arrange(desc(epi_meses_ultima_malaria)) %>% 
-  slice(1) %>% 
+  slice(1) %>%
   ungroup() %>% #count(epi_meses_ultima_malaria)
+  
   mutate(new_alguien_tuvo_malaria=if_else(epi_meses_ultima_malaria<6 & epi_meses_ultima_malaria!=0 & !is.na(epi_meses_ultima_malaria),
                                           "si, hace menos de 6 meses",
                                           if_else(epi_meses_ultima_malaria<=12 & epi_meses_ultima_malaria!=0 & !is.na(epi_meses_ultima_malaria),
@@ -562,7 +571,7 @@ compareGroups(micr_viv_hoth ~
                 epi_alguien_tuvo_malaria, 
               data = viv ,byrow=T 
               ) %>% 
-  createTable(show.n = T) %>% 
+  createTable(show.n = T,show.all = T) %>% 
   export2xls("table/z0-tab2_micr_viv_hoth.xls")
 
 compareGroups(prev_viv_hoth ~ 
@@ -577,7 +586,7 @@ compareGroups(prev_viv_hoth ~
                 sero_viv_hoth, 
               data = viv ,byrow=T 
 ) %>% 
-  createTable(show.n = T) %>% 
+  createTable(show.n = T,show.all = T) %>% 
   export2xls("table/z0-tab2_prev_viv_hoth.xls")
 
 compareGroups(sero_viv_hoth ~ 
@@ -592,7 +601,7 @@ compareGroups(sero_viv_hoth ~
                 prev_viv_hoth, 
               data = viv ,byrow=T 
 ) %>% 
-  createTable(show.n = T) %>% 
+  createTable(show.n = T,show.all = T) %>% 
   export2xls("table/z0-tab2_sero_viv_hoth.xls")
 
 compareGroups(sero_fal_hoth ~ 
@@ -608,7 +617,7 @@ compareGroups(sero_fal_hoth ~
               , 
               data = viv ,byrow=T 
 ) %>% 
-  createTable(show.n = T) %>% 
+  createTable(show.n = T,show.all = T) %>% 
   export2xls("table/z0-tab2_sero_fal_hoth.xls")
 
 # _individuo --------------------------------------------------------------
@@ -733,7 +742,7 @@ compareGroups(prev_viv ~
               ,data = ind ,byrow=T 
               #,method = c(Ab.unit_Pviv = 2,Ab.unit_Pfal=2)
 ) %>% 
-  createTable(show.n = T) %>% 
+  createTable(show.n = T,show.all = T) %>% 
   export2xls("table/z0-tab2_prev_viv.xls")
 
 
@@ -763,7 +772,7 @@ compareGroups(sero_viv ~
               ,data = ind ,byrow=T 
               #,method = c(Ab.unit_Pviv = 2,Ab.unit_Pfal=2)
 ) %>% 
-  createTable(show.n = T) %>% 
+  createTable(show.n = T,show.all = T) %>% 
   export2xls("table/z0-tab2_sero_viv.xls")
 
 compareGroups(sero_fal ~ 
@@ -792,7 +801,7 @@ compareGroups(sero_fal ~
               ,data = ind ,byrow=T 
               #,method = c(Ab.unit_Pviv = 2,Ab.unit_Pfal=2)
 ) %>% 
-  createTable(show.n = T) %>% 
+  createTable(show.n = T,show.all = T) %>% 
   export2xls("table/z0-tab2_sero_fal.xls")
 
 
