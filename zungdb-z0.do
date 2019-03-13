@@ -146,7 +146,7 @@ glm sero_fal i.community_1 i.age_quart i.prev_fal i.tenido_malaria if mis1==0 & 
 
 ************************************ PREV-VIVAX+ (NESTED METHOD) ************************************ 
 
-corr trabajo_rpl community_1 age_quart sex_8 epi_cercania_fuente_agua_c epi_estuvo_campo_antes_c epi_uso_repelente_mosquito_c epi_uso_mangas_largas_c epi_duerme_cerca_monte_c epi_estado_campos_agricultura_c epi_estado_canal_agua_c material_pared_c material_piso_c epi_cerca_fuente_agua epi_rocia_con_insecticida_c epi_alguien_tuvo_malaria  age_7 residence_fct residence_quart actualmente_estudiando tenido_malaria epi_uso_redes_cama_c epi_duerme_ventanas_abiertas_c epi_frecuencia_rocia_casa_c epi_malaria_ultimos_meses_c sero_viv sero_fal
+*corr trabajo_rpl community_1 age_quart sex_8 epi_cercania_fuente_agua_c epi_estuvo_campo_antes_c epi_uso_repelente_mosquito_c epi_uso_mangas_largas_c epi_duerme_cerca_monte_c epi_estado_campos_agricultura_c epi_estado_canal_agua_c material_pared_c material_piso_c epi_cerca_fuente_agua epi_rocia_con_insecticida_c epi_alguien_tuvo_malaria  age_7 residence_fct residence_quart actualmente_estudiando tenido_malaria epi_uso_redes_cama_c epi_duerme_ventanas_abiertas_c epi_frecuencia_rocia_casa_c epi_malaria_ultimos_meses_c sero_viv sero_fal
 coldiag2 epi_duerme_cerca_monte_c material_piso_c sero_viv trabajo_rpl  age_quart epi_alguien_tuvo_malaria community_1
 
 *SIN vce(cluster vivienda )**************************
@@ -277,6 +277,152 @@ xi: glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.epi_a
 *PROBAR AGREGAR ABUNITS
 *i.abunit_pvix_4 
 *i.abunit_pfal_4 
+
+
+
+*MODEL II: MORE CLEAN VARIABLES**************************
+
+*nivel 0
+quietly: glm prev_viv if mis==0, family(binomial) link(log) eform nolog
+estimate store m0
+
+*nivel 1
+*i.epi_uso_red_dormir_c
+*i.micr_viv
+*abunit_pfal 
+*abunit_pviv 
+local l = "i.community_1 age_7 i.age_quart i.sex_8 i.residence_fct i.residence_quart i.trabajo_rpl i.actualmente_estudiando i.nivel_educacion i.tenido_malaria i.epi_ultimas_semanas_viajo i.epi_uso_repelente_mosquito_c i.epi_uso_mangas_largas_c i.epi_cercania_fuente_agua_c i.epi_estuvo_campo_antes_c i.epi_uso_redes_cama_c i.epi_duerme_ventanas_abiertas_c i.epi_duerme_cerca_monte_c i.epi_estado_campos_agricultura_c i.epi_estado_canal_agua_c i.electricidad_red_publica i.combustible_cocinar i.ah_estereo i.ah_television i.ah_radio i.ah_refrigerador i.ah_motocicleta i.ah_mototaxi i.fuente_agua i.banio_conexion i.new_alguien_tuvo_malaria i.new_malaria_ultimos_meses_c i.material_pared_c i.material_piso_c i.epi_cerca_fuente_agua i.epi_frecuencia_rocia_casa_c i.epi_rocia_con_insecticida_c i.sero_viv i.sero_fal i.micr_fal i.prev_fal i.sero_mix i.micr_viv_hoth i.prev_fal_hoth i.sero_viv_hoth i.sero_fal_hoth"
+
+foreach var in `l' {
+	glm prev_viv `var' if mis==0, family(binomial) link(log) eform nolog
+	estimate store m01
+	lrtest m0 m01 //no
+}
+
+*resultado 1
+glm prev_viv i.epi_duerme_cerca_monte_c if mis==0, family(binomial) link(log) eform nolog
+estimate store m1
+
+*nivel 2
+
+local l = "i.community_1 age_7 i.age_quart i.sex_8 i.residence_fct i.residence_quart i.trabajo_rpl i.actualmente_estudiando i.nivel_educacion i.tenido_malaria i.epi_ultimas_semanas_viajo i.epi_uso_repelente_mosquito_c i.epi_uso_mangas_largas_c i.epi_cercania_fuente_agua_c i.epi_estuvo_campo_antes_c i.epi_uso_redes_cama_c i.epi_duerme_ventanas_abiertas_c i.epi_estado_campos_agricultura_c i.epi_estado_canal_agua_c i.electricidad_red_publica i.combustible_cocinar i.ah_estereo i.ah_television i.ah_radio i.ah_refrigerador i.ah_motocicleta i.ah_mototaxi i.fuente_agua i.banio_conexion i.new_alguien_tuvo_malaria i.new_malaria_ultimos_meses_c i.material_pared_c i.material_piso_c i.epi_cerca_fuente_agua i.epi_frecuencia_rocia_casa_c i.epi_rocia_con_insecticida_c i.sero_viv i.sero_fal i.micr_fal i.prev_fal i.sero_mix i.micr_viv_hoth i.prev_fal_hoth i.sero_viv_hoth i.sero_fal_hoth"
+
+foreach var in `l' {
+	glm prev_viv i.epi_duerme_cerca_monte_c `var' if mis==0, family(binomial) link(log) eform nolog
+	estimate store m11
+	lrtest m1 m11 //no
+}
+
+*resultado 2
+glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c if mis==0, family(binomial) link(log) eform nolog
+estimate store m2
+
+*nivel 3
+
+local l = "i.community_1 age_7 i.age_quart i.sex_8 i.residence_fct i.residence_quart i.trabajo_rpl i.actualmente_estudiando i.nivel_educacion i.tenido_malaria i.epi_ultimas_semanas_viajo i.epi_uso_repelente_mosquito_c i.epi_uso_mangas_largas_c i.epi_cercania_fuente_agua_c i.epi_estuvo_campo_antes_c i.epi_uso_redes_cama_c i.epi_duerme_ventanas_abiertas_c i.epi_estado_campos_agricultura_c i.epi_estado_canal_agua_c i.electricidad_red_publica i.combustible_cocinar i.ah_estereo i.ah_television i.ah_radio i.ah_refrigerador i.ah_motocicleta i.ah_mototaxi i.fuente_agua i.banio_conexion i.new_alguien_tuvo_malaria i.new_malaria_ultimos_meses_c i.material_pared_c i.epi_cerca_fuente_agua i.epi_frecuencia_rocia_casa_c i.epi_rocia_con_insecticida_c i.sero_viv i.sero_fal i.micr_fal i.prev_fal i.sero_mix i.micr_viv_hoth i.prev_fal_hoth i.sero_viv_hoth i.sero_fal_hoth"
+
+foreach var in `l' {
+	glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c `var' if mis==0, family(binomial) link(log) eform nolog
+	estimate store m21
+	lrtest m2 m21 //no
+}
+
+*resultado 3
+glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv if mis==0, family(binomial) link(log) eform nolog
+estimate store m3
+
+*nivel 4
+
+local l = "i.community_1 age_7 i.age_quart i.sex_8 i.residence_fct i.residence_quart i.trabajo_rpl i.actualmente_estudiando i.nivel_educacion i.tenido_malaria i.epi_ultimas_semanas_viajo i.epi_uso_repelente_mosquito_c i.epi_uso_mangas_largas_c i.epi_cercania_fuente_agua_c i.epi_estuvo_campo_antes_c i.epi_uso_redes_cama_c i.epi_duerme_ventanas_abiertas_c i.epi_estado_campos_agricultura_c i.epi_estado_canal_agua_c i.electricidad_red_publica i.combustible_cocinar i.ah_estereo i.ah_television i.ah_radio i.ah_refrigerador i.ah_motocicleta i.ah_mototaxi i.fuente_agua i.banio_conexion i.new_alguien_tuvo_malaria i.new_malaria_ultimos_meses_c i.material_pared_c i.epi_cerca_fuente_agua i.epi_frecuencia_rocia_casa_c i.epi_rocia_con_insecticida_c i.sero_fal i.micr_fal i.sero_mix i.micr_viv_hoth i.prev_fal_hoth i.sero_viv_hoth i.sero_fal_hoth"
+
+foreach var in `l' {
+	glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv `var' if mis==0, family(binomial) link(log) eform nolog
+	estimate store m31
+	lrtest m3 m31
+}
+
+
+*resultado 4
+glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.combustible_cocinar if mis==0, family(binomial) link(log) eform nolog
+*glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.combustible_cocinar if mis==0, family(poisson) link(log) eform nolog
+estimate store m4
+
+
+*nivel 5
+
+local l = "i.community_1 age_7 i.age_quart i.sex_8 i.residence_fct i.residence_quart i.trabajo_rpl i.actualmente_estudiando i.nivel_educacion i.tenido_malaria i.epi_ultimas_semanas_viajo i.epi_uso_repelente_mosquito_c i.epi_uso_mangas_largas_c i.epi_cercania_fuente_agua_c i.epi_estuvo_campo_antes_c i.epi_uso_redes_cama_c i.epi_duerme_ventanas_abiertas_c i.epi_estado_campos_agricultura_c i.epi_estado_canal_agua_c i.electricidad_red_publica i.ah_estereo i.ah_television i.ah_radio i.ah_refrigerador i.ah_motocicleta i.ah_mototaxi i.fuente_agua i.banio_conexion i.new_alguien_tuvo_malaria i.new_malaria_ultimos_meses_c i.material_pared_c i.epi_cerca_fuente_agua i.epi_frecuencia_rocia_casa_c i.epi_rocia_con_insecticida_c i.sero_fal i.micr_fal i.sero_mix i.micr_viv_hoth i.prev_fal_hoth i.sero_viv_hoth i.sero_fal_hoth"
+
+foreach var in `l' {
+	glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.combustible_cocinar `var' if mis==0, family(binomial) link(log) eform nolog
+	estimate store m41
+	lrtest m4 m41
+}
+
+*resultado 5
+glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.combustible_cocinar i.nivel_educacion if mis==0, family(binomial) link(log) eform nolog
+glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.combustible_cocinar i.nivel_educacion if mis==0, family(poisson) link(log) eform nolog
+estimate store m5
+
+
+*nivel 6
+
+local l = "i.community_1 age_7 i.age_quart i.sex_8 i.residence_fct i.residence_quart i.trabajo_rpl i.actualmente_estudiando i.tenido_malaria i.epi_ultimas_semanas_viajo i.epi_uso_repelente_mosquito_c i.epi_uso_mangas_largas_c i.epi_cercania_fuente_agua_c i.epi_estuvo_campo_antes_c i.epi_uso_redes_cama_c i.epi_duerme_ventanas_abiertas_c i.epi_estado_campos_agricultura_c i.epi_estado_canal_agua_c i.electricidad_red_publica i.ah_estereo i.ah_television i.ah_radio i.ah_refrigerador i.ah_motocicleta i.ah_mototaxi i.fuente_agua i.banio_conexion i.new_alguien_tuvo_malaria i.new_malaria_ultimos_meses_c i.material_pared_c i.epi_cerca_fuente_agua i.epi_frecuencia_rocia_casa_c i.epi_rocia_con_insecticida_c i.sero_fal i.micr_fal i.sero_mix i.micr_viv_hoth i.prev_fal_hoth i.sero_viv_hoth i.sero_fal_hoth"
+
+foreach var in `l' {
+	glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.combustible_cocinar i.nivel_educacion `var' if mis==0, family(poisson) link(log) eform nolog
+	estimate store m51
+	lrtest m5 m51
+}
+
+*no ingresos en nivel 6
+
+*modelo final
+glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.combustible_cocinar i.nivel_educacion if mis==0, family(poisson) link(log) eform nolog
+xi: glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.combustible_cocinar i.nivel_educacion if mis==0, family(poisson) link(log) eform nolog
+
+
+
+*MODEL III: NO COMBUSTIBLE**************************
+
+
+
+*resultado 4
+glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.new_alguien_tuvo_malaria if mis==0, family(binomial) link(log) eform nolog
+glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.new_alguien_tuvo_malaria if mis==0, family(poisson) link(log) eform nolog
+estimate store m4
+
+
+*nivel 5
+
+local l = "i.combustible_cocinar i.community_1 age_7 i.age_quart i.sex_8 i.residence_fct i.residence_quart i.trabajo_rpl i.actualmente_estudiando i.nivel_educacion i.tenido_malaria i.epi_ultimas_semanas_viajo i.epi_uso_repelente_mosquito_c i.epi_uso_mangas_largas_c i.epi_cercania_fuente_agua_c i.epi_estuvo_campo_antes_c i.epi_uso_redes_cama_c i.epi_duerme_ventanas_abiertas_c i.epi_estado_campos_agricultura_c i.epi_estado_canal_agua_c i.electricidad_red_publica i.ah_estereo i.ah_television i.ah_radio i.ah_refrigerador i.ah_motocicleta i.ah_mototaxi i.fuente_agua i.banio_conexion i.material_pared_c i.epi_cerca_fuente_agua i.epi_frecuencia_rocia_casa_c i.epi_rocia_con_insecticida_c i.sero_fal i.micr_fal i.sero_mix i.micr_viv_hoth i.prev_fal_hoth i.sero_viv_hoth i.sero_fal_hoth"
+
+foreach var in `l' {
+	glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.new_alguien_tuvo_malaria `var' if mis==0, family(poisson) link(log) eform nolog
+	estimate store m41
+	lrtest m4 m41
+}
+
+*resultado 5
+*glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.new_alguien_tuvo_malaria i.trabajo_rpl if mis==0, family(binomial) link(log) eform nolog
+glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.new_alguien_tuvo_malaria i.trabajo_rpl if mis==0, family(poisson) link(log) eform nolog
+estimate store m5
+
+
+*nivel 6
+
+local l = "i.combustible_cocinar i.community_1 age_7 i.age_quart i.sex_8 i.residence_fct i.residence_quart i.actualmente_estudiando i.nivel_educacion i.tenido_malaria i.epi_ultimas_semanas_viajo i.epi_uso_repelente_mosquito_c i.epi_uso_mangas_largas_c i.epi_cercania_fuente_agua_c i.epi_estuvo_campo_antes_c i.epi_uso_redes_cama_c i.epi_duerme_ventanas_abiertas_c i.epi_estado_campos_agricultura_c i.epi_estado_canal_agua_c i.electricidad_red_publica i.ah_estereo i.ah_television i.ah_radio i.ah_refrigerador i.ah_motocicleta i.ah_mototaxi i.fuente_agua i.banio_conexion i.material_pared_c i.epi_cerca_fuente_agua i.epi_frecuencia_rocia_casa_c i.epi_rocia_con_insecticida_c i.sero_fal i.micr_fal i.sero_mix i.micr_viv_hoth i.prev_fal_hoth i.sero_viv_hoth i.sero_fal_hoth"
+
+foreach var in `l' {
+	glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.new_alguien_tuvo_malaria i.trabajo_rpl `var' if mis==0, family(poisson) link(log) eform nolog
+	estimate store m51
+	lrtest m5 m51
+}
+
+*no ingresos en nivel 6
+
+*modelo final
+glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.new_alguien_tuvo_malaria i.trabajo_rpl `var' if mis==0, family(poisson) link(log) eform nolog
+xi: glm prev_viv i.epi_duerme_cerca_monte_c i.material_piso_c i.sero_viv i.new_alguien_tuvo_malaria i.trabajo_rpl `var' if mis==0, family(poisson) link(log) eform nolog
 
 
 
