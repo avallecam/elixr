@@ -30,6 +30,8 @@ bas <- read_rds("data/x-zungaro_basal.rds") %>%
          #definir y corregir por missing
          trabajo_rpl=if_else(trabajo_tdy=="Farmer/Breeder/Guard/Fisher","Outdoors","Other"),
          trabajo_rpl=if_else(is.na(trabajo_rpl) & actualmente_estudiando=="Si","Other",trabajo_rpl),
+         trabajo_rpl=fct_relevel(trabajo_rpl,"Outdoors"),
+         trabajo_tdy=fct_relevel(trabajo_tdy,"Farmer/Breeder/Guard/Fisher"),
          
          nivel_educacion_c=fct_collapse(nivel_educacion,
                                       "Primary"=c("primaria"),
@@ -154,6 +156,15 @@ bas <- read_rds("data/x-zungaro_basal.rds") %>%
          #epi_cerca_fuente_agua
          epi_tipo_fuente_agua=if_else(epi_cerca_fuente_agua=="Si",epi_tipo_fuente_agua,NA_integer_),
          epi_distancia_fuente_agua=if_else(epi_cerca_fuente_agua=="Si",epi_distancia_fuente_agua,NA_integer_),
+         epi_distancia_fuente_agua=fct_relevel(epi_distancia_fuente_agua,"Menor de 100 metros"),
+         fuente_agua=fct_recode(fuente_agua,
+                                "agua de pozo"="Pozo",
+                                "agua de lluvia"="Tanque de agua o similar",
+                                "Red pública, fuera de casa, de uso compartido"="Tuberia publica, fuente fuera de la casa, compartido con la comunidad",
+                                "Red pública, dentro de casa, de uso exclusivo"="Sistema publico en la casa, uso exclusivo de la familia",
+                                "Red pública, dentro de casa, de uso exclusivo"="TuberiƒÂa publica, fuente fuera de la casa, compartido con la comunidad",
+                                "Red pública, dentro de casa, de uso exclusivo"="Sistema publico en casa, compartido en otras casas"),
+         fuente_agua=fct_collapse(fuente_agua,"agua de pozo o lluvia"=c("agua de pozo","agua de lluvia")),
          #epi_malaria_ultimos_meses
          epi_viajo_fuera_villa=if_else(epi_malaria_ultimos_meses=="Si",epi_viajo_fuera_villa,NA_integer_),
          #epi_meses_ultima_malaria=if_else(epi_malaria_ultimos_meses=="Si",epi_meses_ultima_malaria,NA_real_),
@@ -185,7 +196,12 @@ bas <- read_rds("data/x-zungaro_basal.rds") %>%
                                          quantile(residence,probs = seq(0,1,0.25),na.rm = T)[3],
                                          quantile(residence,probs = seq(0,1,0.25),na.rm = T)[4],
                                          quantile(residence,probs = seq(0,1,0.25),na.rm = T)[5]),
-                             include.lowest = T)
+                             include.lowest = T),
+         banio_conexion=fct_collapse(banio_conexion,
+                                   "campo abierto, silo, sin banio"=c("Campo abierto","silo","No tiene banio","NA"),
+                                   "letrina"=c("Letrina","Sistema publico fuera de la casa")),
+         banio_conexion=fct_collapse(banio_conexion,"otro (letrina, campo abierto, silo, sin banio)"=c("letrina","campo abierto, silo, sin banio")),
+         banio_conexion=fct_relevel(banio_conexion,"Sistema publico dentro de la casa")
          
          #epialguientuvomalaria ---> VARIABLE DE VIVIENDA igual a otra pregunta!!!
          #epiredesusadasactualmente --> recategorizar
@@ -211,6 +227,10 @@ bas %>% glimpse()
 #bas %>% count(epi_cerca_fuente_agua,epi_tipo_fuente_agua,epi_distancia_fuente_agua)
 #bas %>% count(epi_malaria_ultimos_meses,epi_viajo_fuera_villa,epi_meses_ultima_malaria,epi_especie_causo_malaria)
 #bas %>% count(epi_malaria_ultimos_meses)
+
+bas %>% count(epi_distancia_fuente_agua)
+bas %>% count(fuente_agua)
+bas %>% count(banio_conexion)
 
 bas %>% count(community_1)
 
@@ -303,8 +323,9 @@ history_sol <- bas %>%
                                               #"si, hace algunos anos",
                                               "si, el ultimo ano"),
          new_malaria_ultimos_meses_c=if_else(epi_meses_ultima_malaria<=12 & epi_meses_ultima_malaria!=0 & !is.na(epi_meses_ultima_malaria),
-                                             "si",
-                                             "No/No sabe")
+                                             "si, hace 12 meses o menos",
+                                             "No/No sabe"),
+         new_alguien_tuvo_malaria=fct_collapse(new_alguien_tuvo_malaria,"si, hace 6 meses o más"=c("si, hace mas de un ano","si, el ultimo ano"))
   ) %>% 
   select(-age_7,-epi_meses_ultima_malaria)
 
@@ -462,7 +483,13 @@ ind %>% select(id,sex_8,age_7,residence) %>%
 # MERGE ENTRE BASE SUJETO + BASE VIVIENDA ---------------------------------
 
 ind_viv <- ind %>% select(-community_1) %>% 
-  left_join(viv)
+  left_join(viv) %>% 
+  
+  #asignar etiquetas a variables
+  labelled::set_variable_labels(
+    age_quart = "Age quartiles (years)", 
+    sex_8 = "Sex",
+    nivel_educacion = "Education")
 
 
 # BASES FINALES -----------------------------------------------------------
@@ -717,12 +744,34 @@ compareGroups(community_1 ~
 # __tabla 2 ---------------------------------------------------------------
 
 compareGroups(prev_viv ~ 
+                
+                age_quart+
+                sex_8+
+                nivel_educacion+
+                trabajo_tdy+trabajo_rpl+
+                actualmente_estudiando+
+                residence_quart+#residence+#
+                
                 community_1 + 
                 
-                age_quart+sex_8+
-                residence_fct+residence_quart+#residence+#
-                trabajo_rpl+actualmente_estudiando+nivel_educacion+
-                tenido_malaria+epi_ultimas_semanas_viajo+
+                electricidad_red_publica+
+                combustible_cocinar+
+                ah_estereo+ah_television+ah_radio+ah_refrigerador+ah_motocicleta+ah_mototaxi+
+                material_pared_c+material_piso_c+
+                fuente_agua+banio_conexion+
+                
+                tenido_malaria+
+                recibio_tratamiento_malaria+
+                enfermedad_cronica+
+                enf_tomo_medicinas_parasitos+
+                
+                epi_cerca_fuente_agua+epi_tipo_fuente_agua+epi_distancia_fuente_agua+
+                epi_malaria_ultimos_meses_c+epi_viajo_fuera_villa+epi_meses_ultima_malaria+#epi_especie_causo_malaria+
+                
+                
+                #epi_alguien_tuvo_malaria+
+                new_alguien_tuvo_malaria+
+                new_malaria_ultimos_meses_c+
                 
                 epi_uso_repelente_mosquito_c+
                 epi_uso_mangas_largas_c+
@@ -732,14 +781,19 @@ compareGroups(prev_viv ~
                 epi_uso_redes_cama_c+
                 epi_duerme_ventanas_abiertas_c+
                 epi_duerme_cerca_monte_c+
-                #epi_rocia_con_insecticida_c+
+                epi_rocia_con_insecticida_c+
                 
+                
+                epi_ultimas_semanas_viajo+
+                epi_frecuencia_rocia_casa_c+
                 epi_estado_campos_agricultura_c+
                 epi_estado_canal_agua_c+
                 
-                epi_uso_red_dormir_c+sero_viv
+                epi_uso_red_dormir_c+
+                sero_viv+
+                prev_viv
               
-              ,data = ind ,byrow=T 
+              ,data = ind_viv ,byrow=T 
               #,method = c(Ab.unit_Pviv = 2,Ab.unit_Pfal=2)
 ) %>% 
   createTable(show.n = T,show.all = T) %>% 
@@ -747,7 +801,7 @@ compareGroups(prev_viv ~
 
 
 compareGroups(sero_viv ~ 
-                community_1 + age_7 +
+                community_1 + age_7 + new_alguien_tuvo_malaria +
                 
                 age_quart+sex_8+
                 residence_fct+residence_quart+#residence+#
@@ -875,12 +929,39 @@ viv %>%
 ind_viv %>% 
   select(
     id,
-    community_1 , age_7,
     
-    age_quart,sex_8,
-    residence_fct,residence_quart,
-    trabajo_rpl,actualmente_estudiando,nivel_educacion,
-    tenido_malaria,epi_ultimas_semanas_viajo,
+    vivienda,
+    longitud,latitud,
+    
+    age_quart,
+    sex_8,
+    nivel_educacion,
+    trabajo_tdy,trabajo_rpl,
+    actualmente_estudiando,
+    residence_quart,#residence,#
+    
+    community_1 , 
+    
+    electricidad_red_publica,
+    combustible_cocinar,
+    ah_estereo,ah_television,ah_radio,ah_refrigerador,ah_motocicleta,ah_mototaxi,
+    material_pared_c,material_piso_c,
+    fuente_agua,banio_conexion,
+    
+    tenido_malaria,
+    recibio_tratamiento_malaria,
+    enfermedad_cronica,
+    enf_tomo_medicinas_parasitos,
+    
+    epi_cerca_fuente_agua,epi_tipo_fuente_agua,epi_distancia_fuente_agua,
+    epi_malaria_ultimos_meses_c,
+    new_malaria_ultimos_meses_c,
+    epi_viajo_fuera_villa,epi_meses_ultima_malaria,#epi_especie_causo_malaria,
+    
+    
+    epi_alguien_tuvo_malaria,
+    new_alguien_tuvo_malaria,
+    
     
     epi_uso_repelente_mosquito_c,
     epi_uso_mangas_largas_c,
@@ -890,36 +971,24 @@ ind_viv %>%
     epi_uso_redes_cama_c,
     epi_duerme_ventanas_abiertas_c,
     epi_duerme_cerca_monte_c,
-    #epi_rocia_con_insecticida_c,
+    epi_rocia_con_insecticida_c,
+    
+    
+    epi_ultimas_semanas_viajo,
+    epi_frecuencia_rocia_casa_c,
     epi_estado_campos_agricultura_c,
     epi_estado_canal_agua_c,
+    
     epi_uso_red_dormir_c,
-    
-    vivienda,
-    
-    electricidad_red_publica,combustible_cocinar,
-    ah_estereo,ah_television,ah_radio,ah_refrigerador,ah_motocicleta,ah_mototaxi,
-    fuente_agua,banio_conexion,
-    new_alguien_tuvo_malaria,new_malaria_ultimos_meses_c,
-    
-    material_pared_c,material_piso_c,
-    epi_cerca_fuente_agua,#epi_tipo_fuente_agua,epi_distancia_fuente_agua,
-    epi_frecuencia_rocia_casa_c,epi_rocia_con_insecticida_c,
-    epi_malaria_ultimos_meses_c,#epi_viajo_fuera_villa,epi_meses_ultima_malaria,epi_especie_causo_malaria,
-    epi_alguien_tuvo_malaria,
-    longitud,latitud,
+    sero_viv,
+    #prev_viv
     
     micr_viv,prev_viv,
     sero_viv,Ab.unit_Pviv,Ab.unit_Pviv_4,
     sero_fal,Ab.unit_Pfal,Ab.unit_Pfal_4,
     
     micr_fal,prev_fal,
-    micr_mix,prev_mix,sero_mix,
-    
-    micr_viv_hoth,
-    prev_viv_hoth,prev_fal_hoth,
-    sero_viv_hoth,sero_fal_hoth,
-    sero_viv_prct,sero_fal_prct
+    micr_mix,prev_mix,sero_mix
     
   ) %>% 
   #rename_all(funs(str_replace_all(.,"_",""))) %>% 
