@@ -34,7 +34,7 @@ z0db <- read_dta("data/z0_ind_viv_t3.dta") %>%
     fuente_agua,banio_conexion,
     
     tenido_malaria,
-    recibio_tratamiento_malaria,
+    recibio_tratamiento_malaria_c,
     enfermedad_cronica,
     #enf_tomo_medicinas_parasitos,
     
@@ -64,7 +64,7 @@ z0db <- read_dta("data/z0_ind_viv_t3.dta") %>%
     epi_estado_campos_agricultura_c,
     epi_estado_canal_agua_c,
     
-    epi_uso_red_dormir_c,
+    #epi_uso_red_dormir_c,
     sero_viv,
     prev_viv
   ) %>% 
@@ -89,7 +89,7 @@ num/dem
 #z0db %>% glimpse()
 
 #how many months ago was your last malaria episode?
-#z0db %>% filter(!complete.cases(.)) %>% 
+#z0db %>% filter(!complete.cases(.)) %>% visdat::vis_dat()
 #  select(vivienda,id,epi_meses_ultima_malaria)
 
 # complete case analysis --------------------------------------------------
@@ -117,7 +117,7 @@ myformula <- as.formula(prev_viv ~
                         fuente_agua+banio_conexion+
                         
                         tenido_malaria+
-                        recibio_tratamiento_malaria+
+                        recibio_tratamiento_malaria_c+
                         enfermedad_cronica+
                         #enf_tomo_medicinas_parasitos+
                         
@@ -147,7 +147,7 @@ myformula <- as.formula(prev_viv ~
                         epi_estado_campos_agricultura_c+
                         epi_estado_canal_agua_c+
                         
-                        epi_uso_red_dormir_c+
+                        #epi_uso_red_dormir_c+
                         sero_viv)
 
 # create functions --------------------------------------------------------
@@ -170,27 +170,23 @@ epi_tidynested <- function(add_nested,level=i) {
 
 add1(glm.null,scope = myformula,test = "LRT") %>% 
   epi_tidynested(1) -> rank_l1
-add1(update(glm.null, ~ . + community_1),scope = myformula,test = "LRT") %>% 
+add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c),scope = myformula,test = "LRT") %>% 
   epi_tidynested(2) -> rank_l2
-add1(update(glm.null, ~ . + community_1 + epi_duerme_cerca_monte_c),scope = myformula,test = "LRT") %>% 
+add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c),scope = myformula,test = "LRT") %>% 
   epi_tidynested(3) -> rank_l3
-add1(update(glm.null, ~ . + community_1 + epi_duerme_cerca_monte_c + sero_viv),scope = myformula,test = "LRT") %>% 
+add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv),scope = myformula,test = "LRT") %>% 
   epi_tidynested(4) -> rank_l4
-add1(update(glm.null, ~ . + community_1 + epi_duerme_cerca_monte_c + sero_viv + age_quart),scope = myformula,test = "LRT") %>% 
+add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv + new_alguien_tuvo_malaria),scope = myformula,test = "LRT") %>% 
   epi_tidynested(5) -> rank_l5
-add1(update(glm.null, ~ . + community_1 + epi_duerme_cerca_monte_c + sero_viv + age_quart + sex_8),scope = myformula,test = "LRT") %>% 
+add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv + new_alguien_tuvo_malaria + trabajo_rpl),scope = myformula,test = "LRT") %>% 
   epi_tidynested(6) -> rank_l6
-add1(update(glm.null, ~ . + community_1 + epi_duerme_cerca_monte_c + sero_viv + age_quart + sex_8 + banio_conexion),scope = myformula,test = "LRT") %>% 
-  epi_tidynested(7) -> rank_l7
-add1(update(glm.null, ~ . + community_1 + epi_duerme_cerca_monte_c + sero_viv + age_quart + sex_8 + banio_conexion + epi_frecuencia_rocia_casa_c),scope = myformula,test = "LRT") %>% 
-  epi_tidynested(8) -> rank_l8
-add1(update(glm.null, ~ . + community_1 + epi_duerme_cerca_monte_c + sero_viv + age_quart + sex_8 + banio_conexion + epi_frecuencia_rocia_casa_c + ah_motocicleta),scope = myformula,test = "LRT") %>% 
-  epi_tidynested(9) -> rank_l9
+#add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv + new_alguien_tuvo_malaria + trabajo_rpl + age_quart),scope = myformula,test = "LRT") %>% 
+#  epi_tidynested(7) -> rank_l7
 
 # parsimonius model -------------------------------------------------------------
 
-#wm1 <- update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + new_alguien_tuvo_malaria + sero_viv + nivel_educacion)
-wm1 <- update(glm.null, ~ . + community_1 + epi_duerme_cerca_monte_c + sero_viv + age_quart + sex_8 + banio_conexion + epi_frecuencia_rocia_casa_c)
+wm1 <- update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv + new_alguien_tuvo_malaria + trabajo_rpl)
+#wm1 <- update(glm.null, ~ . + community_1 + epi_duerme_cerca_monte_c + sero_viv + age_quart + sex_8 + banio_conexion + epi_frecuencia_rocia_casa_c)
 
 epi_tidymodel_pr <- function(wm1) {
   m1 <- wm1 %>% tidy() %>% mutate(pr=exp(estimate)) %>% rownames_to_column()
@@ -213,23 +209,23 @@ rank_table <- rank_l1 %>%
   left_join(rank_l2) %>% 
   left_join(rank_l3) %>% 
   left_join(rank_l4) %>% 
-  left_join(rank_l5) %>% 
-  left_join(rank_l6) %>% 
-  left_join(rank_l7) %>% 
-  left_join(rank_l8) %>% 
+  left_join(rank_l5) %>% select(-df) %>% 
+  left_join(rank_l6) %>% select(-df) %>% #lost of one degree of freedom in work
   mutate_at(vars(starts_with("rank_")), funs(as.numeric)) %>% 
   mutate(rank_2=if_else(is.na(rank_2),rank_1,rank_2+1),
          rank_3=if_else(is.na(rank_3),rank_2,rank_3+2),
          rank_4=if_else(is.na(rank_4),rank_3,rank_4+3),
          rank_5=if_else(is.na(rank_5),rank_4,rank_5+4),
-         rank_6=if_else(is.na(rank_6),rank_5,rank_6+5),
-         rank_7=if_else(is.na(rank_7),rank_6,rank_7+6),
-         rank_8=if_else(is.na(rank_8),rank_7,rank_8+7)
+         rank_6=if_else(is.na(rank_6),rank_5,rank_6+5)
   ) %>% 
   select(-starts_with("LRT")) %>% 
   filter(term!="<none>")
 
-rank_table %>% arrange(rank_8) %>% print(n=Inf) %>% xlsx::write.xlsx("table/z0-nested-table.xlsx")
+rank_table %>% arrange(rank_6) %>% 
+  left_join(rank_l1 %>% select(term,df),by = "term") %>% 
+  select(term,df,everything()) %>% 
+  print(n=Inf) %>% 
+  xlsx::write.xlsx("table/z0-nested-table.xlsx")
 #rank_table %>% arrange(rank_2) %>% print(n=Inf)
 #rank_table %>% arrange(rank_3) %>% print(n=Inf)
 #rank_table %>% arrange(rank_4) %>% print(n=Inf)
@@ -257,45 +253,9 @@ rank_table_term_l <- rank_table_term %>%
 CGPfunctions::newggslopegraph(rank_table_term_l,rank,value,term,Title = "Niveles modelo anidado",SubTitle = "Y: PCR+ P. vivax")
 ggsave("figure/slopegraph-nested.png",width = 12,height = 8)
 
-#MySpecial <- list(  
-#  # move the x axis labels up top
-#  scale_x_discrete(position = "top"),
-#  theme_bw(),
-#  # Format tweaks
-#  # Remove the legend
-#  theme(legend.position = "none"),
-#  # Remove the panel border
-#  theme(panel.border     = element_blank()),
-#  # Remove just about everything from the y axis
-#  theme(axis.title.y     = element_blank()),
-#  theme(axis.text.y      = element_blank()),
-#  theme(panel.grid.major.y = element_blank()),
-#  theme(panel.grid.minor.y = element_blank()),
-#  # Remove a few things from the x axis and increase font size
-#  theme(axis.title.x     = element_blank()),
-#  theme(panel.grid.major.x = element_blank()),
-#  theme(axis.text.x.top      = element_text(size=12)),
-#  # Remove x & y tick marks
-#  theme(axis.ticks       = element_blank()),
-#  # Format title & subtitle
-#  theme(plot.title       = element_text(size=14, face = "bold", hjust = 0.5)),
-#  theme(plot.subtitle    = element_text(hjust = 0.5))
-#)
-#
-#rank_table_term_l %>% 
-#  ggplot(aes(rank, value, group=term)) +
-#  geom_line(aes(colour=term,alpha = 1),size=1) +
-#  ggrepel::geom_text_repel(data = rank_table_term_l %>% filter(rank == "rank_1"), 
-#                           aes(label = term) , 
-#                           hjust = "left", 
-#                           fontface = "bold", 
-#                           size = 3, 
-#                           nudge_x = -5, 
-#                           direction = "y") +
-#  MySpecial
-
 #TAREA:
 #- CORREGIR EXTRA MODELS
+#- personalizar slopegraph
 
 # extra-models ------------------------------------------------------------
 
