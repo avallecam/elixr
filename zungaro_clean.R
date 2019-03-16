@@ -17,14 +17,15 @@ bas <- read_rds("data/x-zungaro_basal.rds") %>%
                                  recibio_tratamiento_malaria =  "No sabe",
                                  enf_tomo_medicinas_parasitos =  "No Sabe",
                                  epi_estado_campos_agricultura = "98. No sabe")) %>% #%>% count(pertenencia_casa)
-  mutate(trabajo_tdy=fct_collapse(trabajo,
+  mutate(trabajo=if_else(is.na(trabajo),"None",as.character(trabajo)),
+         trabajo_tdy=fct_collapse(trabajo,
                                   "Housewife"=c("Ama de casa"),
                                   "Farmer/Breeder/Guard/Fisher"=c("Agricultor","pescador","Vigilante","Granjero"),
                                   "Laborer/Trader/Independent/Driver(Mototaxi)"=c("Obrero/albanil/construccion","Comerciante","independiente",
                                                      "Mecanico/tecnico","Administrativo/limpieza/profesor","carpintero",
                                                      "panadero","Profesional de la salud","guia en la unap","pensionista",
                                                      "mototaxista","Chofer"),
-                                  "None/Unemployed/Pensionist"=c("pensionista","no aplica","desempleado"),
+                                  "None/Unemployed/Pensionist"=c("pensionista","no aplica","desempleado","None"),
                                   "Student"=c("Estudiante")
                                   ),
          #definir y corregir por missing
@@ -51,6 +52,22 @@ bas <- read_rds("data/x-zungaro_basal.rds") %>%
                                       #"Complete Secondary or more"=c("secundaria completa", "tecnica","universitaria"),
                                       "None"=c("sin educacion","inicial")
          ),
+         
+         recibio_tratamiento_malaria=as.character(recibio_tratamiento_malaria),
+         recibio_tratamiento_malaria_c=if_else(cantidad_tratamiento_malaria==0,
+                                             "Ninguna",
+                                             if_else(cantidad_tratamiento_malaria==1,
+                                                     "Solo una vez",
+                                                     if_else(cantidad_tratamiento_malaria>1,
+                                                             "Mas de una vez",
+                                                             NA_character_)
+                                                     )
+                                             ),
+         recibio_tratamiento_malaria_c=if_else(is.na(recibio_tratamiento_malaria_c),
+                                               recibio_tratamiento_malaria,
+                                               recibio_tratamiento_malaria_c),
+         recibio_tratamiento_malaria_c=fct_relevel(recibio_tratamiento_malaria_c,
+                                                   "Ninguna","Solo una vez"),
          
          tenido_malaria=fct_collapse(tenido_malaria,"no"=c("no","no sabe")),
          tenido_malaria=if_else(cuantas_tenido_malaria==0,"no",as.character(tenido_malaria)) %>% as.factor(),
@@ -216,6 +233,9 @@ bas <- read_rds("data/x-zungaro_basal.rds") %>%
          ) %>% 
   select(-opciones_tenido_malaria)
 
+bas %>% count(recibio_tratamiento_malaria)
+bas %>% count(recibio_tratamiento_malaria_c)
+bas %>% count(recibio_tratamiento_malaria,recibio_tratamiento_malaria_c,cantidad_tratamiento_malaria) %>% print(n=Inf)
 #bas %>% count(donde_busco_tratamiento_c)
 #bas %>% count(relacion_jefe_familia_c)
 #bas %>% count(actualmente_estudiando_18)
@@ -665,7 +685,7 @@ compareGroups(community_1 ~ age_7+age_quart+age_oms+age_gcb+sex_8+
   createTable(show.all = T, show.n = T) %>% 
   export2xls("table/z0-tab1_ind_r01.xls")
 
-compareGroups(community_1 ~ tenido_malaria+recibio_tratamiento_malaria+busco_ayuda_tratamiento+donde_busco_tratamiento_c+
+compareGroups(community_1 ~ tenido_malaria+recibio_tratamiento_malaria_c+busco_ayuda_tratamiento+donde_busco_tratamiento_c+
                 enfermedad_cronica+enf_tomo_medicinas_parasitos, 
               data = ind #,byrow=T 
               #,method = c(residence = 2)
@@ -761,7 +781,7 @@ compareGroups(prev_viv ~
                 fuente_agua+banio_conexion+
                 
                 tenido_malaria+
-                recibio_tratamiento_malaria+
+                recibio_tratamiento_malaria_c+
                 enfermedad_cronica+
                 enf_tomo_medicinas_parasitos+
                 
@@ -949,7 +969,7 @@ ind_viv %>%
     fuente_agua,banio_conexion,
     
     tenido_malaria,
-    recibio_tratamiento_malaria,
+    recibio_tratamiento_malaria_c,
     enfermedad_cronica,
     enf_tomo_medicinas_parasitos,
     
