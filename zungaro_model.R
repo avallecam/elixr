@@ -92,6 +92,10 @@ num/dem
 #z0db %>% filter(!complete.cases(.)) %>% visdat::vis_dat()
 #  select(vivienda,id,epi_meses_ultima_malaria)
 
+read_dta("data/z0_ind_viv_t3.dta") %>% 
+  as_factor() %>% 
+  miss_var_summary() %>% filter(n_miss>0)
+
 # duplicates --------------------------------------------------------------
 
 z0db %>% filter(duplicated(.))
@@ -339,7 +343,9 @@ update(wm1, ~ . - trabajo_rpl + trabajo_tdy) %>%
 
 # modelos simple ----------------------------------------------------------
 
-parsimonioso_var <- rank_table %>% arrange(rank_6) %>% filter(is.na(p.value_6)) %>% .$term
+parsimonioso_var <- rank_table %>% 
+  arrange(rank_6) %>% 
+  filter(is.na(p.value_6)) %>% .$term
 #parsimonioso_var
 #ajustado_var
 todo_var <- c(parsimonioso_var,ajustado_var)
