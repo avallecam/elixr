@@ -18,7 +18,7 @@ z0db <- read_dta("data/z0_ind_viv_t3.dta") %>%
     
     id,vivienda,
     
-    age_quart,
+    age_quart,age_7,
     sex_8,
     nivel_educacion,
     trabajo_tdy,trabajo_rpl,
@@ -92,6 +92,10 @@ num/dem
 #z0db %>% filter(!complete.cases(.)) %>% visdat::vis_dat()
 #  select(vivienda,id,epi_meses_ultima_malaria)
 
+# duplicates --------------------------------------------------------------
+
+z0db %>% filter(duplicated(.))
+
 # complete case analysis --------------------------------------------------
 
 z0db_cc <- z0db %>% filter(complete.cases(.))
@@ -101,7 +105,7 @@ z0db_cc %>% dim()
 # create formula ----------------------------------------------------------
 
 myformula <- as.formula(prev_viv ~ 
-                        age_quart+
+                        age_quart+age_7+
                         sex_8+
                         nivel_educacion+
                         trabajo_tdy+trabajo_rpl+
@@ -201,7 +205,7 @@ epi_tidymodel_pr <- function(wm1) {
     return()
 }
 
-mpf_tidy <- epi_tidymodel_pr(wm1) %>% print()
+parsimonioso_tidy <- epi_tidymodel_pr(wm1) %>% print()
 
 # table: LRT p values -----------------------------------------------------
 
@@ -261,114 +265,98 @@ ggsave("figure/slopegraph-nested.png",width = 12,height = 8)
 
 rank_table %>% arrange(rank_6) %>% print(n=Inf)
 
-mpf_tidy
+parsimonioso_tidy
 
-ex1 <- update(wm1, ~ . + enfermedad_cronica)
-ex1_tidy <- epi_tidymodel_pr(ex1) %>% slice(-c(1:7))
+ajustado_var <- c("age_quart",
+                  "sex_8",
+                  "nivel_educacion",
+                  "trabajo_tdy",
+                  "community_1",
+                  "residence_quart",
+                  "electricidad_red_publica",
+                  "combustible_cocinar",
+                  "ah_radio",
+                  "ah_mototaxi",
+                  "material_pared_c",
+                  "tenido_malaria",
+                  "recibio_tratamiento_malaria_c",
+                  "enfermedad_cronica",
+                  "epi_cerca_fuente_agua",
+                  "new_malaria_ultimos_meses_c",
+                  "epi_estuvo_campo_antes_c",
+                  "epi_duerme_ventanas_abiertas_c",
+                  "epi_ultimas_semanas_viajo",
+                  "epi_frecuencia_rocia_casa_c")
 
-ex1 <- update(wm1, ~ . + combustible_cocinar)
-ex2_tidy <- epi_tidymodel_pr(ex1) %>% slice(-c(1:7))
+#https://adv-r.hadley.nz/quasiquotation.html
+#19.4.1 Unquoting one argument
+epi_postadjusted <- function(wm1, ajustado_var) {
+  
+  ex0_tidy <- parsimonioso_tidy %>% .[FALSE,]
+  
+  for (i in 1:length(ajustado_var)) { #i=1
+    
+    x_var <- sym(ajustado_var[i])
+    
+    ex1_tidy <- update(wm1, expr(~ . + !!x_var)) %>% 
+      epi_tidymodel_pr() %>% slice(-c(1:7))
+    
+    ex0_tidy <- union_all(ex0_tidy,ex1_tidy)
+    
+  }
+  
+  postadjusted <- ex0_tidy %>% rename_at(.vars = vars(-term),.funs = str_replace, "(.+)","\\1\\_post")
+  
+  postadjusted %>% return()
+  
+}
 
-ex1 <- update(wm1, ~ . + sex_8)
-ex3_tidy <- epi_tidymodel_pr(ex1) %>% slice(-c(1:7))
+ajustados_post <- epi_postadjusted(wm1,ajustado_var)
+ajustados_post %>% print(n=Inf)
 
-ex1 <- update(wm1, ~ . + epi_frecuencia_rocia_casa_c)
-ex4_tidy <- epi_tidymodel_pr(ex1) %>% slice(-c(1:7))
-
-ex1 <- update(wm1, ~ . + trabajo_rpl)
-ex5_tidy <- epi_tidymodel_pr(ex1) %>% slice(-c(1:7))
-
-ex1 <- update(wm1, ~ . + trabajo_tdy)
-ex6_tidy <- epi_tidymodel_pr(ex1) %>% slice(-c(1:7))
-
-ex1 <- update(wm1, ~ . + age_quart)
-ex7_tidy <- epi_tidymodel_pr(ex1) %>% slice(-c(1:7))
-
-ex1 <- update(wm1, ~ . + community_1)
-ex8_tidy <- epi_tidymodel_pr(ex1) %>% slice(-c(1:7))
-
-ex1 <- update(wm1, ~ . + material_pared_c)
-ex9_tidy <- epi_tidymodel_pr(ex1) %>% slice(-c(1:7))
-
-ex1 <- update(wm1, ~ . + recibio_tratamiento_malaria)
-ex10_tidy <- epi_tidymodel_pr(ex1) %>% slice(-c(1:7))
-
-ex1 <- update(wm1, ~ . + epi_cerca_fuente_agua)
-ex11_tidy <- epi_tidymodel_pr(ex1) %>% slice(-c(1:7))
-
-ex1 <- update(wm1, ~ . + epi_duerme_ventanas_abiertas_c)
-ex12_tidy <- epi_tidymodel_pr(ex1) %>% slice(-c(1:7))
-
-ex1 <- update(wm1, ~ . + residence_quart)
-ex13_tidy <- epi_tidymodel_pr(ex1) %>% slice(-c(1:7))
-
-ex0_post <- ex1_tidy %>% 
-  union_all(ex2_tidy) %>% 
-  union_all(ex3_tidy) %>% 
-  union_all(ex4_tidy) %>% 
-  union_all(ex5_tidy) %>% 
-  union_all(ex6_tidy) %>% 
-  union_all(ex7_tidy) %>% 
-  union_all(ex8_tidy) %>% 
-  union_all(ex9_tidy) %>% 
-  union_all(ex10_tidy) %>% 
-  union_all(ex11_tidy) %>% 
-  union_all(ex12_tidy) %>% 
-  union_all(ex13_tidy) %>% 
-  rename_at(.vars = vars(-term),.funs = str_replace, "(.+)","\\1\\_post")
-
+update(wm1, ~ . - trabajo_rpl + trabajo_tdy) %>% 
+  epi_tidymodel_pr() #%>% slice(-c(1:6))
 
 # modelos simple ----------------------------------------------------------
 
-mpf_tidy
-sm1 <- update(glm.null, ~ . + epi_duerme_cerca_monte_c) %>% epi_tidymodel_pr()
-sm2 <- update(glm.null, ~ . + material_piso_c) %>% epi_tidymodel_pr()
-sm3 <- update(glm.null, ~ . + epi_meses_ultima_malaria) %>% epi_tidymodel_pr()
-sm4 <- update(glm.null, ~ . + sero_viv) %>% epi_tidymodel_pr()
-sm5 <- update(glm.null, ~ . + nivel_educacion) %>% epi_tidymodel_pr()
+parsimonioso_var <- rank_table %>% arrange(rank_6) %>% filter(is.na(p.value_6)) %>% .$term
+#parsimonioso_var
+#ajustado_var
+todo_var <- c(parsimonioso_var,ajustado_var)
 
-sme1 <- update(glm.null, ~ . + enfermedad_cronica) %>% epi_tidymodel_pr()
-sme2 <- update(glm.null, ~ . + combustible_cocinar) %>% epi_tidymodel_pr()
-sme3 <- update(glm.null, ~ . + sex_8) %>% epi_tidymodel_pr()
-sme4 <- update(glm.null, ~ . + epi_frecuencia_rocia_casa_c) %>% epi_tidymodel_pr()
-sme5 <- update(glm.null, ~ . + trabajo_rpl) %>% epi_tidymodel_pr()
-sme6 <- update(glm.null, ~ . + trabajo_tdy) %>% epi_tidymodel_pr()
-sme7 <- update(glm.null, ~ . + age_quart) %>% epi_tidymodel_pr()
-sme8 <- update(glm.null, ~ . + community_1) %>% epi_tidymodel_pr()
-sme9 <- update(glm.null, ~ . + material_pared_c) %>% epi_tidymodel_pr()
-sme10 <- update(glm.null, ~ . + recibio_tratamiento_malaria) %>% epi_tidymodel_pr()
-sme11 <- update(glm.null, ~ . + epi_cerca_fuente_agua) %>% epi_tidymodel_pr()
-sme12 <- update(glm.null, ~ . + epi_duerme_ventanas_abiertas_c) %>% epi_tidymodel_pr()
-sme13 <- update(glm.null, ~ . + residence_quart) %>% epi_tidymodel_pr()
+epi_presimples <- function(glm.null,todo_var) {
+  
+  sm0_tidy <- parsimonioso_tidy %>% .[FALSE,]
+  nul_tidy <- glm.null %>% epi_tidymodel_pr()
+  
+  for (i in 1:length(todo_var)) {
+    
+    x_var <- sym(todo_var[i])
+    
+    sm1 <- update(glm.null, expr(~ . + !!x_var)) %>% 
+      epi_tidymodel_pr()
+    
+    sm0_tidy <- union_all(sm0_tidy,sm1)
+    
+  }
+  
+  simples_tidy <- sm0_tidy %>% 
+    filter(term!="(Intercept)") %>% 
+    union_all(nul_tidy) %>% 
+    rename_at(.vars = vars(-term),.funs = str_replace, "(.+)","\\1\\_simple")
+  
+  simples_tidy %>% return()
+  
+}
 
-nul_tidy <- glm.null %>% epi_tidymodel_pr()
-
-msi_tidy <- sm1 %>% 
-  union_all(sm2) %>% 
-  union_all(sm3) %>% 
-  union_all(sm4) %>% 
-  union_all(sm5) %>% 
-  union_all(sme1) %>%
-  union_all(sme2) %>%
-  union_all(sme3) %>%
-  union_all(sme4) %>%
-  union_all(sme5) %>%
-  union_all(sme6) %>%
-  union_all(sme7) %>%
-  union_all(sme8) %>%
-  union_all(sme9) %>%
-  union_all(sme10) %>%
-  union_all(sme11) %>%
-  union_all(sme12) %>% 
-  union_all(sme13) %>% 
-  filter(term!="(Intercept)") %>% 
-  union_all(nul_tidy) %>% 
-  rename_at(.vars = vars(-term),.funs = str_replace, "(.+)","\\1\\_simple")
+simples_tidy <- epi_presimples(glm.null,todo_var)
+simples_tidy %>% print(n=Inf)
 
 # final output ------------------------------------------------------------
 
-final <- left_join(msi_tidy,mpf_tidy,"term") %>% 
-  left_join(ex0_post)
+final <- left_join(simples_tidy,parsimonioso_tidy,"term") %>% 
+  left_join(ajustados_post)
 
 final %>% print(n=Inf)
-final %>% xlsx::write.xlsx("table/z0-nested-r.xlsx")
+final %>% as.data.frame() %>% 
+  xlsx::write.xlsx("table/z0-nested-r.xlsx",showNA = FALSE)
