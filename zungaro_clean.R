@@ -814,7 +814,7 @@ compareGroups(prev_viv ~
                 prev_viv
               
               ,data = ind_viv ,byrow=T 
-              #,method = c(Ab.unit_Pviv = 2,Ab.unit_Pfal=2)
+              ,method = c(epi_meses_ultima_malaria = 2)
 ) %>% 
   createTable(show.n = T,show.all = T) %>% 
   export2xls("table/z0-tab2_prev_viv.xls")
