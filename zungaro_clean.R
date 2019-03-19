@@ -953,7 +953,7 @@ ind_viv %>%
     vivienda,
     longitud,latitud,
     
-    age_quart,
+    age_quart,age_7,
     sex_8,
     nivel_educacion,
     trabajo_tdy,trabajo_rpl,
