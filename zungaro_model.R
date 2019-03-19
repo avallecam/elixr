@@ -237,6 +237,9 @@ rank_table %>% arrange(rank_6) %>%
 
 # graph: visualize levels -------------------------------------------------
 
+#TAREA:
+#- personalizar slopegraph
+
 rank_table_term <- rank_table %>% 
   select(term,starts_with("rank")) %>% 
   arrange(rank_6) %>% 
@@ -256,10 +259,6 @@ rank_table_term_l <- rank_table_term %>%
 
 CGPfunctions::newggslopegraph(rank_table_term_l,rank,value,term,Title = "Niveles modelo anidado",SubTitle = "Y: PCR+ P. vivax")
 ggsave("figure/slopegraph-nested.png",width = 12,height = 8)
-
-#TAREA:
-#- CORREGIR EXTRA MODELS
-#- personalizar slopegraph
 
 # extra-models ------------------------------------------------------------
 
@@ -313,6 +312,27 @@ epi_postadjusted <- function(wm1, ajustado_var) {
 
 ajustados_post <- epi_postadjusted(wm1,ajustado_var)
 ajustados_post %>% print(n=Inf)
+
+
+# collineality -------------------------------------------------------
+#https://stackoverflow.com/questions/7337761/linear-regression-na-estimate-just-for-last-coefficient
+#https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
+
+update(wm1, ~ . + trabajo_tdy) %>% 
+  epi_tidymodel_pr()
+
+update(glm.null, ~ . + trabajo_tdy) %>% 
+  epi_tidymodel_pr()
+
+update(glm.null, ~ . + trabajo_rpl) %>% 
+  epi_tidymodel_pr()
+
+update(glm.null, ~ . + trabajo_rpl + trabajo_tdy) %>% 
+  epi_tidymodel_pr()
+
+z0db_cc %>% count(trabajo_rpl,trabajo_tdy)
+
+# __solucion --------------------------------------------------------------
 
 update(wm1, ~ . - trabajo_rpl + trabajo_tdy) %>% 
   epi_tidymodel_pr() #%>% slice(-c(1:6))
