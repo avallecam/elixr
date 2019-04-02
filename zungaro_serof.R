@@ -66,7 +66,7 @@ z0db <- read_dta("data/z0_ind_viv_t3.dta") %>%
     
     epi_uso_red_dormir_c,
     sero_viv,sero_fal,
-    prev_viv
+    prev_viv,prev_fal
   ) %>% 
   mutate(sero_fal=as.numeric(sero_fal)-1)
 
@@ -156,7 +156,7 @@ myformula <- as.formula(sero_fal ~
                           epi_estado_canal_agua_c+
                           
                           epi_uso_red_dormir_c+
-                          prev_viv, sero_viv)
+                          prev_viv + prev_fal + sero_viv)
 
 # create functions --------------------------------------------------------
 
@@ -182,19 +182,21 @@ add1(update(glm.null, ~ . + community_1),scope = myformula,test = "LRT") %>%
   epi_tidynested(2) -> rank_l2
 add1(update(glm.null, ~ . + community_1  + age_quart),scope = myformula,test = "LRT") %>% 
   epi_tidynested(3) -> rank_l3
-add1(update(glm.null, ~ . + community_1  + age_quart + tenido_malaria),scope = myformula,test = "LRT") %>% 
+add1(update(glm.null, ~ . + community_1  + age_quart + prev_fal),scope = myformula,test = "LRT") %>% 
   epi_tidynested(4) -> rank_l4
-#add1(update(glm.null, ~ . + community_1  + age_quart + tenido_malaria + epi_estado_canal_agua_c),scope = myformula,test = "LRT") %>% 
-#  epi_tidynested(5) -> rank_l5
-#add1(update(glm.null, ~ . + age_quart + recibio_tratamiento_malaria_c + prev_viv + ah_mototaxi + ah_motocicleta),scope = myformula,test = "LRT") %>% 
-#  epi_tidynested(6) -> rank_l6
-#add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv + new_alguien_tuvo_malaria + trabajo_rpl + age_quart),scope = myformula,test = "LRT") %>% 
-#  epi_tidynested(7) -> rank_l7
+add1(update(glm.null, ~ . + community_1  + age_quart + prev_fal + tenido_malaria),scope = myformula,test = "LRT") %>% 
+  epi_tidynested(5) -> rank_l5
+add1(update(glm.null, ~ . + community_1  + age_quart + prev_fal + tenido_malaria + sero_viv),scope = myformula,test = "LRT") %>% 
+  epi_tidynested(6) -> rank_l6
+add1(update(glm.null, ~ . + community_1  + age_quart + prev_fal + tenido_malaria + sero_viv + prev_viv),scope = myformula,test = "LRT") %>% 
+  epi_tidynested(7) -> rank_l7
+#add1(update(glm.null, ~ . + community_1  + age_quart + prev_fal + tenido_malaria + sero_viv + prev_viv + epi_estado_canal_agua_c),scope = myformula,test = "LRT") %>% 
+#  epi_tidynested(8) -> rank_l8
 
 # parsimonius model -------------------------------------------------------------
 
-wm1 <- update(glm.null, ~ . + community_1  + age_quart + tenido_malaria)
-#wm1 <- update(glm.null, ~ . + community_1 + epi_duerme_cerca_monte_c + sero_viv + age_quart + sex_8 + banio_conexion + epi_frecuencia_rocia_casa_c)
+#wm1 <- update(glm.null, ~ . + community_1  + age_quart + tenido_malaria)
+wm1 <- update(glm.null, ~ . + community_1  + age_quart + prev_fal + tenido_malaria + sero_viv + prev_viv)
 
 epi_tidymodel_pr <- function(wm1,i=3) {
   m1 <- wm1 %>% tidy() %>% mutate(pr=exp(estimate)) %>% rownames_to_column()
@@ -209,7 +211,7 @@ epi_tidymodel_pr <- function(wm1,i=3) {
     return()
 }
 
-parsimonioso_tidy <- epi_tidymodel_pr(wm1,10) %>% print()
+parsimonioso_tidy <- epi_tidymodel_pr(wm1,7) %>% print()
 
 # table: LRT p values -----------------------------------------------------
 
@@ -217,14 +219,16 @@ rank_table <- rank_l1 %>%
   left_join(rank_l2) %>% 
   left_join(rank_l3) %>% 
   left_join(rank_l4) %>% 
-  #left_join(rank_l5) %>% #select(-df) %>% 
-  #left_join(rank_l6) %>% select(-df) %>% #lost of one degree of freedom in work
+  left_join(rank_l5) %>% #select(-df) %>% 
+  left_join(rank_l6) %>% #select(-df) %>% #lost of one degree of freedom in work
+  left_join(rank_l7) %>% 
   mutate_at(vars(starts_with("rank_")), funs(as.numeric)) %>% 
   mutate(rank_2=if_else(is.na(rank_2),rank_1,rank_2+1),
          rank_3=if_else(is.na(rank_3),rank_2,rank_3+2),
          rank_4=if_else(is.na(rank_4),rank_3,rank_4+3),
-         #rank_5=if_else(is.na(rank_5),rank_4,rank_5+4)#,
-         #rank_6=if_else(is.na(rank_6),rank_5,rank_6+5)
+         rank_5=if_else(is.na(rank_5),rank_4,rank_5+4),
+         rank_6=if_else(is.na(rank_6),rank_5,rank_6+5),
+         rank_7=if_else(is.na(rank_7),rank_6,rank_7+6)
   ) %>% 
   select(-starts_with("LRT")) %>% 
   filter(term!="<none>")
@@ -246,7 +250,7 @@ rank_table %>% arrange(rank_4) %>%
 
 rank_table_term <- rank_table %>% 
   select(term,starts_with("rank")) %>% 
-  arrange(rank_4) %>% 
+  arrange(rank_7) %>% 
   column_to_rownames("term") 
 
 #library(slopegraph)
@@ -266,13 +270,13 @@ ggsave("figure/slopegraph-nested-serof.png",width = 12,height = 8)
 
 # extra-models ------------------------------------------------------------
 
-rank_table %>% arrange(rank_4) %>% print(n=Inf)
+rank_table %>% arrange(rank_7) %>% print(n=Inf)
 
 parsimonioso_tidy
 
 ajustado_var <- rank_table %>% 
-  arrange(rank_4) %>% 
-  filter(!is.na(p.value_4)) %>% 
+  arrange(rank_7) %>% 
+  filter(!is.na(p.value_7)) %>% 
   filter(term!="epi_uso_ropa_impregnada_c") %>% 
   .$term
 
@@ -307,8 +311,8 @@ ajustados_post %>% print(n=Inf)
 # modelos simple ----------------------------------------------------------
 
 parsimonioso_var <- rank_table %>% 
-  arrange(rank_4) %>% 
-  filter(is.na(p.value_4)) %>% .$term
+  arrange(rank_7) %>% 
+  filter(is.na(p.value_7)) %>% .$term
 #parsimonioso_var
 #ajustado_var
 todo_var <- z0db %>% select(-id,-vivienda,-epi_uso_ropa_impregnada_c) %>% colnames()
