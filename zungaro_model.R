@@ -45,7 +45,7 @@ z0db <- read_dta("data/z0_ind_viv_t3.dta") %>%
     
     
     epi_alguien_tuvo_malaria,
-    new_alguien_tuvo_malaria,
+    new_alguien_tuvo_malaria,new_alguien_tuvo_malaria_c,
     
     
     epi_uso_repelente_mosquito_c,
@@ -106,6 +106,46 @@ z0db_cc <- z0db %>% filter(complete.cases(.))
 z0db_cc %>% dim()
 #z0db_cc %>% glimpse()
 
+z0db %>% glimpse()
+z0db %>% count(new_alguien_tuvo_malaria,new_alguien_tuvo_malaria_c,new_malaria_ultimos_meses_c)
+
+# explore -----------------------------------------------------------------
+
+library(moments)
+
+epi_summary_group <- function(df, g, x) {
+  
+  g_var <- enquo(g)
+  x_var <- enquo(x)
+  
+  df %>% 
+    group_by(!!g_var) %>% 
+    summarise(n_obs=n(),
+              min=min(!!x_var,na.rm = T),
+              max=max(!!x_var,na.rm = T),
+              mean=mean(!!x_var,na.rm = T) %>% 
+                signif(.,
+                       digits = str_length(str_replace(.,"(.+)\\.(.+)","\\1")) + 2),
+              sd=sd(!!x_var,na.rm = T),
+              q25=quantile(!!x_var,probs = 0.25,na.rm = T),
+              q50=median(!!x_var,na.rm = T),
+              q75=quantile(!!x_var,probs = 0.75,na.rm = T),
+              skewness=skewness(!!x_var,na.rm = T),
+              kurtosis=kurtosis(!!x_var,na.rm = T)
+    )
+}
+
+read_dta("data/z0_ind_viv_t3.dta") %>% 
+  as_factor() %>% #select(epi_meses_ultima_malaria,new_alguien_tuvo_malaria)
+  epi_summary_group(new_alguien_tuvo_malaria,epi_meses_ultima_malaria)
+
+#ojo: que un sujeto no tenga episodios, 
+#no implica que algun miembro en su vivienda hay tenido episodios
+read_dta("data/z0_ind_viv_t3.dta") %>% 
+  as_factor() %>% 
+  count(new_alguien_tuvo_malaria,epi_meses_ultima_malaria)
+#por ello: tampoco restringe el rango de 6 a más!
+
 # create formula ----------------------------------------------------------
 
 myformula <- as.formula(prev_viv ~ 
@@ -136,7 +176,7 @@ myformula <- as.formula(prev_viv ~
                         
                         
                         epi_alguien_tuvo_malaria+
-                        new_alguien_tuvo_malaria+
+                        new_alguien_tuvo_malaria+new_alguien_tuvo_malaria_c+
                         
                         
                         epi_uso_repelente_mosquito_c+
@@ -184,16 +224,16 @@ add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c),scope = 
   epi_tidynested(3) -> rank_l3
 add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv),scope = myformula,test = "LRT") %>% 
   epi_tidynested(4) -> rank_l4
-add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv + new_alguien_tuvo_malaria),scope = myformula,test = "LRT") %>% 
+add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv + new_alguien_tuvo_malaria_c),scope = myformula,test = "LRT") %>% 
   epi_tidynested(5) -> rank_l5
-add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv + new_alguien_tuvo_malaria + trabajo_rpl),scope = myformula,test = "LRT") %>% 
+add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv + new_alguien_tuvo_malaria_c + trabajo_rpl),scope = myformula,test = "LRT") %>% 
   epi_tidynested(6) -> rank_l6
 #add1(update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv + new_alguien_tuvo_malaria + trabajo_rpl + age_quart),scope = myformula,test = "LRT") %>% 
 #  epi_tidynested(7) -> rank_l7
 
 # parsimonius model -------------------------------------------------------------
 
-wm1 <- update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv + new_alguien_tuvo_malaria + trabajo_rpl)
+wm1 <- update(glm.null, ~ . + epi_duerme_cerca_monte_c + material_piso_c + sero_viv + new_alguien_tuvo_malaria_c + trabajo_rpl)
 #wm1 <- update(glm.null, ~ . + community_1 + epi_duerme_cerca_monte_c + sero_viv + age_quart + sex_8 + banio_conexion + epi_frecuencia_rocia_casa_c)
 
 epi_tidymodel_pr <- function(wm1) {

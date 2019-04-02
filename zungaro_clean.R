@@ -237,6 +237,7 @@ bas <- read_rds("data/x-zungaro_basal.rds") %>%
          ) %>% 
   select(-opciones_tenido_malaria)
 
+#bas %>% count(epi_meses_ultima_malaria)
 bas %>% count(recibio_tratamiento_malaria)
 bas %>% count(recibio_tratamiento_malaria_c)
 bas %>% count(recibio_tratamiento_malaria,recibio_tratamiento_malaria_c,cantidad_tratamiento_malaria) %>% print(n=Inf)
@@ -349,11 +350,11 @@ history_sol <- bas %>%
          new_malaria_ultimos_meses_c=if_else(epi_meses_ultima_malaria<=12 & epi_meses_ultima_malaria!=0 & !is.na(epi_meses_ultima_malaria),
                                              "si, hace 12 meses o menos",
                                              "No/No sabe"),
-         new_alguien_tuvo_malaria=fct_collapse(new_alguien_tuvo_malaria,"si, hace 6 meses o más"=c("si, hace mas de un ano","si, el ultimo ano"))
+         new_alguien_tuvo_malaria_c=fct_collapse(new_alguien_tuvo_malaria,"si, hace 6 meses o más"=c("si, hace mas de un ano","si, el ultimo ano"))
   ) %>% 
   select(-age_7,-epi_meses_ultima_malaria)
 
-history_sol %>% count(new_alguien_tuvo_malaria)
+history_sol %>% count(new_alguien_tuvo_malaria,new_alguien_tuvo_malaria_c)
 #viv %>% count(epi_alguien_tuvo_malaria)
 history_sol %>% count(new_malaria_ultimos_meses_c)
 #viv %>% count(epi_malaria_ultimos_meses_c)
@@ -430,7 +431,7 @@ viv <- bas %>%
          #consevada a nivel sujeto
          epi_frecuencia_rocia_casa,epi_frecuencia_rocia_casa_c,epi_alguien_tuvo_malaria,
          #preferida sobre rociamiento
-         epi_rocia_con_insecticida_c,new_alguien_tuvo_malaria,new_malaria_ultimos_meses_c
+         epi_rocia_con_insecticida_c,new_alguien_tuvo_malaria,new_alguien_tuvo_malaria_c,new_malaria_ultimos_meses_c
          ) %>% 
   #por cada vivienda
   group_by(vivienda) %>% 
@@ -633,7 +634,7 @@ compareGroups(prev_viv_hoth ~
                 epi_cerca_fuente_agua+epi_tipo_fuente_agua+epi_distancia_fuente_agua+
                 epi_frecuencia_rocia_casa_c+epi_rocia_con_insecticida_c+
                 epi_malaria_ultimos_meses_c+epi_viajo_fuera_villa+epi_meses_ultima_malaria+epi_especie_causo_malaria+
-                epi_alguien_tuvo_malaria+new_alguien_tuvo_malaria+new_malaria_ultimos_meses_c+
+                epi_alguien_tuvo_malaria+new_alguien_tuvo_malaria+new_alguien_tuvo_malaria_c+new_malaria_ultimos_meses_c+
                 sero_viv_hoth, 
               data = viv ,byrow=T 
 ) %>% 
@@ -648,7 +649,7 @@ compareGroups(sero_viv_hoth ~
                 epi_cerca_fuente_agua+epi_tipo_fuente_agua+epi_distancia_fuente_agua+
                 epi_frecuencia_rocia_casa_c+epi_rocia_con_insecticida_c+
                 epi_malaria_ultimos_meses_c+epi_viajo_fuera_villa+epi_meses_ultima_malaria+epi_especie_causo_malaria+
-                epi_alguien_tuvo_malaria+new_alguien_tuvo_malaria+new_malaria_ultimos_meses_c+
+                epi_alguien_tuvo_malaria+new_alguien_tuvo_malaria+new_alguien_tuvo_malaria_c+new_malaria_ultimos_meses_c+
                 prev_viv_hoth, 
               data = viv ,byrow=T 
 ) %>% 
@@ -663,7 +664,7 @@ compareGroups(sero_fal_hoth ~
                 epi_cerca_fuente_agua+epi_tipo_fuente_agua+epi_distancia_fuente_agua+
                 epi_frecuencia_rocia_casa_c+epi_rocia_con_insecticida_c+
                 epi_malaria_ultimos_meses_c+epi_viajo_fuera_villa+epi_meses_ultima_malaria+epi_especie_causo_malaria+
-                epi_alguien_tuvo_malaria+new_alguien_tuvo_malaria+new_malaria_ultimos_meses_c+
+                epi_alguien_tuvo_malaria+new_alguien_tuvo_malaria+new_alguien_tuvo_malaria_c+new_malaria_ultimos_meses_c+
                 prev_fal_hoth
               , 
               data = viv ,byrow=T 
@@ -794,7 +795,7 @@ compareGroups(prev_viv ~
                 
                 
                 #epi_alguien_tuvo_malaria+
-                new_alguien_tuvo_malaria+
+                new_alguien_tuvo_malaria+new_alguien_tuvo_malaria_c+
                 new_malaria_ultimos_meses_c+
                 
                 epi_uso_repelente_mosquito_c+
@@ -850,8 +851,8 @@ compareGroups(sero_viv ~
                 
                 
                 #epi_alguien_tuvo_malaria+
-                new_alguien_tuvo_malaria+
-                #new_malaria_ultimos_meses_c+
+                new_alguien_tuvo_malaria+new_alguien_tuvo_malaria_c+
+                new_malaria_ultimos_meses_c+
                 
                 epi_uso_repelente_mosquito_c+
                 epi_uso_mangas_largas_c+
@@ -905,8 +906,8 @@ compareGroups(sero_fal ~
                 
                 
                 #epi_alguien_tuvo_malaria+
-                new_alguien_tuvo_malaria+
-                #new_malaria_ultimos_meses_c+
+                new_alguien_tuvo_malaria+new_alguien_tuvo_malaria_c+
+                new_malaria_ultimos_meses_c+
                 
                 epi_uso_repelente_mosquito_c+
                 epi_uso_mangas_largas_c+
@@ -980,7 +981,7 @@ viv %>%
     electricidad_red_publica,combustible_cocinar,
     ah_estereo,ah_television,ah_radio,ah_refrigerador,ah_motocicleta,ah_mototaxi,
     fuente_agua,banio_conexion,
-    new_alguien_tuvo_malaria,new_malaria_ultimos_meses_c,
+    new_alguien_tuvo_malaria,new_alguien_tuvo_malaria_c,new_malaria_ultimos_meses_c,
     
     material_pared,material_piso,
     epi_cerca_fuente_agua,#epi_tipo_fuente_agua,epi_distancia_fuente_agua,
@@ -1036,7 +1037,7 @@ ind_viv %>%
     
     
     epi_alguien_tuvo_malaria,
-    new_alguien_tuvo_malaria,
+    new_alguien_tuvo_malaria,new_alguien_tuvo_malaria_c,
     
     
     epi_uso_repelente_mosquito_c,
