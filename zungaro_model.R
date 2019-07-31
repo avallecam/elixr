@@ -6,6 +6,7 @@ library(haven)
 library(naniar)
 library(broom)
 library(CGPfunctions)
+library(janitor)
 
 rm(list = ls())
 theme_set(theme_bw())
@@ -14,6 +15,10 @@ theme_set(theme_bw())
 
 z0db <- read_dta("data/z0_ind_viv_t3.dta") %>% 
   as_factor() %>% 
+  
+  #retirar observaciones segun reporte 25junio2019
+  filter(!id %in% c("NN003-4","NN061-1")) %>% 
+  
   select(
     
     id,vivienda,
@@ -72,7 +77,9 @@ z0db <- read_dta("data/z0_ind_viv_t3.dta") %>%
 
 # evaluate outcome --------------------------------------------------------
 
-z0db %>% count(prev_viv)
+z0db %>% tabyl(prev_viv) %>% 
+  adorn_totals("row") %>%
+  adorn_pct_formatting()
 z0db %>% dim()
 
 # identify missings -------------------------------------------------------
