@@ -1,5 +1,6 @@
 .Rproj.user
 .Rhistory
+.Rhistory (1)
 analysis/*.csl
 analysis/trialerror/*
 analysis/*Hmisc*
@@ -15,7 +16,7 @@ test/*
 *.odp
 _book/*
 _bookdown_files/*
-*.html
+0*
 s1.tex
 01-complete.md
 *.tex
@@ -33,3 +34,4 @@ unap-marilly*
 unap8*
 *.txt
 abstract*
+README.html
